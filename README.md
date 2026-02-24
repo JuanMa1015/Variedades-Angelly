@@ -1,24 +1,36 @@
 # Variedades-Angelly - Sistema de Gestión Financiera y Ventas
 
-Sistema desarrollado para la gestión de inventarios, control de ventas (contado y crédito) y seguimiento de gastos para pequeños negocios.
+Este proyecto es una solución integral para la digitalización de tiendas de barrio, enfocado en resolver el problema del control de "fiados", inventarios y utilidades reales. Desarrollado bajo principios de **Arquitectura Limpia** y **POO Avanzada**.
 
-## 🚀 Objetivo del Proyecto
-Digitalizar el "libro de cuentas" tradicional, permitiendo un control riguroso sobre los saldos de clientes ("fiado"), la utilidad real del negocio y el stock de productos.
+## 🚀 Objetivo de la Entrega
+Implementar la capa de dominio del sistema utilizando Python 3.11+, aplicando conceptos avanzados como encapsulamiento, herencia, polimorfismo y validaciones robustas.
 
 ## 🛠️ Stack Tecnológico
-- **Backend:** Python 3.10+ con FastAPI.
-- **Frontend:** React.js (Vite).
-- **Lógica de Dominio:** Programación Orientada a Objetos (POO) avanzada.
+- **Lenguaje:** Python 3.11+
+- **Backend:** FastAPI (Próxima fase)
+- **Frontend:** React + Vite (Próxima fase)
+- **Herramientas de Calidad:** Black (PEP 8), Type Hints.
 
-## 📂 Estructura del Proyecto (Capa de Dominio)
-El corazón del sistema se encuentra en `backend/src/domain/`, siguiendo principios de arquitectura limpia:
-- `usuario.py`: Gestión de Admin y Trabajadores.
-- `cliente.py`: Gestión de deudores y límites de crédito.
-- `producto.py`: Control de inventario y precios.
-- `transaccion.py`: Lógica de ventas y abonos (Clases abstractas).
+## 📂 Estructura del Dominio (`src/domain/`)
+La lógica de negocio está organizada de la siguiente manera:
+- **`usuario.py`**: Gestión de roles (Admin/Trabajador) con atributos inmutables.
+- **`producto.py`**: Control de inventario y congelación de precios en ventas.
+- **`cliente.py`**: Gestión de deudas y abonos (Cálculo dinámico de saldo).
+- **`transaccion.py`**: Clase abstracta y polimorfismo para Ventas y Gastos.
+- **`enums.py`**: Tipos seguros para evitar errores de integridad.
 
-## ⚙️ Instalación y Ejecución
+## 🧠 Conceptos POO Aplicados
+1. **Encapsulamiento:** Uso de atributos privados (`_atributo`) y `@property` para validar datos (ej: impedir precios negativos o emails inválidos).
+2. **Abstracción:** Implementación de la clase `Transaccion(ABC)` para estandarizar movimientos financieros.
+3. **Polimorfismo:** Procesamiento uniforme de distintas transacciones mediante el método `obtener_total()`.
+4. **Herencia:** Especialización de usuarios y tipos de transacciones.
+
+## ⚙️ Instalación y Pruebas
 1. Clonar el repositorio.
 2. Crear entorno virtual: `python -m venv venv`.
-3. Activar entorno: `source venv/bin/activate` (Linux/Mac) o `venv\Scripts\activate` (Windows).
+3. Activar entorno: `.\venv\Scripts\Activate.ps1` (Windows).
 4. Instalar dependencias: `pip install -r requirements.txt`.
+5. Ejecutar test de dominio:
+   ```powershell
+   $env:PYTHONPATH = "."
+   python test_dominio.py
