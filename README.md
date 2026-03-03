@@ -1,8 +1,8 @@
 # Variedades-Angelly - Sistema de Gestión Financiera y Ventas
 
-Juan Manuel Londoño González
-Gilar Valentina Castaño Uran 
-Danilo Tangarife Bustamante
+### Juan Manuel Londoño González
+### Gilar Valentina Castaño Uran 
+### Danilo Tangarife Bustamante
 
 Este proyecto es una solución integral para la digitalización de tiendas de barrio, enfocado en resolver el problema del control de "fiados", inventarios y utilidades reales. Desarrollado bajo principios de **Arquitectura Limpia** y **POO Avanzada**.
 
