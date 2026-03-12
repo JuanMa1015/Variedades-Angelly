@@ -1,7 +1,12 @@
-black
-autopep8
-pytest
+pytest==8.3.5
+pytest-cov==6.0.0
+behave==1.2.6
+sqlalchemy==2.0.39
 fastapi==0.109.0
 uvicorn==0.27.0
-black==24.1.1
 typing-extensions==4.9.0
+alembic==1.14.1
+psycopg[binary]==3.2.9
+python-dotenv==1.0.1
+black==24.1.1
+autopep8==2.3.2

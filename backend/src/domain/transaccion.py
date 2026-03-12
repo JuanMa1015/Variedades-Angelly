@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import List
-from .producto import ItemVenta
+
 from .enums import CategoriaGasto
+from .producto import ItemVenta
 
 
 class Transaccion(ABC):
@@ -14,24 +17,76 @@ class Transaccion(ABC):
 
     @abstractmethod
     def obtener_total(self) -> float:
-        """Método polimórfico para obtener el valor de la operación."""
-        pass
+        """Metodo polimorfico para obtener el valor de la operacion."""
+
+
+class DetalleVenta:
+    """Representa una linea del comprobante de venta."""
+
+    def __init__(
+        self,
+        producto_id: int,
+        nombre_producto: str,
+        cantidad: int,
+        precio_unitario: float,
+    ) -> None:
+        if producto_id <= 0:
+            raise ValueError("producto_id invalido")
+        if not nombre_producto.strip():
+            raise ValueError("El nombre del producto es obligatorio")
+        if cantidad <= 0:
+            raise ValueError("La cantidad debe ser mayor a cero")
+        if precio_unitario < 0:
+            raise ValueError("El precio unitario no puede ser negativo")
+
+        self.producto_id = producto_id
+        self.nombre_producto = nombre_producto.strip()
+        self.cantidad = cantidad
+        self.precio_unitario = float(precio_unitario)
+
+    @property
+    def subtotal(self) -> float:
+        """Total parcial de la linea."""
+        return self.cantidad * self.precio_unitario
 
 
 class Venta(Transaccion):
-    """Registro de venta de productos."""
+    """Entidad de dominio para una venta con sus detalles."""
 
-    def __init__(self, concepto: str, es_credito: bool = False) -> None:
+    def __init__(
+        self,
+        concepto: str = "Venta",
+        es_credito: bool = False,
+        *,
+        cliente_id: int | None = None,
+        venta_id: int | None = None,
+        es_fiado: bool | None = None,
+    ) -> None:
         super().__init__(concepto)
+        self.id = venta_id
+        self.cliente_id = cliente_id
+        self.es_fiado = es_credito if es_fiado is None else es_fiado
+        # Retrocompatibilidad con pruebas existentes de ItemVenta.
         self.items: List[ItemVenta] = []
-        self.es_credito = es_credito
+        self.detalles: List[DetalleVenta] = []
+
+    @property
+    def es_credito(self) -> bool:
+        """Alias retrocompatible para el flujo de fiados."""
+        return self.es_fiado
 
     def agregar_item(self, item: ItemVenta) -> None:
-        """Añade un producto al carrito de la venta."""
+        """Mantiene compatibilidad con las pruebas unitarias existentes."""
         self.items.append(item)
 
+    def agregar_detalle(self, detalle: DetalleVenta) -> None:
+        """Agrega una linea formal al comprobante de venta."""
+        self.detalles.append(detalle)
+
     def obtener_total(self) -> float:
-        """Suma el subtotal de todos los items."""
+        """Suma subtotales de detalles o items segun el flujo usado."""
+        if self.detalles:
+            return sum(detalle.subtotal for detalle in self.detalles)
         return sum(item.subtotal() for item in self.items)
 
 

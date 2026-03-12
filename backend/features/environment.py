@@ -1,4 +1,4 @@
-"""Configuracion global de Behave para pruebas de la tienda."""
+"""Configuracion global de Behave para el proyecto backend."""
 
 from __future__ import annotations
 
@@ -7,11 +7,7 @@ from pathlib import Path
 
 
 def _ensure_backend_path() -> Path:
-    """Inserta el directorio backend en ``sys.path`` si no existe.
-
-    Returns:
-        Path: Ruta absoluta al directorio backend.
-    """
+    """Inserta el directorio backend en ``sys.path`` si no existe."""
     backend_root = Path(__file__).resolve().parents[1]
     backend_root_path = str(backend_root)
 
@@ -26,9 +22,5 @@ BACKEND_ROOT = _ensure_backend_path()
 
 
 def before_all(context) -> None:
-    """Prepara el path para importar modulos de src en todos los escenarios.
-
-    Args:
-        context: Contexto global de Behave.
-    """
+    """Prepara el path para importar modulos de src en todos los escenarios."""
     context.backend_root = BACKEND_ROOT
