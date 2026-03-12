@@ -1,0 +1,20 @@
+[run]
+source =
+    src/domain
+omit =
+    tests/*
+    features/*
+    src/infrastructure/*
+    src/main.py
+    */__pycache__/*
+
+[report]
+omit =
+    tests/*
+    features/*
+    src/infrastructure/*
+    src/main.py
+    */__pycache__/*
+exclude_lines =
+    pragma: no cover
+    if __name__ == "__main__":

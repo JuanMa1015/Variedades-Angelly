@@ -2,7 +2,15 @@
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
 import pytest
+
+# Permite importar el paquete src incluso cuando pytest se ejecuta como script.
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
 
 from src.domain.cliente import Cliente
 from src.domain.enums import RolUsuario
@@ -26,7 +34,7 @@ def usuario_ejemplo() -> Usuario:
     )
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def producto_ejemplo() -> Producto:
     """Crea un producto base para pruebas de venta e inventario.
 
@@ -38,6 +46,16 @@ def producto_ejemplo() -> Producto:
         precio_costo=2800.0,
         precio_venta=3500.0,
         stock=40,
+    )
+
+
+@pytest.fixture(scope="function")
+def cliente_ejemplo() -> Cliente:
+    """Construye un cliente valido para pruebas unitarias de dominio."""
+    return Cliente(
+        nombre="Dona Marta",
+        documento="1000000001",
+        limite_credito=60000.0,
     )
 
 
@@ -57,7 +75,7 @@ def venta_ejemplo(producto_ejemplo: Producto) -> Venta:
 
 
 @pytest.fixture(scope="function")
-def cliente_con_deuda(venta_ejemplo: Venta) -> Cliente:
+def cliente_con_deuda(cliente_ejemplo: Cliente, venta_ejemplo: Venta) -> Cliente:
     """Prepara un cliente con una deuda inicial por venta fiada.
 
     Args:
@@ -66,6 +84,6 @@ def cliente_con_deuda(venta_ejemplo: Venta) -> Cliente:
     Returns:
         Cliente: Cliente con deuda activa para pruebas de abonos.
     """
-    cliente = Cliente(nombre="Dona Marta", limite_credito=60000.0)
+    cliente = cliente_ejemplo
     cliente.registrar_venta_credito(venta_ejemplo)
     return cliente
