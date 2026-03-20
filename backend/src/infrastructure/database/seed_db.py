@@ -5,29 +5,22 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
-from src.domain.enums import RolUsuario
+from src.auth.bootstrap import ensure_default_auth_users
 from src.infrastructure.database.connection import SessionLocal
-from src.infrastructure.database.models import ClienteModel, ProductoModel, UsuarioModel
+from src.infrastructure.database.models import (
+    ClienteFiadoTiendaModel,
+    ClienteFidelizacionModel,
+    ClienteModel,
+    ProductoModel,
+    ProveedorModel,
+)
 
 
 def seed_db() -> None:
     """Inserta registros base de usuario y cliente para pruebas manuales."""
     session = SessionLocal()
     try:
-        usuario_existente = session.execute(
-            select(UsuarioModel).where(UsuarioModel.username == "admin"),
-        ).scalar_one_or_none()
-
-        if usuario_existente is None:
-            session.add(
-                UsuarioModel(
-                    username="admin",
-                    email="admin@angelly.com",
-                    rol=RolUsuario.ADMIN,
-                    nombre_completo="Administrador General",
-                    activo=True,
-                ),
-            )
+        ensure_default_auth_users(session)
 
         cliente_existente = session.execute(
             select(ClienteModel).where(ClienteModel.nombre == "Cliente Test"),
@@ -38,12 +31,16 @@ def seed_db() -> None:
                 ClienteModel(
                     nombre="Cliente Test",
                     documento="1000000000",
+                    telefono_whatsapp="3001112233",
                     limite_credito=60000.0,
                     deuda_total=0.0,
                 ),
             )
         elif not cliente_existente.documento:
             cliente_existente.documento = "1000000000"
+
+        if cliente_existente is not None and not cliente_existente.telefono_whatsapp:
+            cliente_existente.telefono_whatsapp = "3001112233"
 
         if cliente_existente is not None and cliente_existente.deuda_total < 0:
             cliente_existente.deuda_total = 0.0
@@ -75,6 +72,92 @@ def seed_db() -> None:
                     stock_minimo=10,
                 ),
             )
+
+        clientes_fidelizacion_seed = (
+            {
+                "nombre": "Lina Rojas",
+                "telefono_whatsapp": "3001234567",
+                "puntos_acumulados": 120,
+            },
+            {
+                "nombre": "Camilo Perez",
+                "telefono_whatsapp": "3012345678",
+                "puntos_acumulados": 65,
+            },
+            {
+                "nombre": "Monica Salazar",
+                "telefono_whatsapp": "3023456789",
+                "puntos_acumulados": 180,
+            },
+        )
+
+        for item in clientes_fidelizacion_seed:
+            existente = session.execute(
+                select(ClienteFidelizacionModel).where(
+                    ClienteFidelizacionModel.telefono_whatsapp
+                    == item["telefono_whatsapp"],
+                ),
+            ).scalar_one_or_none()
+            if existente is None:
+                session.add(
+                    ClienteFidelizacionModel(
+                        nombre=item["nombre"],
+                        telefono_whatsapp=item["telefono_whatsapp"],
+                        puntos_acumulados=item["puntos_acumulados"],
+                    ),
+                )
+
+        clientes_fiado_tienda_seed = (
+            {
+                "nombre": "Fiado Tienda 1",
+                "telefono_whatsapp": "3008889900",
+            },
+            {
+                "nombre": "Fiado Tienda 2",
+                "telefono_whatsapp": "3017776655",
+            },
+        )
+
+        for item in clientes_fiado_tienda_seed:
+            existente = session.execute(
+                select(ClienteFiadoTiendaModel).where(
+                    ClienteFiadoTiendaModel.nombre == item["nombre"],
+                ),
+            ).scalar_one_or_none()
+            if existente is None:
+                session.add(
+                    ClienteFiadoTiendaModel(
+                        nombre=item["nombre"],
+                        telefono_whatsapp=item["telefono_whatsapp"],
+                    ),
+                )
+
+        proveedores_seed = (
+            {
+                "nombre": "Distribuciones La Central",
+                "contacto": "Diana",
+                "telefono": "3101002000",
+            },
+            {
+                "nombre": "Mayorista El Bodegon",
+                "contacto": "Carlos",
+                "telefono": "3112003000",
+            },
+        )
+
+        for item in proveedores_seed:
+            existente = session.execute(
+                select(ProveedorModel).where(ProveedorModel.nombre == item["nombre"]),
+            ).scalar_one_or_none()
+            if existente is None:
+                session.add(
+                    ProveedorModel(
+                        nombre=item["nombre"],
+                        contacto=item["contacto"],
+                        telefono=item["telefono"],
+                        activo=True,
+                    ),
+                )
 
         session.commit()
         print("Datos semilla aplicados correctamente.")

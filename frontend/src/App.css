@@ -1,3 +1,17 @@
+/* Professional Styling */
+:root {
+  --color-rosewood: #5f3245;
+  --color-blush-100: #ffe5ec;
+  --color-blush-200: #ffd1dc;
+  --color-gold-100: #f8e5ab;
+  --color-bg-light: #f9fafb;
+}
+
+html, body {
+  background-color: #f9fafb;
+  color: #111827;
+}
+
 .dashboard-title {
   font-family: 'Playfair Display', serif;
 }
@@ -13,3 +27,4 @@
   outline: none;
   box-shadow: 0 0 0 3px rgba(244, 114, 182, 0.25);
 }
+

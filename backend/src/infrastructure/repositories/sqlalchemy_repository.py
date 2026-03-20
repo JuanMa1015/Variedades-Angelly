@@ -9,6 +9,7 @@ from typing import Any, Generic, TypeVar, cast
 from sqlalchemy.orm import Session
 
 from src.domain.cliente import Cliente
+from src.domain.enums import RolUsuario
 from src.domain.producto import Producto
 from src.domain.repositories.base_repository import BaseRepository
 from src.domain.repositories.cliente_repository import ClienteRepository
@@ -159,24 +160,23 @@ class SqlAlchemyUsuarioRepository(
         super().__init__(db=db, model_class=UsuarioModel)
 
     def _to_model(self, entity: Usuario) -> UsuarioModel:
+        rol_normalizado = "admin" if entity.rol is RolUsuario.ADMIN else "vendedor"
         return UsuarioModel(
             username=entity.username,
-            email=entity.email,
-            rol=entity.rol,
-            nombre_completo=entity.nombre_completo,
-            activo=entity.activo,
-            fecha_registro=entity.fecha_registro,
+            password_hash=getattr(entity, "password_hash", ""),
+            rol=rol_normalizado,
         )
 
     def _to_domain(self, model: UsuarioModel) -> Usuario:
+        rol = RolUsuario.ADMIN if model.rol == "admin" else RolUsuario.TRABAJADOR
         usuario = Usuario(
             username=model.username,
-            email=model.email,
-            rol=model.rol,
-            nombre_completo=model.nombre_completo,
+            email=f"{model.username}@local.angelly",
+            rol=rol,
+            nombre_completo=None,
         )
-        usuario.activo = model.activo
-        usuario.fecha_registro = model.fecha_registro or datetime.utcnow()
+        usuario.activo = True
+        usuario.fecha_registro = datetime.utcnow()
         return usuario
 
     def _find_model_for_update(self, entity: Usuario) -> UsuarioModel | None:
@@ -187,11 +187,7 @@ class SqlAlchemyUsuarioRepository(
         )
 
     def _apply_domain_updates(self, model: UsuarioModel, entity: Usuario) -> None:
-        model.email = entity.email
-        model.rol = entity.rol
-        model.nombre_completo = entity.nombre_completo
-        model.activo = entity.activo
-        model.fecha_registro = entity.fecha_registro
+        model.rol = "admin" if entity.rol is RolUsuario.ADMIN else "vendedor"
 
     def get_by_username(self, username: str) -> Usuario | None:
         """Busca usuario por username unico y retorna None si no existe."""
@@ -205,11 +201,8 @@ class SqlAlchemyUsuarioRepository(
         return self._to_domain(model)
 
     def get_by_email(self, email: str) -> Usuario | None:
-        """Busca usuario por email y retorna None si no existe."""
-        model = self.db.query(UsuarioModel).filter(UsuarioModel.email == email).first()
-        if model is None:
-            return None
-        return self._to_domain(model)
+        """Compatibilidad legacy: el esquema auth actual no persiste email."""
+        return None
 
 
 class SqlAlchemyProductoRepository(
