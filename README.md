@@ -9,7 +9,7 @@
 ## Gilar Valentina Castaño
 
 
-## 🎯 Visión General
+## Visión General
 
 Variedades-Angelly es una aplicación full-stack diseñada para pequeños negocios de barrio. Integra:
 - **Punto de Venta (POS)** con soporte para cartera de crédito
@@ -21,7 +21,7 @@ Variedades-Angelly es una aplicación full-stack diseñada para pequeños negoci
 
 ---
 
-## 🛠 Stack Tecnológico
+## Stack Tecnológico
 
 ### Backend
 - **Framework**: FastAPI 0.135.2
@@ -44,7 +44,7 @@ Variedades-Angelly es una aplicación full-stack diseñada para pequeños negoci
 
 ---
 
-## 💾 Variables de Entorno
+## Variables de Entorno
 
 Crear archivo `.env` en la raíz del proyecto con:
 
@@ -64,7 +64,7 @@ AUTH_SELLER_USERNAME=vendedor1
 AUTH_SELLER_PASSWORD=ventas123
 ```
 
-**⚠️ Notas Críticas:**
+**Notas Críticas:**
 - `JWT_SECRET_KEY` es **obligatorio**; la API no inicia sin él
 - Las credenciales se crean automáticamente en el primer inicio si `AUTH_BOOTSTRAP_ENABLED=true`
 - Las credenciales demo solo se muestran en frontend en `APP_ENV=development`
@@ -72,7 +72,7 @@ AUTH_SELLER_PASSWORD=ventas123
 
 ---
 
-## 🚀 Instalación
+## Instalación
 
 ### Requisitos Previos
 - Python 3.10+ (verificar: `python --version`)
@@ -113,7 +113,7 @@ npm install
 
 ---
 
-## ⚡ Ejecución Local
+## Ejecución Local
 
 ### Terminal 1: Backend
 ```powershell
@@ -146,7 +146,7 @@ npm run dev
 
 ---
 
-## 📁 Estructura del Proyecto
+## Estructura del Proyecto
 
 ```
 Variedades-Angelly/
@@ -216,7 +216,7 @@ Variedades-Angelly/
 
 ---
 
-## 🔐 Autenticación
+## Autenticación
 
 ### Flujo JWT
 
@@ -267,9 +267,9 @@ Variedades-Angelly/
 
 ---
 
-## 📡 Documentación de APIs
+## Documentación de APIs
 
-### 1️⃣ Autenticación
+### 1. Autenticación
 
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
@@ -287,7 +287,7 @@ curl -X POST http://127.0.0.1:8000/api/auth/login \
 
 ---
 
-### 2️⃣ Productos (Inventario)
+### 2. Productos (Inventario)
 
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
@@ -315,7 +315,7 @@ curl -X POST http://127.0.0.1:8000/api/productos \
 
 ---
 
-### 3️⃣ Clientes & Cartera
+### 3. Clientes & Cartera
 
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
@@ -330,7 +330,7 @@ curl -X POST http://127.0.0.1:8000/api/productos \
 
 ---
 
-### 4️⃣ Ventas & Fidelización
+### 4. Ventas & Fidelización
 
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
@@ -343,7 +343,7 @@ curl -X POST http://127.0.0.1:8000/api/productos \
 
 ---
 
-### 5️⃣ Operaciones (Proveedores & Gastos)
+### 5. Operaciones (Proveedores & Gastos)
 
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
@@ -358,7 +358,7 @@ curl -X POST http://127.0.0.1:8000/api/productos \
 
 ---
 
-### 6️⃣ Auditoría
+### 6. Auditoría
 
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
@@ -369,7 +369,7 @@ curl -X POST http://127.0.0.1:8000/api/productos \
 
 ---
 
-## 🧪 Pruebas
+## Pruebas
 
 ### Unit Tests (pytest)
 ```powershell
@@ -400,12 +400,12 @@ behave backend/features/clientes.feature
 ```
 
 **Estados Esperados:**
-- ✅ pytest: 37/37 tests pasando
-- ✅ behave: 12/12 escenarios pasando
+- [OK] pytest: 37/37 tests pasando
+- [OK] behave: 12/12 escenarios pasando
 
 ---
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### 1. "RuntimeError: JWT_SECRET_KEY no está definido"
 **Causa**: Variable de entorno faltante
@@ -460,7 +460,7 @@ python -m uvicorn src.main:app --reload
 
 ---
 
-## 🛣 Guía de Desarrollo
+## Guía de Desarrollo
 
 ### Estructura de commit
 
@@ -516,16 +516,16 @@ app.include_router(reportes_router)
 3. Crear tests en `backend/tests/test_reportes.py`
 
 
-## 📊 Status del Proyecto
+## Status del Proyecto
 
 | Componente | Estado | Ver |
 |-----------|--------|-----|
-| Backend API | ✅ Activo | [Swagger](http://127.0.0.1:8000/docs) |
-| Frontend | ✅ Activo | http://localhost:5173 |
-| Tests Unit | ✅ 37/37 | `pytest` |
-| Tests BDD | ✅ 12/12 | `behave` |
-| Auth | ✅ JWT + RBAC | `.env` |
-| DB | ✅ PostgreSQL | Neon Cloud |
+| Backend API | [OK] Activo | [Swagger](http://127.0.0.1:8000/docs) |
+| Frontend | [OK] Activo | http://localhost:5173 |
+| Tests Unit | [OK] 37/37 | `pytest` |
+| Tests BDD | [OK] 12/12 | `behave` |
+| Auth | [OK] JWT + RBAC | `.env` |
+| DB | [OK] PostgreSQL | Neon Cloud |
 
 ---
 
