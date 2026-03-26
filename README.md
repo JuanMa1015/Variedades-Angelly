@@ -540,7 +540,17 @@ app.include_router(reportes_router)
 
 ---
 
-## 📞 Contacto & Soporte
+## � Equipo
+
+| Nombre | Rol |
+|--------|-----|
+| Juan Manuel Londoño Gonzalez | Full-Stack Developer |
+| Danilo Tangarife Bustamante | Full-Stack Developer |
+| Gilar Valentina Castaño | Full-Stack Developer |
+
+---
+
+## �📞 Contacto & Soporte
 Para issues o sugerencias, abrir GitHub issue con contexto completo.
 
 ---
