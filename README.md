@@ -3,9 +3,9 @@
 > Sistema integrado para gestión de ventas, cartera de crédito, inventario, proveedores, gastos operacionales, programa de fidelización y auditoría en tiendas de barrio.
 
 ## � Equipo
-| Juan Manuel Londoño Gonzalez | Full-Stack Developer |
-| Danilo Tangarife Bustamante | Full-Stack Developer |
-| Gilar Valentina Castaño | Full-Stack Developer |
+## Juan Manuel Londoño Gonzalez 
+## Danilo Tangarife Bustamante
+## Gilar Valentina Castaño
 
 
 ## 🎯 Visión General
