@@ -2,20 +2,11 @@
 
 > Sistema integrado para gestión de ventas, cartera de crédito, inventario, proveedores, gastos operacionales, programa de fidelización y auditoría en tiendas de barrio.
 
-## 📋 Tabla de Contenidos
-- [Visión General](#visión-general)
-- [Stack Tecnológico](#stack-tecnológico)
-- [Instalación](#instalación)
-- [Ejecución Local](#ejecución-local)
-- [Estructura del Proyecto](#estructura-del-proyecto)
-- [Autenticación](#autenticación)
-- [Documentación de APIs](#documentación-de-apis)
-- [Roles y Permisos](#roles-y-permisos)
-- [Pruebas](#pruebas)
-- [Troubleshooting](#troubleshooting)
-- [Contribuir](#contribuir)
+## � Equipo
+| Juan Manuel Londoño Gonzalez | Full-Stack Developer |
+| Danilo Tangarife Bustamante | Full-Stack Developer |
+| Gilar Valentina Castaño | Full-Stack Developer |
 
----
 
 ## 🎯 Visión General
 
@@ -523,9 +514,6 @@ app.include_router(reportes_router)
 
 3. Crear tests en `backend/tests/test_reportes.py`
 
-4. Commit y PR
-
----
 
 ## 📊 Status del Proyecto
 
@@ -540,19 +528,6 @@ app.include_router(reportes_router)
 
 ---
 
-## � Equipo
 
-| Nombre | Rol |
-|--------|-----|
-| Juan Manuel Londoño Gonzalez | Full-Stack Developer |
-| Danilo Tangarife Bustamante | Full-Stack Developer |
-| Gilar Valentina Castaño | Full-Stack Developer |
 
----
 
-## �📞 Contacto & Soporte
-Para issues o sugerencias, abrir GitHub issue con contexto completo.
-
----
-
-**Última actualización**: Marzo 2026 | Versión: 1.0
