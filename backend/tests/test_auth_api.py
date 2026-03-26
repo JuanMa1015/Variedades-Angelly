@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Generator
+import os
 
 import pytest
 from fastapi.testclient import TestClient
@@ -26,6 +27,14 @@ from src.main import app
 @pytest.fixture()
 def auth_client() -> Generator[tuple[TestClient, sessionmaker[Session]], None, None]:
     """Entrega cliente API con BD SQLite aislada para pruebas auth."""
+    os.environ["APP_ENV"] = "test"
+    os.environ["AUTH_BOOTSTRAP_ENABLED"] = "true"
+    os.environ["AUTH_ADMIN_USERNAME"] = "angelly_admin"
+    os.environ["AUTH_ADMIN_PASSWORD"] = "cambiame123"
+    os.environ["AUTH_SELLER_USERNAME"] = "vendedor1"
+    os.environ["AUTH_SELLER_PASSWORD"] = "ventas123"
+    os.environ["JWT_SECRET_KEY"] = "test-jwt-secret-key-with-32-bytes-minimum"
+
     engine = create_engine(
         "sqlite+pysqlite://",
         connect_args={"check_same_thread": False},

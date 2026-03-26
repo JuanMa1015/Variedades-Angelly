@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -10,6 +10,11 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 class Base(DeclarativeBase):
     """Base declarativa compartida por todos los modelos ORM."""
+
+
+def _utcnow_naive() -> datetime:
+    """Retorna fecha UTC naive para columnas DateTime(timezone=False)."""
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class UsuarioModel(Base):
@@ -92,7 +97,7 @@ class VentaModel(Base):
     fecha: Mapped[datetime] = mapped_column(
         DateTime(timezone=False),
         nullable=False,
-        default=datetime.utcnow,
+        default=_utcnow_naive,
     )
 
 
@@ -137,7 +142,7 @@ class PedidoProveedorModel(Base):
     fecha_creacion: Mapped[datetime] = mapped_column(
         DateTime(timezone=False),
         nullable=False,
-        default=datetime.utcnow,
+        default=_utcnow_naive,
     )
     fecha_resolucion: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=False),
@@ -157,7 +162,7 @@ class GastoModel(Base):
     fecha: Mapped[datetime] = mapped_column(
         DateTime(timezone=False),
         nullable=False,
-        default=datetime.utcnow,
+        default=_utcnow_naive,
     )
     registrado_por: Mapped[str] = mapped_column(String(50), nullable=False)
 
@@ -175,7 +180,7 @@ class AbonoCarteraModel(Base):
     fecha: Mapped[datetime] = mapped_column(
         DateTime(timezone=False),
         nullable=False,
-        default=datetime.utcnow,
+        default=_utcnow_naive,
     )
 
 
@@ -194,5 +199,5 @@ class AuditoriaModel(Base):
     fecha: Mapped[datetime] = mapped_column(
         DateTime(timezone=False),
         nullable=False,
-        default=datetime.utcnow,
+        default=_utcnow_naive,
     )
