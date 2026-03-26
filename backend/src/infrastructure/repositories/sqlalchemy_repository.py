@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Generic, TypeVar, cast
 
 from sqlalchemy.orm import Session
@@ -176,7 +176,7 @@ class SqlAlchemyUsuarioRepository(
             nombre_completo=None,
         )
         usuario.activo = True
-        usuario.fecha_registro = datetime.utcnow()
+        usuario.fecha_registro = datetime.now(UTC)
         return usuario
 
     def _find_model_for_update(self, entity: Usuario) -> UsuarioModel | None:
