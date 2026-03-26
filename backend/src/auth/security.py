@@ -14,8 +14,13 @@ DEFAULT_JWT_EXPIRE_MINUTES = 60 * 8
 
 
 def _jwt_secret_key() -> str:
-    """Retorna la llave JWT desde entorno con fallback de desarrollo."""
-    return os.getenv("JWT_SECRET_KEY", "angelly-dev-secret-change-me")
+    """Retorna la llave JWT desde entorno y falla si no existe."""
+    secret = os.getenv("JWT_SECRET_KEY", "").strip()
+    if not secret:
+        raise RuntimeError(
+            "JWT_SECRET_KEY no esta definido. Configuralo antes de iniciar la API.",
+        )
+    return secret
 
 
 def token_expire_minutes() -> int:
