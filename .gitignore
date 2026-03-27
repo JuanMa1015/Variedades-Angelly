@@ -1,0 +1,25 @@
+# Python caches and bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+backend/.venv/
+
+# Tool caches
+.pytest_cache/
+.mypy_cache/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.vscode/*.log
+
+# Environment variables (secrets, credentials)
+.env
+backend/.env
+frontend/.env
+env.local
+*.env.local
