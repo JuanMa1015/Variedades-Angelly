@@ -46,7 +46,19 @@ Variedades-Angelly es una aplicación full-stack diseñada para pequeños negoci
 
 ## Variables de Entorno
 
-Crear archivo `.env` en la raíz del proyecto con:
+Configurar archivos separados por capa. Usar los templates de ejemplo como base:
+
+```powershell
+# Backend
+Copy-Item backend\.env.example backend\.env
+
+# Frontend
+Copy-Item frontend\.env.example frontend\.env
+```
+
+Luego completar con valores reales:
+
+### Backend: [backend/.env](backend/.env)
 
 ```env
 # Base de Datos
@@ -64,10 +76,16 @@ AUTH_SELLER_USERNAME=vendedor1
 AUTH_SELLER_PASSWORD=ventas123
 ```
 
+### Frontend: [frontend/.env](frontend/.env)
+
+```env
+VITE_API_URL=http://127.0.0.1:8000
+```
+
 **Notas Críticas:**
 - `JWT_SECRET_KEY` es **obligatorio**; la API no inicia sin él
 - Las credenciales se crean automáticamente en el primer inicio si `AUTH_BOOTSTRAP_ENABLED=true`
-- Las credenciales demo solo se muestran en frontend en `APP_ENV=development`
+- Las credenciales demo solo se muestran en frontend en modo desarrollo
 - Cambiar `JWT_SECRET_KEY` invalidará todos los tokens existentes
 
 ---
