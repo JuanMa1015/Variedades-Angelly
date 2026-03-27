@@ -13,12 +13,12 @@ from sqlalchemy.orm import Session, sessionmaker
 
 
 def _resolve_dotenv_path() -> Path | None:
-    """Busca un archivo .env en backend o en la raiz del proyecto."""
+    """Busca .env priorizando backend y luego la raiz del proyecto."""
     current_file = Path(__file__).resolve()
     project_root = current_file.parents[4]
     backend_root = current_file.parents[3]
 
-    for candidate in (project_root / ".env", backend_root / ".env"):
+    for candidate in (backend_root / ".env", project_root / ".env"):
         if candidate.exists():
             return candidate
     return None
