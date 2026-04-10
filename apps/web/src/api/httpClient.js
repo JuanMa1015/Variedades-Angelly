@@ -20,7 +20,7 @@ const buildUrl = (endpoint) => {
 const notifyUnauthorized = () => {
   try {
     window.dispatchEvent(new CustomEvent('auth:unauthorized'));
-  } catch (_error) {
+  } catch {
     // No-op for non-browser contexts.
   }
 };

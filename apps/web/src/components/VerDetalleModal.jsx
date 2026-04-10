@@ -37,7 +37,7 @@ const VerDetalleModal = ({ cliente, isOpen, onClose }) => {
 
         setMovimientos(Array.isArray(payload.data) ? payload.data : []);
         setTotalPages(Math.max(1, Number(payload.total_pages ?? 1)));
-      } catch (err) {
+      } catch {
         if (controller.signal.aborted) return;
         setError('No fue posible cargar los movimientos del cliente');
         setMovimientos([]);
