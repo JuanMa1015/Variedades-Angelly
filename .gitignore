@@ -31,3 +31,7 @@ env.local
 node_modules/
 dist/
 .vite/
+
+.env
+.coverage
+*.ini
