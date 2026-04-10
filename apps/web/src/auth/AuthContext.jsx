@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { apiPost } from '../api/httpClient';
 
 const TOKEN_STORAGE_KEY = 'angelly.auth.token';
@@ -15,7 +16,7 @@ const parseTokenPayload = (token) => {
 
     const decoded = atob(padded);
     return JSON.parse(decoded);
-  } catch (error) {
+  } catch {
     return null;
   }
 };
@@ -47,19 +48,19 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [bootstrapped, setBootstrapped] = useState(false);
 
-  const clearAuth = () => {
+  const clearAuth = useCallback(() => {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
     localStorage.removeItem(USER_STORAGE_KEY);
     setToken(null);
     setUser(null);
-  };
+  }, []);
 
-  const persistAuth = (nextToken, nextUser) => {
+  const persistAuth = useCallback((nextToken, nextUser) => {
     localStorage.setItem(TOKEN_STORAGE_KEY, nextToken);
     localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(nextUser));
     setToken(nextToken);
     setUser(nextUser);
-  };
+  }, []);
 
   useEffect(() => {
     const storedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
@@ -81,12 +82,12 @@ export const AuthProvider = ({ children }) => {
 
       setToken(storedToken);
       setUser(parsedUser);
-    } catch (error) {
+    } catch {
       clearAuth();
     } finally {
       setBootstrapped(true);
     }
-  }, []);
+  }, [clearAuth]);
 
   useEffect(() => {
     const handleUnauthorized = () => {
@@ -95,9 +96,9 @@ export const AuthProvider = ({ children }) => {
 
     window.addEventListener('auth:unauthorized', handleUnauthorized);
     return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
-  }, []);
+  }, [clearAuth]);
 
-  const login = async ({ username, password }) => {
+  const login = useCallback(async ({ username, password }) => {
     const payload = await apiPost('/api/auth/login', { username, password }, { includeAuth: false });
 
     const nextUser = normalizeUser({
@@ -111,11 +112,11 @@ export const AuthProvider = ({ children }) => {
 
     persistAuth(payload.access_token, nextUser);
     return nextUser;
-  };
+  }, [persistAuth]);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     clearAuth();
-  };
+  }, [clearAuth]);
 
   const value = useMemo(
     () => ({
@@ -128,7 +129,7 @@ export const AuthProvider = ({ children }) => {
       login,
       logout,
     }),
-    [token, user, bootstrapped],
+    [token, user, bootstrapped, login, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -37,7 +37,6 @@ const Ventas = () => {
   const { token } = useAuth();
 
   const [productos, setProductos] = useState([]);
-  const [ventas, setVentas] = useState([]);
   const [clientesTienda, setClientesTienda] = useState([]);
 
   const [loading, setLoading] = useState(true);
@@ -70,23 +69,17 @@ const Ventas = () => {
           errorMessage: 'No fue posible cargar productos',
         }),
         fetchJson({
-          endpoint: '/api/ventas',
-          signal,
-          errorMessage: 'No fue posible cargar ventas',
-        }),
-        fetchJson({
           endpoint: '/api/clientes/tienda-fiado',
           signal,
           errorMessage: 'No fue posible cargar clientes de fiado tienda',
         }),
       ];
 
-      const [productosPayload, ventasPayload, tiendaPayload] = await Promise.all(requestList);
+      const [productosPayload, tiendaPayload] = await Promise.all(requestList);
 
       if (signal?.aborted) return;
 
       setProductos(Array.isArray(productosPayload) ? productosPayload : []);
-      setVentas(Array.isArray(ventasPayload) ? ventasPayload : []);
       setClientesTienda(Array.isArray(tiendaPayload) ? tiendaPayload : []);
     },
     [token],
@@ -95,7 +88,6 @@ const Ventas = () => {
   useEffect(() => {
     if (!token) {
       setProductos([]);
-      setVentas([]);
       setClientesTienda([]);
       setLoading(false);
       return;

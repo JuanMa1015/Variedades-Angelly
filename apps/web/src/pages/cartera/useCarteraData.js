@@ -182,7 +182,7 @@ export const useCarteraData = () => {
         setProductosCartera(Array.isArray(payload.productosCartera) ? payload.productosCartera : []);
         setDashboardVentas(typeof payload.dashboardVentas === 'object' && payload.dashboardVentas ? payload.dashboardVentas : emptyDashboardResumen);
         setResumenCartera(typeof payload.resumenCartera === 'object' && payload.resumenCartera ? payload.resumenCartera : emptyCarteraResumen);
-      } catch (_err) {
+      } catch {
         if (controller.signal.aborted) return;
         setError('No fue posible cargar los clientes');
         setClientes([]);
@@ -192,8 +192,9 @@ export const useCarteraData = () => {
         setResumenCartera(emptyCarteraResumen);
         setTotalPages(1);
       } finally {
-        if (controller.signal.aborted) return;
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     };
 

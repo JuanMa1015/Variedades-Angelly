@@ -108,15 +108,17 @@ const ClientesTienda = () => {
     try {
       setSaving(true);
 
-      const payload = editingId
-        ? await apiPatch(`/api/clientes/tienda-fiado/${editingId}`, {
-            nombre: fullName,
-            telefono_whatsapp: normalizedPhone || null,
-          })
-        : await apiPost('/api/clientes/tienda-fiado', {
-            nombre: fullName,
-            telefono_whatsapp: normalizedPhone || null,
-          });
+      if (editingId) {
+        await apiPatch(`/api/clientes/tienda-fiado/${editingId}`, {
+          nombre: fullName,
+          telefono_whatsapp: normalizedPhone || null,
+        });
+      } else {
+        await apiPost('/api/clientes/tienda-fiado', {
+          nombre: fullName,
+          telefono_whatsapp: normalizedPhone || null,
+        });
+      }
 
       setSuccess(editingId ? 'Cliente actualizado correctamente' : 'Cliente creado correctamente');
       resetForm();

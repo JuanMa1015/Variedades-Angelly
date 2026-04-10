@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Barcode, Package, Plus, RotateCcw, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { apiGet, apiPatch, apiPost } from '../api/httpClient';
@@ -44,12 +44,12 @@ const Inventario = () => {
     setSuccess('');
   };
 
-  const loadProductos = async (signal) => {
+  const loadProductos = useCallback(async (signal) => {
     if (!token) return;
     const payload = await apiGet('/api/productos?catalogo=tienda', { signal });
     if (signal?.aborted) return;
     setProductos(Array.isArray(payload) ? payload : []);
-  };
+  }, [token]);
 
   useEffect(() => {
     if (!token) {
@@ -76,7 +76,7 @@ const Inventario = () => {
 
     fetchData();
     return () => controller.abort();
-  }, [token]);
+  }, [token, loadProductos]);
 
   const createProducto = async (payload) => {
     return apiPost('/api/productos', payload);
@@ -133,7 +133,7 @@ const Inventario = () => {
       setSaving(true);
 
       if (existing) {
-        const body = await apiPatch(`/api/productos/${existing.id}/stock`, {
+        await apiPatch(`/api/productos/${existing.id}/stock`, {
           delta: Number(barcodeForm.stock_actual || 1),
         });
         await loadProductos();

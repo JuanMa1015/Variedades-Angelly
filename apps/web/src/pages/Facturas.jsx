@@ -59,9 +59,10 @@ const Facturas = () => {
         setProductos(Array.isArray(productosPayload) ? productosPayload : []);
         setFacturas(Array.isArray(facturasPayload) ? facturasPayload : []);
 
-        if (!proveedorId && proveedoresList.length > 0) {
-          setProveedorId(String(proveedoresList[0].id));
-        }
+        setProveedorId((current) => {
+          if (current) return current;
+          return proveedoresList.length > 0 ? String(proveedoresList[0].id) : '';
+        });
       } catch (err) {
         if (controller.signal.aborted) return;
         setError(err.message || 'No se pudo cargar facturas');

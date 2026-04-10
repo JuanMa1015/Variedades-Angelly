@@ -32,7 +32,7 @@ const Fidelizacion = () => {
         setLoading(true);
         setError('');
         await fetchClientes(controller.signal);
-      } catch (err) {
+      } catch {
         if (controller.signal.aborted) return;
         setError('No fue posible cargar clientes de fidelización');
         setClientes([]);

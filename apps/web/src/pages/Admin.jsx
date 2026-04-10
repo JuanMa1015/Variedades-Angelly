@@ -163,7 +163,7 @@ const Admin = () => {
     } else {
       setVendedores([]);
     }
-  }, [token, isSuperAdmin]);
+  }, [isSuperAdmin]);
 
   useEffect(() => {
     if (!token) {
