@@ -1,0 +1,96 @@
+name: Monorepo CI
+
+on:
+  pull_request:
+    paths:
+      - 'apps/api/**'
+      - 'apps/web/**'
+      - 'infra/**'
+      - 'docs/**'
+      - 'scripts/**'
+      - 'README.md'
+      - '.env.example'
+      - '.github/workflows/backend-ci.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/api/**'
+      - 'apps/web/**'
+      - 'infra/**'
+      - 'docs/**'
+      - 'scripts/**'
+      - 'README.md'
+      - '.env.example'
+      - '.github/workflows/backend-ci.yml'
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    env:
+      APP_ENV: test
+      DATABASE_URL: sqlite+pysqlite:///./ci.db
+      JWT_SECRET_KEY: test-jwt-secret-key-with-32-bytes-minimum
+      AUTH_BOOTSTRAP_ENABLED: true
+      AUTH_ADMIN_USERNAME: angelly_admin
+      AUTH_ADMIN_PASSWORD: cambiame123
+      AUTH_SELLER_USERNAME: vendedor1
+      AUTH_SELLER_PASSWORD: ventas123
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: apps/api/requirements.txt
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Alembic drift guard
+        run: python -m pytest tests/test_alembic_drift.py -q
+
+      - name: Run backend contract suites
+        run: |
+          python -m pytest tests/test_apply_migration_runner.py -q
+          python -m pytest tests/test_auth_api.py -q
+          python -m pytest tests/test_cartera_contract.py -q
+          python -m pytest tests/test_operaciones_contract.py -q
+          python -m pytest tests/test_inventario_contract.py -q
+          python -m pytest tests/test_router_split_contract.py -q
+
+  frontend-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Run frontend lint
+        run: npm run lint
+
+      - name: Run frontend tests
+        run: npm run test
+
+      - name: Build frontend
+        run: npm run build

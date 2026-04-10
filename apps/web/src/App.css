@@ -1,0 +1,30 @@
+/* Professional Styling */
+:root {
+  --color-rosewood: #5f3245;
+  --color-blush-100: #ffe5ec;
+  --color-blush-200: #ffd1dc;
+  --color-gold-100: #f8e5ab;
+  --color-bg-light: #f9fafb;
+}
+
+html, body {
+  background-color: #f9fafb;
+  color: #111827;
+}
+
+.dashboard-title {
+  font-family: 'Playfair Display', serif;
+}
+
+.kpi-glass {
+  border: 1px solid rgba(244, 114, 182, 0.28);
+  backdrop-filter: blur(14px);
+  background: linear-gradient(125deg, rgba(255, 255, 255, 0.82), rgba(255, 209, 220, 0.35));
+  box-shadow: 0 16px 32px rgba(224, 123, 159, 0.16);
+}
+
+.focus-soft:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(244, 114, 182, 0.25);
+}
+

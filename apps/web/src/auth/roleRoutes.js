@@ -1,0 +1,9 @@
+export const ROLE_DEFAULT_ROUTES = {
+  vendedor: '/ventas',
+  admin: '/cartera/venta',
+  superadmin: '/dashboard',
+};
+
+export const getDefaultRouteForRole = (role) => {
+  return ROLE_DEFAULT_ROUTES[role] ?? '/login';
+};

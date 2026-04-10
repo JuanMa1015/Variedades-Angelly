@@ -1,4 +1,4 @@
-"""Fixtures compartidas para pruebas del dominio de Variedades Angelly."""
+"""Fixtures compartidas para pruebas del dominio de Tienda Angelly."""
 
 from __future__ import annotations
 
