@@ -34,4 +34,5 @@ dist/
 
 .env
 .coverage
-*.ini
+pytest.ini
+behave.ini
