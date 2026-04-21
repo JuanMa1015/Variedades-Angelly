@@ -127,7 +127,7 @@ const Sidebar = ({
 
     if (role === 'superadmin') return true;
     if (role === 'admin') return false;
-    if (role === 'vendedor') return !['/dashboard', '/admin', '/cartera', '/cartera/dashboard', '/gastos', '/facturas'].includes(item.path);
+    if (role === 'vendedor') return !['/dashboard', '/admin', '/cartera', '/cartera/venta', '/cartera/dashboard', '/gastos', '/facturas'].includes(item.path);
     return false;
   });
 

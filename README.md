@@ -1,274 +1,179 @@
 # Variedades-Angelly
 
-> Sistema integrado para gestión de ventas, cartera de crédito, inventario, proveedores, gastos operacionales, programa de fidelización y auditoría en tiendas de barrio.
+Sistema full-stack para ventas, cartera, inventario, proveedores, gastos, fidelización y auditoría. El repositorio ya está organizado como monorepo de producción.
 
-## � Equipo
+## Equipo
 
-## Juan Manuel Londoño Gonzalez 
-## Danilo Tangarife Bustamante
-## Gilar Valentina Castaño
+- Juan Manuel Londoño Gonzalez
+- Danilo Tangarife Bustamante
+- Gilar Valentina Castaño
 
-
-## Visión General
-
-Variedades-Angelly es una aplicación full-stack diseñada para pequeños negocios de barrio. Integra:
-- **Punto de Venta (POS)** con soporte para cartera de crédito
-- **Gestión de Inventario** con alertas de stock
-- **Cartera de Crédito** para clientes recurrentes
-- **Sistema de Proveedores** con pedidos y gastos
-- **Fidelización** de clientes con programa de bonos
-- **Auditoría** completa de operaciones
-
----
-
-## Stack Tecnológico
-
-### Backend
-- **Framework**: FastAPI 0.135.2
-- **ORM**: SQLAlchemy 2.0.48
-- **Validación**: Pydantic 2.12.5
-- **Base de Datos**: PostgreSQL (Neon Cloud)
-- **Autenticación**: JWT (HS256) + bcrypt
-
-### Frontend
-- **Framework**: React 18
-- **Build Tool**: Vite 7.3.1
-- **Styling**: Tailwind CSS
-- **HTTP Client**: Centralizado con interceptores
-- **Iconos**: Lucide React
-
-### Testing
-- **Unit Tests**: pytest 8.3.5 + pytest-cov
-- **BDD**: Behave
-- **Coverage Target**: >80%
-
----
-
-## Variables de Entorno
-
-Configurar archivos separados por capa. Usar los templates de ejemplo como base:
-
-```powershell
-# Backend
-Copy-Item backend\.env.example backend\.env
-
-# Frontend
-Copy-Item frontend\.env.example frontend\.env
-```
-
-Luego completar con valores reales:
-
-### Backend: [backend/.env](backend/.env)
-
-```env
-# Base de Datos
-DATABASE_URL=postgresql://user:password@host:port/dbname?sslmode=require
-
-# JWT & Seguridad
-JWT_SECRET_KEY=angelly-local-jwt-secret-2026-very-strong
-APP_ENV=development
-
-# Bootstrap de usuarios por defecto
-AUTH_BOOTSTRAP_ENABLED=true
-AUTH_ADMIN_USERNAME=angelly_admin
-AUTH_ADMIN_PASSWORD=cambiame123
-AUTH_SELLER_USERNAME=vendedor1
-AUTH_SELLER_PASSWORD=ventas123
-```
-
-### Frontend: [frontend/.env](frontend/.env)
-
-```env
-VITE_API_URL=http://127.0.0.1:8000
-```
-
-**Notas Críticas:**
-- `JWT_SECRET_KEY` es **obligatorio**; la API no inicia sin él
-- Las credenciales se crean automáticamente en el primer inicio si `AUTH_BOOTSTRAP_ENABLED=true`
-- Las credenciales demo solo se muestran en frontend en modo desarrollo
-- Cambiar `JWT_SECRET_KEY` invalidará todos los tokens existentes
-
----
-
-## Instalación
-
-### Requisitos Previos
-- Python 3.10+ (verificar: `python --version`)
-- Node.js 18+ (verificar: `npm --version`)
-- PostgreSQL 14+ (local o Neon Cloud)
-
-### Backend Setup
-
-```powershell
-# 1. Navegar al directorio backend
-Set-Location backend
-
-# 2. Crear entorno virtual
-python -m venv .venv
-
-# 3. Activar entorno (Windows)
-& .\.venv\Scripts\Activate.ps1
-
-# 4. Instalar dependencias
-pip install -r requirements.txt
-
-# 5. Aplicar migraciones (si existen)
-# python src/infrastructure/database/apply_migration.py
-```
-
-### Frontend Setup
-
-```powershell
-# 1. Navegar al directorio frontend
-Set-Location frontend
-
-# 2. Instalar dependencias
-npm install
-
-# 3. Verificar configuración de Vite
-# vite.config.js debe tener proxy para /api -> http://127.0.0.1:8000
-```
-
----
-
-## Ejecución Local
-
-### Terminal 1: Backend
-```powershell
-Set-Location backend
-& .\.venv\Scripts\Activate.ps1
-uvicorn src.main:app --reload
-```
-
-**Salida esperada:**
-```
-INFO:     Uvicorn running on http://127.0.0.1:8000
-INFO:     Application startup complete.
-```
-
-### Terminal 2: Frontend
-```powershell
-Set-Location frontend
-npm run dev
-```
-
-**Salida esperada:**
-```
-➜ Local: http://localhost:5173/
-```
-
-### Acceso
-- **Frontend**: http://localhost:5173
-- **Backend API**: http://127.0.0.1:8000
-- **API Docs Swagger**: http://127.0.0.1:8000/docs
-
----
-
-## Estructura del Proyecto
+## Estructura Actual
 
 ```
 Variedades-Angelly/
-├── backend/
-│   ├── src/
-│   │   ├── main.py                    # Composición FastAPI + CORS + routers
-│   │   ├── api/
-│   │   │   ├── routers/               # 6 routers modulares por dominio
-│   │   │   │   ├── auth.py           # Autenticación y login
-│   │   │   │   ├── productos.py      # Gestión de inventario
-│   │   │   │   ├── clientes_cartera.py  # Crédito y movimientos
-│   │   │   │   ├── ventas_fidelizacion.py # Ventas y fidelización
-│   │   │   │   ├── operaciones.py    # Proveedores y gastos
-│   │   │   │   └── auditorias.py     # Logs de auditoría
-│   │   │   └── dependencies.py        # Autenticación compartida
-│   │   ├── application/services/      # Lógica de aplicación
-│   │   ├── domain/                    # Modelos de dominio
-│   │   │   ├── cliente.py
-│   │   │   ├── producto.py
-│   │   │   ├── usuario.py
-│   │   │   ├── transaccion.py
-│   │   │   └── enums.py
-│   │   ├── auth/
-│   │   │   ├── bootstrap.py          # Seed de usuarios por entorno
-│   │   │   └── security.py           # JWT + bcrypt
-│   │   └── infrastructure/
-│   │       ├── database/
-│   │       │   ├── models.py         # Modelos SQLAlchemy
-│   │       │   ├── connection.py     # Configuración DB
-│   │       │   └── seed_db.py        # Datos iniciales
-│   │       └── repositories/
-│   │           └── sqlalchemy_repository.py
-│   ├── tests/                         # Tests unitarios
-│   ├── features/                      # Escenarios BDD
-│   ├── requirements.txt
-│   └── pytest.ini
-├── frontend/
-│   ├── src/
-│   │   ├── main.jsx                   # Entry point
-│   │   ├── App.jsx
-│   │   ├── api/
-│   │   │   └── httpClient.js         # Cliente HTTP centralizado
-│   │   ├── auth/
-│   │   │   ├── AuthContext.jsx       # JWT + ciclo de vida
-│   │   │   └── PrivateRoute.jsx      # Rutas protegidas
-│   │   ├── components/               # Componentes reutilizables
-│   │   ├── layouts/
-│   │   │   └── MainLayout.jsx        # Layout principal
-│   │   └── pages/                    # Páginas por módulo
-│   │       ├── Login.jsx
-│   │       ├── Dashboard.jsx
-│   │       ├── Ventas.jsx
-│   │       ├── Cartera.jsx
-│   │       ├── Inventario.jsx
-│   │       ├── Fidelizacion.jsx
-│   │       ├── Gastos.jsx
-│   │       ├── Proveedores.jsx
-│   │       └── Admin.jsx
-│   ├── vite.config.js                # Proxy para /api
-│   ├── package.json
-│   └── tailwind.config.js
-├── .env                               # Variables de entorno COMPARTIDAS
-├── .gitignore
-├── behave.ini
+├── apps/
+│   ├── api/        # FastAPI + SQLAlchemy + Alembic + pytest/behave
+│   └── web/        # React + Vite + Tailwind + Vitest
+├── infra/          # docker-compose, Dockerfiles, nginx
+├── docs/           # documentación del proyecto
+├── scripts/        # utilidades de automatización
+├── .github/        # CI/CD
+├── .env.example    # plantilla canónica de variables
 └── README.md
 ```
 
----
+## Stack
+
+### Backend
+- FastAPI 0.135.2
+- SQLAlchemy 2.0.48
+- Pydantic 2.12.5
+- PostgreSQL en producción / SQLite en CI y tests
+- JWT (HS256) + bcrypt
+
+### Frontend
+- React 19
+- Vite 7.3.1
+- Tailwind CSS
+- Vitest + Testing Library
+
+### Infra y automatización
+- Alembic para migraciones
+- Docker / Docker Compose
+- GitHub Actions para CI
+
+## Entorno
+
+La plantilla canónica está en [`.env.example`](.env.example). Las variables reales se usan por capa:
+
+- [apps/api/.env](apps/api/.env) para backend
+- [apps/web/.env](apps/web/.env) para frontend
+
+Ejemplo de valores frontend:
+
+```env
+VITE_API_URL=http://127.0.0.1:8000
+VITE_COBRO_BANCO=
+VITE_COBRO_TIPO_CUENTA=
+VITE_COBRO_NUMERO_CUENTA=
+VITE_COBRO_TITULAR_CUENTA=
+VITE_COBRO_NEQUI_NUMERO=
+VITE_COBRO_NEQUI_TITULAR=
+```
+
+Notas:
+- No versionar archivos `.env` reales.
+- `JWT_SECRET_KEY` y credenciales bootstrap deben rotarse si estuvieron expuestas.
+- El frontend usa `VITE_API_URL`; las variables `VITE_COBRO_*` quedan para el texto de WhatsApp.
+
+## Instalación
+
+### Requisitos
+- Python 3.10+
+- Node.js 18+
+- PostgreSQL 14+ o Neon Cloud
+
+### Backend
+
+```powershell
+Set-Location apps/api
+python -m venv .venv
+& .\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+### Frontend
+
+```powershell
+Set-Location apps/web
+npm ci
+```
+
+## Ejecución local
+
+### Backend
+
+```powershell
+Set-Location apps/api
+& .\.venv\Scripts\Activate.ps1
+python -m alembic -c alembic.ini upgrade head
+uvicorn src.main:app --reload
+```
+
+### Frontend
+
+```powershell
+Set-Location apps/web
+npm run dev
+```
+
+### URLs
+- Frontend: http://localhost:5173
+- Backend API: http://127.0.0.1:8000
+- Swagger: http://127.0.0.1:8000/docs
+
+## Validación
+
+### Backend
+
+```powershell
+Set-Location apps/api
+python -m pytest -q
+```
+
+### Frontend
+
+```powershell
+Set-Location apps/web
+npm run lint
+npm run test
+npm run build
+```
+
+### Docker
+
+```powershell
+docker compose -f infra/docker-compose.yml up --build
+```
+
+## Base de datos
+
+### Instalar dependencias
+```bash
+pip install -r requirements.txt
+```
+
+### Aplicar migraciones
+```bash
+cd apps/api
+alembic upgrade head
+```
+
+### Verificar estado
+```bash
+alembic current
+alembic history --verbose
+```
 
 ## Autenticación
 
-### Flujo JWT
+- Login: `POST /api/auth/login`
+- El backend retorna `access_token`, `role` y `username`
+- El frontend guarda el token en `localStorage`
+- El token expira según lo configurado en backend
 
-```
-1. Usuario envía credenciales
-   POST /api/auth/login
-   {
-     "username": "angelly_admin",
-     "password": "cambiame123"
-   }
+## CI / CD
 
-2. Backend valida y retorna token JWT
-   Response 200:
-   {
-     "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-     "role": "admin",
-     "username": "angelly_admin",
-     "expires_in": 28800
-   }
+El workflow de GitHub Actions vive en [.github/workflows/backend-ci.yml](.github/workflows/backend-ci.yml) y ejecuta:
+- backend tests y drift de Alembic
+- frontend lint, tests y build
 
-3. Frontend almacena token en localStorage
-   localStorage.setItem('angelly.auth.token', token)
+## Seguridad
 
-4. Frontend incluye token en todas las requests
-   Authorization: Bearer <token>
-
-5. Backend valida token y autoriza según rol
-```
-
-### Ciclo de Vida del Token
-- **Duración**: 8 horas (28800 segundos)
-- **Almacenamiento**: localStorage del navegador
-- **Validación**: En cada request a través del header `Authorization`
-- **Token expirado**: Automáticamente limpia sesión y redirige a login
+- [`.env`](.env) no debe estar versionado.
+- [.gitignore](.gitignore) excluye secretos y artefactos de build.
+- Si un secreto se publicó en GitHub, rotarlo de inmediato aunque luego se haya removido del tracking.
 
 ### Roles y Permisos
 

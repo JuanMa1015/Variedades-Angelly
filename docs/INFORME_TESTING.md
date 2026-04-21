@@ -1,76 +1,72 @@
-# Informe de Testing - Entrega 2
+# Informe de Testing
 
-**Proyecto:** Tienda Angelly (Tienda de Abarrotes)  
-**Fecha:** 9 de marzo de 2026
+**Proyecto:** Variedades-Angelly  
+**Estructura actual:** monorepo de producción con `apps/api`, `apps/web`, `infra`, `docs` y `scripts`
 
-## 1) Resumen de cobertura
+## 1) Resumen
 
-Ejecucion validada con:
+La validación de pruebas del backend se ejecuta desde [apps/api](../apps/api) y la validación del frontend desde [apps/web](../apps/web).
 
-```bash
-pytest --cov=src --cov-report=term-missing --cov-report=html
-```
+Validaciones que ya están disponibles en el repo:
 
-Resultado general:
+- Backend unit tests y contratos con `pytest`
+- Escenarios BDD con `behave`
+- Lint, tests y build del frontend con Vite/Vitest/ESLint
+- Verificación de Docker Compose desde [infra/docker-compose.yml](../infra/docker-compose.yml)
 
-- Cobertura total: **95%**
-- Tests unitarios ejecutados: **23**
-- Estado: **23 passed, 0 failed**
+Resultados verificados recientemente:
 
-Detalle por modulo de dominio:
+- Backend: `60 passed`
+- Frontend tests: `6 passed`
+- Frontend lint: sin errores
+- Frontend build: exitoso
+- Docker Compose: configuración válida con `docker compose -f infra/docker-compose.yml config`
 
-- `src/domain/cliente.py`: 93%
-- `src/domain/enums.py`: 100%
-- `src/domain/producto.py`: 90%
-- `src/domain/transaccion.py`: 96%
-- `src/domain/usuario.py`: 97%
+## 2) Cómo ejecutar los tests
 
-Adicionalmente, pruebas BDD (Behave):
-
-- Features: **1 passed**
-- Scenarios: **3 passed**
-- Steps: **12 passed**
-
-## 2) Instrucciones exactas para correr los tests (profesor)
-
-Ejecutar desde la raiz del proyecto `Variedades_Angelly` en **PowerShell**:
-
-1. Activar entorno virtual.
+### Backend
 
 ```powershell
-& ".\.venv\Scripts\Activate.ps1"
+Set-Location apps/api
+& .\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python -m pytest -q
+python -m behave
 ```
 
-2. Ejecutar Pytest con cobertura (recomendado desde `backend/` para respetar imports `src.*`).
+### Frontend
 
 ```powershell
-Set-Location backend
-& "../.venv/Scripts/python.exe" -m pytest --cov=src --cov-report=term-missing --cov-report=html
+Set-Location apps/web
+npm ci
+npm run lint
+npm run test
+npm run build
 ```
 
-3. Volver a la raiz y ejecutar Behave.
+### Docker
 
 ```powershell
-Set-Location ..
-& ".\.venv\Scripts\python.exe" -m behave
+docker compose -f infra/docker-compose.yml config
+docker compose -f infra/docker-compose.yml up --build
 ```
 
-Notas tecnicas:
+## 3) Ubicación de pruebas y soporte
 
-- Se agrego `behave.ini` en la raiz para que Behave encuentre automaticamente `backend/features` y `backend/features/steps`.
-- `backend/features/environment.py` inyecta `backend` en `sys.path` al cargar el modulo, evitando `ImportError: No module named 'src'`.
-- Reporte HTML de cobertura generado en `backend/htmlcov/index.html`.
+- Tests backend: [apps/api/tests](../apps/api/tests)
+- Features BDD: [apps/api/features](../apps/api/features)
+- Tests frontend: [apps/web/src/pages/__tests__](../apps/web/src/pages/__tests__)
+- Tests de cartera por secciones: [apps/web/src/pages/cartera/__tests__](../apps/web/src/pages/cartera/__tests__)
+- Script auxiliar: [scripts/check_tests.sh](../scripts/check_tests.sh)
 
-## 3) Justificacion del umbral minimo (80%) y superacion
+## 4) Notas operativas
 
-Se toma **80%** como umbral minimo porque es una referencia ampliamente aceptada en QA para garantizar una base solida de verificacion sin caer en sobrecostos de mantenimiento por cubrir lineas de bajo valor.
+- No usar [backend](../backend) ni [frontend](../frontend) como roots de ejecución; solo quedan como carpetas legacy/artefactos locales.
+- Las variables de entorno canónicas están en [`.env.example`](../.env.example).
+- Los `.env` reales no deben versionarse.
 
-En esta entrega se supera ese umbral con **95%** gracias a:
+## 5) Estado actual de calidad
 
-- Cobertura de flujos felices y de error en entidades clave (`Usuario`, `Producto`, `Cliente`, `Transaccion`).
-- Casos de borde explicitamente probados (venta sin items, gasto en cero, limites de credito y abonos invalidos).
-- Validacion BDD de reglas de negocio de fiados con `Scenario Outline` y multiples ejemplos.
-
-## 4) Alcance de la E2
-
-Las pruebas implementadas son **puramente de dominio** sobre `backend/src/domain`. No se agrego codigo de conexion a PostgreSQL/Neon en esta etapa.
+- El backend y el frontend ya fueron validados en la nueva estructura.
+- La referencia histórica de cobertura sigue siendo útil, pero la ejecución real hoy debe hacerse con las rutas nuevas del monorepo.
+- El estado actual de CI local es sano: backend, frontend y Docker Compose pasan en la estructura migrada.

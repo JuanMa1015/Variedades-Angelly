@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class Base(DeclarativeBase):
@@ -27,6 +27,9 @@ class UsuarioModel(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     rol: Mapped[str] = mapped_column(String(20), nullable=False)
 
+    def __repr__(self) -> str:
+        return f"UsuarioModel(id={self.id!r}, username={self.username!r})"
+
 
 class ClienteModel(Base):
     """Representacion persistente de un cliente con cupo de credito."""
@@ -44,6 +47,9 @@ class ClienteModel(Base):
     limite_credito: Mapped[float] = mapped_column(Float, nullable=False)
     deuda_total: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
 
+    def __repr__(self) -> str:
+        return f"ClienteModel(id={self.id!r}, nombre={self.nombre!r})"
+
 
 class ClienteFidelizacionModel(Base):
     """Representacion persistente de clientes del modulo de fidelizacion."""
@@ -55,6 +61,12 @@ class ClienteFidelizacionModel(Base):
     telefono_whatsapp: Mapped[str] = mapped_column(String(25), nullable=False, unique=True)
     puntos_acumulados: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
+    def __repr__(self) -> str:
+        return (
+            f"ClienteFidelizacionModel(id={self.id!r}, "
+            f"telefono_whatsapp={self.telefono_whatsapp!r})"
+        )
+
 
 class ClienteFiadoTiendaModel(Base):
     """Clientes fiados operativos del punto de venta (no cartera admin)."""
@@ -64,6 +76,9 @@ class ClienteFiadoTiendaModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     nombre: Mapped[str] = mapped_column(String(120), nullable=False)
     telefono_whatsapp: Mapped[str | None] = mapped_column(String(25), nullable=True)
+
+    def __repr__(self) -> str:
+        return f"ClienteFiadoTiendaModel(id={self.id!r}, nombre={self.nombre!r})"
 
 
 class ProductoModel(Base):
@@ -79,6 +94,9 @@ class ProductoModel(Base):
     catalogo: Mapped[str] = mapped_column(String(20), nullable=False, default="tienda")
     stock_actual: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     stock_minimo: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    def __repr__(self) -> str:
+        return f"ProductoModel(id={self.id!r}, nombre={self.nombre!r})"
 
 
 class VentaModel(Base):
@@ -103,6 +121,9 @@ class VentaModel(Base):
         default=_utcnow_naive,
     )
 
+    def __repr__(self) -> str:
+        return f"VentaModel(id={self.id!r}, total={self.total!r})"
+
 
 class DetalleVentaModel(Base):
     """Representacion persistente del detalle de una venta."""
@@ -117,6 +138,12 @@ class DetalleVentaModel(Base):
     precio_unitario: Mapped[float] = mapped_column(Float, nullable=False)
     subtotal: Mapped[float] = mapped_column(Float, nullable=False)
 
+    def __repr__(self) -> str:
+        return (
+            f"DetalleVentaModel(id={self.id!r}, "
+            f"nombre_producto={self.nombre_producto!r})"
+        )
+
 
 class ProveedorModel(Base):
     """Catalogo de proveedores para ordenes de compra."""
@@ -128,6 +155,13 @@ class ProveedorModel(Base):
     contacto: Mapped[str | None] = mapped_column(String(120), nullable=True)
     telefono: Mapped[str | None] = mapped_column(String(25), nullable=True)
     activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    facturas_compra: Mapped[list["FacturaCompraModel"]] = relationship(
+        "FacturaCompraModel",
+        back_populates="proveedor",
+    )
+
+    def __repr__(self) -> str:
+        return f"ProveedorModel(id={self.id!r}, nombre={self.nombre!r})"
 
 
 class PedidoProveedorModel(Base):
@@ -152,6 +186,9 @@ class PedidoProveedorModel(Base):
         nullable=True,
     )
 
+    def __repr__(self) -> str:
+        return f"PedidoProveedorModel(id={self.id!r}, descripcion={self.descripcion!r})"
+
 
 class FacturaCompraModel(Base):
     """Cabecera de facturas de compra por proveedor."""
@@ -164,11 +201,22 @@ class FacturaCompraModel(Base):
     subtotal: Mapped[float] = mapped_column(Float, nullable=False)
     total_iva: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     total_factura: Mapped[float] = mapped_column(Float, nullable=False)
+    proveedor: Mapped["ProveedorModel"] = relationship(
+        "ProveedorModel",
+        back_populates="facturas_compra",
+    )
+    detalles: Mapped[list["FacturaCompraDetalleModel"]] = relationship(
+        "FacturaCompraDetalleModel",
+        back_populates="factura",
+    )
     fecha_creacion: Mapped[datetime] = mapped_column(
         DateTime(timezone=False),
         nullable=False,
         default=_utcnow_naive,
     )
+
+    def __repr__(self) -> str:
+        return f"FacturaCompraModel(id={self.id!r}, total_factura={self.total_factura!r})"
 
 
 class FacturaCompraDetalleModel(Base):
@@ -184,6 +232,16 @@ class FacturaCompraDetalleModel(Base):
     aplica_iva: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     precio_unitario: Mapped[float] = mapped_column(Float, nullable=False)
     precio_total: Mapped[float] = mapped_column(Float, nullable=False)
+    factura: Mapped["FacturaCompraModel"] = relationship(
+        "FacturaCompraModel",
+        back_populates="detalles",
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"FacturaCompraDetalleModel(id={self.id!r}, "
+            f"nombre_producto={self.nombre_producto!r})"
+        )
 
 
 class GastoModel(Base):
@@ -201,6 +259,9 @@ class GastoModel(Base):
         default=_utcnow_naive,
     )
     registrado_por: Mapped[str] = mapped_column(String(50), nullable=False)
+
+    def __repr__(self) -> str:
+        return f"GastoModel(id={self.id!r}, categoria={self.categoria!r})"
 
 
 class AbonoCarteraModel(Base):
@@ -220,6 +281,9 @@ class AbonoCarteraModel(Base):
         default=_utcnow_naive,
     )
 
+    def __repr__(self) -> str:
+        return f"AbonoCarteraModel(id={self.id!r}, monto={self.monto!r})"
+
 
 class AuditoriaModel(Base):
     """Registro manual/administrativo de eventos para trazabilidad."""
@@ -238,3 +302,6 @@ class AuditoriaModel(Base):
         nullable=False,
         default=_utcnow_naive,
     )
+
+    def __repr__(self) -> str:
+        return f"AuditoriaModel(id={self.id!r}, accion={self.accion!r})"
