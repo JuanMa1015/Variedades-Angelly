@@ -1,0 +1,165 @@
+import { useMemo, useState } from 'react';
+import { Search, ShoppingCart } from 'lucide-react';
+
+const PRODUCT_ICON_RULES = [
+  { match: /arroz|grano|lenteja/i, icon: '🍚' },
+  { match: /pan|galleta|torta|ponque/i, icon: '🥖' },
+  { match: /leche|queso|yogurt|mantequilla/i, icon: '🥛' },
+  { match: /coca|gaseosa|jugo|agua|bebida/i, icon: '🥤' },
+  { match: /huevo/i, icon: '🥚' },
+  { match: /pollo|carne|atun|salchicha/i, icon: '🍗' },
+  { match: /aseo|jabon|detergente|cloro/i, icon: '🧼' },
+  { match: /shampoo|crema|higiene/i, icon: '🧴' },
+];
+
+const getProductIcon = (nombre = '') => {
+  const rule = PRODUCT_ICON_RULES.find((entry) => entry.match.test(nombre));
+  return rule?.icon || '🛒';
+};
+
+const getCategoryName = (producto) => {
+  const raw = producto.categoria || producto.catalogo || producto.tipo || 'General';
+  return String(raw).trim() || 'General';
+};
+
+const ProductSelectionView = ({
+  productos,
+  searchTerm,
+  onSearchChange,
+  onAddItem,
+  cart,
+  onGoToTicket,
+  formatMoney,
+  loading,
+}) => {
+  const [activeCategory, setActiveCategory] = useState('Todas');
+
+  const categories = useMemo(() => {
+    const categorySet = new Set(productos.map(getCategoryName));
+    return ['Todas', ...Array.from(categorySet)];
+  }, [productos]);
+
+  const visibleProducts = useMemo(() => {
+    if (activeCategory === 'Todas') return productos;
+    return productos.filter((producto) => getCategoryName(producto) === activeCategory);
+  }, [activeCategory, productos]);
+
+  const totalItems = useMemo(
+    () => cart.reduce((acc, item) => acc + Number(item.cantidad || 0), 0),
+    [cart],
+  );
+
+  return (
+    <section className="rounded-2xl border border-gray-200 bg-white p-4 pb-24 shadow-sm sm:p-5">
+      <div className="mb-4">
+        <h2 className="text-xl font-black text-gray-900">Ventas POS</h2>
+        <p className="text-sm text-gray-500">Selecciona productos para construir el ticket.</p>
+      </div>
+
+      {/* TODO: scanner de código de barras aquí */}
+      <label className="relative mb-4 block">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(event) => onSearchChange(event.target.value)}
+          className="w-full rounded-xl border border-gray-300 bg-white py-3 pl-10 pr-4 text-sm focus:border-rosewood focus:outline-none"
+          placeholder="Buscar por nombre"
+        />
+      </label>
+
+      {categories.length > 2 && (
+        <div className="mb-4 -mx-1 overflow-x-auto pb-2">
+          <div className="flex w-max gap-2 px-1">
+            {categories.map((category) => (
+              <button
+                key={category}
+                type="button"
+                onClick={() => setActiveCategory(category)}
+                className={`whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                  activeCategory === category
+                    ? 'border-rosewood bg-rosewood text-white'
+                    : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                }`}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {loading && (
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+          Cargando productos...
+        </div>
+      )}
+
+      {!loading && visibleProducts.length === 0 && (
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+          No hay productos para ese filtro.
+        </div>
+      )}
+
+      {!loading && visibleProducts.length > 0 && (
+        <div className="grid grid-cols-2 gap-3">
+          {visibleProducts.map((producto) => {
+            const stock = Number(producto.stock_actual || 0);
+            const lowStock = stock < 5;
+            const qtyInCart = cart.find(
+              (item) => Number(item.producto_id) === Number(producto.id),
+            )?.cantidad || 0;
+
+            return (
+              <button
+                key={producto.id}
+                type="button"
+                onClick={() => onAddItem(producto.id)}
+                className={`relative rounded-2xl border p-3 text-left shadow-sm transition active:scale-[0.99] ${
+                  qtyInCart > 0
+                    ? 'border-rosewood bg-blush-50'
+                    : lowStock
+                      ? 'border-amber-300 bg-amber-50'
+                      : 'border-gray-200 bg-white hover:border-rosewood hover:bg-blush-100'
+                }`}
+              >
+                {qtyInCart > 0 && (
+                  <span className="absolute -right-1.5 -top-1.5 inline-flex h-6 min-w-[24px] items-center justify-center rounded-full bg-red-600 px-1 text-xs font-bold text-white shadow-sm">
+                    {qtyInCart}
+                  </span>
+                )}
+                <div className="mb-2 text-2xl">{getProductIcon(producto.nombre)}</div>
+                <p className="truncate text-sm font-bold text-gray-900">{producto.nombre}</p>
+                <p className="mt-1 text-sm font-semibold text-rosewood">{formatMoney(producto.precio_venta)}</p>
+                <p className={`mt-1 text-xs font-medium ${lowStock ? 'text-amber-800' : 'text-gray-500'}`}>
+                  Stock: {stock}
+                  {lowStock ? ' · Bajo' : ''}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-gray-200 bg-white/95 px-4 py-3 backdrop-blur sm:left-auto sm:right-auto sm:w-full">
+        <div className="mx-auto flex w-full max-w-3xl items-center gap-3">
+          <div className="flex flex-1 items-center gap-2 rounded-xl border border-gray-300 bg-gray-50 px-3 py-2">
+            <ShoppingCart className="h-5 w-5 text-rosewood" />
+            <span className="text-sm font-semibold text-gray-700">{totalItems} items</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={onGoToTicket}
+            disabled={totalItems === 0}
+            className="rounded-xl bg-rosewood px-4 py-2.5 text-sm font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300"
+          >
+            Ver ticket
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+export default ProductSelectionView;
