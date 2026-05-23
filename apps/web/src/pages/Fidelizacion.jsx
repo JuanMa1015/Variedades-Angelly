@@ -2,6 +2,7 @@ import { Gift } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { apiGet, apiRequest } from '../api/httpClient';
+import ErrorMessage from '../components/ErrorMessage'
 
 const UMBRAL_BONO = 100;
 
@@ -97,11 +98,7 @@ const Fidelizacion = () => {
         </div>
       </div>
 
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700 font-medium">
-          {error}
-        </div>
-      )}
+      <ErrorMessage message={error} onDismiss={() => setError('')} />
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">

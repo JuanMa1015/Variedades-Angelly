@@ -14,6 +14,9 @@ import ClientesTienda from './pages/ClientesTienda';
 import Login from './pages/Login';
 import Admin from './pages/Admin';
 import { getDefaultRouteForRole } from './auth/roleRoutes';
+import ErrorBoundary from './components/ErrorBoundary'
+import { ToastProvider } from './components/ToastContext'
+import ToastContainer from './components/ToastContainer'
 import './App.css';
 
 const LandingRedirect = () => {
@@ -33,42 +36,47 @@ const LandingRedirect = () => {
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<LandingRedirect />} />
-        <Route path="/login" element={<Login />} />
+    <ErrorBoundary>
+      <ToastProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<LandingRedirect />} />
+            <Route path="/login" element={<Login />} />
 
-        <Route element={<PrivateRoute />}>
-          <Route element={<MainLayout />}>
-            <Route element={<PrivateRoute allowedRoles={['superadmin']} />}>
-              <Route path="/admin" element={<Admin />} />
-              <Route path="/gastos" element={<Gastos />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/facturas" element={<Facturas />} />
+            <Route element={<PrivateRoute />}>
+              <Route element={<MainLayout />}>
+                <Route element={<PrivateRoute allowedRoles={['superadmin']} />}>
+                  <Route path="/admin" element={<Admin />} />
+                  <Route path="/gastos" element={<Gastos />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/facturas" element={<Facturas />} />
+                </Route>
+
+                <Route element={<PrivateRoute allowedRoles={['admin', 'superadmin']} />}>
+                  <Route path="/cartera" element={<Navigate to="/cartera/venta" replace />} />
+                  <Route path="/cartera/dashboard" element={<Cartera />} />
+                  <Route path="/cartera/clientes" element={<Cartera />} />
+                  <Route path="/cartera/venta" element={<Cartera />} />
+                  <Route path="/cartera/productos" element={<Cartera />} />
+                  <Route path="/cartera/cobrar" element={<Cartera />} />
+                </Route>
+
+                <Route element={<PrivateRoute allowedRoles={['superadmin', 'vendedor']} />}>
+                  <Route path="/proveedores" element={<Proveedores />} />
+                  <Route path="/inventario" element={<Inventario />} />
+                  <Route path="/fidelizacion" element={<Fidelizacion />} />
+                  <Route path="/ventas" element={<Ventas />} />
+                  <Route path="/clientes" element={<ClientesTienda />} />
+                </Route>
+              </Route>
             </Route>
 
-            <Route element={<PrivateRoute allowedRoles={['admin', 'superadmin']} />}>
-              <Route path="/cartera" element={<Navigate to="/cartera/venta" replace />} />
-              <Route path="/cartera/dashboard" element={<Cartera />} />
-              <Route path="/cartera/clientes" element={<Cartera />} />
-              <Route path="/cartera/venta" element={<Cartera />} />
-              <Route path="/cartera/productos" element={<Cartera />} />
-              <Route path="/cartera/cobrar" element={<Cartera />} />
-            </Route>
-
-            <Route element={<PrivateRoute allowedRoles={['superadmin', 'vendedor']} />}>
-              <Route path="/proveedores" element={<Proveedores />} />
-              <Route path="/inventario" element={<Inventario />} />
-              <Route path="/fidelizacion" element={<Fidelizacion />} />
-              <Route path="/ventas" element={<Ventas />} />
-              <Route path="/clientes" element={<ClientesTienda />} />
-            </Route>
-          </Route>
-        </Route>
-
-        <Route path="*" element={<LandingRedirect />} />
-      </Routes>
-    </BrowserRouter>
+            <Route path="*" element={<LandingRedirect />} />
+          </Routes>
+        </BrowserRouter>
+        <ToastContainer />
+      </ToastProvider>
+    </ErrorBoundary>
   );
 }
 

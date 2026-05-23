@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { apiGet, apiPost } from '../api/httpClient';
+import ErrorMessage from '../components/ErrorMessage';
+import SuccessMessage from '../components/SuccessMessage';
 import ProductSelectionView from './Ventas/ProductSelectionView';
 import TicketReviewView from './Ventas/TicketReviewView';
 import CheckoutView from './Ventas/CheckoutView';

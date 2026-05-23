@@ -1,6 +1,8 @@
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { fetchCarteraMovimientos } from '../api/carteraApi';
+import ErrorMessage from './ErrorMessage';
+import SuccessMessage from './SuccessMessage';
 
 const MOVIMIENTOS_PAGE_SIZE = 5;
 
@@ -89,11 +91,7 @@ const VerDetalleModal = ({ cliente, isOpen, onClose }) => {
         <div className="mb-6">
           <h3 className="text-xl font-bold text-gray-900 mb-4">Historial de Transacciones</h3>
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4 text-red-700 font-semibold">
-              {error}
-            </div>
-          )}
+          <ErrorMessage message={error} onDismiss={() => setError('')} />
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm sm:text-base">

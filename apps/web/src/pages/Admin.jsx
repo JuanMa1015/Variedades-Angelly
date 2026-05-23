@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Database, RefreshCw, Shield } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { apiDelete, apiRequest } from '../api/httpClient';
+import ErrorMessage from '../components/ErrorMessage';
+import SuccessMessage from '../components/SuccessMessage';
 
 const MONEY_FORMATTER = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -327,6 +329,11 @@ const Admin = () => {
   const handleCreateCliente = async (event) => {
     event.preventDefault();
 
+    if (Number(clienteForm.limite_credito) < 0) {
+      notifyError('El limite de credito no puede ser negativo');
+      return;
+    }
+
     try {
       await request({
         endpoint: '/api/cartera/clientes',
@@ -518,6 +525,23 @@ const Admin = () => {
   const handleCreateProducto = async (event) => {
     event.preventDefault();
 
+    if (Number(productoForm.precio_costo) < 0) {
+      notifyError('El precio de costo no puede ser negativo');
+      return;
+    }
+    if (Number(productoForm.precio_venta) < 0) {
+      notifyError('El precio de venta no puede ser negativo');
+      return;
+    }
+    if (Number(productoForm.stock_actual) < 0) {
+      notifyError('El stock actual no puede ser negativo');
+      return;
+    }
+    if (Number(productoForm.stock_minimo) < 0) {
+      notifyError('El stock minimo no puede ser negativo');
+      return;
+    }
+
     try {
       await request({
         endpoint: '/api/productos',
@@ -561,6 +585,23 @@ const Admin = () => {
     if (catalogoRaw === null) return;
     const catalogo = catalogoRaw.trim().toLowerCase();
 
+    if (Number(costoRaw) < 0) {
+      notifyError('El precio de costo no puede ser negativo');
+      return;
+    }
+    if (Number(ventaRaw) < 0) {
+      notifyError('El precio de venta no puede ser negativo');
+      return;
+    }
+    if (Number(stockRaw) < 0) {
+      notifyError('El stock actual no puede ser negativo');
+      return;
+    }
+    if (Number(minimoRaw) < 0) {
+      notifyError('El stock minimo no puede ser negativo');
+      return;
+    }
+
     try {
       await request({
         endpoint: `/api/productos/${item.id}`,
@@ -597,6 +638,11 @@ const Admin = () => {
   const handleCreateGasto = async (event) => {
     event.preventDefault();
 
+    if (Number(gastoForm.monto) < 0) {
+      notifyError('El monto no puede ser negativo');
+      return;
+    }
+
     try {
       await request({
         endpoint: '/api/gastos',
@@ -622,6 +668,11 @@ const Admin = () => {
     if (descripcion === null) return;
     const montoRaw = window.prompt('Monto', String(item.monto));
     if (montoRaw === null) return;
+
+    if (Number(montoRaw) < 0) {
+      notifyError('El monto no puede ser negativo');
+      return;
+    }
 
     try {
       await request({
@@ -656,6 +707,11 @@ const Admin = () => {
   const handleCreateFidelizacion = async (event) => {
     event.preventDefault();
 
+    if (Number(fidelizacionForm.puntos_acumulados) < 0) {
+      notifyError('Los puntos acumulados no pueden ser negativos');
+      return;
+    }
+
     try {
       await request({
         endpoint: '/api/fidelizacion/clientes',
@@ -681,6 +737,11 @@ const Admin = () => {
     if (telefono === null) return;
     const puntosRaw = window.prompt('Puntos acumulados', String(item.puntos_acumulados));
     if (puntosRaw === null) return;
+
+    if (Number(puntosRaw) < 0) {
+      notifyError('Los puntos acumulados no pueden ser negativos');
+      return;
+    }
 
     try {
       await request({
@@ -809,17 +870,8 @@ const Admin = () => {
         </button>
       </div>
 
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-          {error}
-        </div>
-      )}
-
-      {success && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
-          {success}
-        </div>
-      )}
+      <ErrorMessage message={error} onDismiss={() => setError('')} />
+      <SuccessMessage message={success} onDismiss={() => setSuccess('')} />
 
       <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap gap-2">

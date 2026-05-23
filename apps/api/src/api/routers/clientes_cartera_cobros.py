@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from src.api.dependencies import AuthenticatedUser, require_roles
@@ -30,25 +30,24 @@ def cartera_resumen(
     db: Session = Depends(get_db),
     _: AuthenticatedUser = Depends(require_roles("admin")),
 ) -> CarteraResumenResponse:
-    clientes = db.execute(select(ClienteModel)).scalars().all()
+    row = db.execute(
+        select(
+            func.count().label("clientes_totales"),
+            func.coalesce(func.sum(ClienteModel.deuda_total), 0).label("deuda_total"),
+            func.coalesce(func.sum(ClienteModel.limite_credito), 0).label("limite_total"),
+            func.count().filter(ClienteModel.deuda_total > 0).label("clientes_con_deuda"),
+            func.count().filter(
+                ClienteModel.limite_credito > 0,
+                ClienteModel.deuda_total / func.nullif(ClienteModel.limite_credito, 0) >= 0.8,
+            ).label("clientes_alto_riesgo"),
+        ).select_from(ClienteModel),
+    ).one()
 
-    clientes_totales = len(clientes)
-    clientes_con_deuda = 0
-    deuda_total = 0.0
-    limite_total = 0.0
-    clientes_alto_riesgo = 0
-
-    for cliente in clientes:
-        deuda = float(cliente.deuda_total or 0)
-        limite = float(cliente.limite_credito or 0)
-        deuda_total += deuda
-        limite_total += limite
-
-        if deuda > 0:
-            clientes_con_deuda += 1
-        if limite > 0 and deuda / limite >= 0.8:
-            clientes_alto_riesgo += 1
-
+    clientes_totales = int(row.clientes_totales)
+    deuda_total = float(row.deuda_total)
+    limite_total = float(row.limite_total)
+    clientes_con_deuda = int(row.clientes_con_deuda)
+    clientes_alto_riesgo = int(row.clientes_alto_riesgo)
     disponible_total = max(limite_total - deuda_total, 0.0)
     saldo_promedio = deuda_total / clientes_con_deuda if clientes_con_deuda > 0 else 0.0
 

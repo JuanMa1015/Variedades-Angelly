@@ -1,5 +1,7 @@
 import { X, DollarSign } from 'lucide-react';
 import { useState } from 'react';
+import ErrorMessage from './ErrorMessage';
+import SuccessMessage from './SuccessMessage';
 
 const RegistrarAbonoModal = ({ cliente, isOpen, onClose, onConfirm }) => {
   const [monto, setMonto] = useState('');
