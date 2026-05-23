@@ -2,15 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
-
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
 
-from src.api.dependencies import AuthenticatedUser, require_roles
-from src.application.services.ventas_service import pagos_totales_por_metodo, ventas_metric_since
-from src.infrastructure.database.connection import get_db
+from src.api.dependencies import AuthenticatedUser, get_dashboard_service, require_roles
+from src.application.services.dashboard_service import DashboardService
 
 router = APIRouter(tags=["dashboard"])
 
@@ -30,26 +26,18 @@ class DashboardResumenResponse(BaseModel):
 
 @router.get("/api/dashboard/resumen", response_model=DashboardResumenResponse)
 def dashboard_resumen(
-    db: Session = Depends(get_db),
+    service: DashboardService = Depends(get_dashboard_service),
     _: AuthenticatedUser = Depends(require_roles("admin", "vendedor")),
 ) -> DashboardResumenResponse:
-    now = datetime.now(UTC)
-    inicio_dia = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    inicio_semana = inicio_dia - timedelta(days=inicio_dia.weekday())
-    inicio_mes = inicio_dia.replace(day=1)
-
-    ventas_diarias, transacciones_diarias = ventas_metric_since(db, inicio_dia)
-    ventas_semanales, transacciones_semanales = ventas_metric_since(db, inicio_semana)
-    ventas_mensuales, transacciones_mensuales = ventas_metric_since(db, inicio_mes)
-    pagos_efectivo, pagos_transferencia = pagos_totales_por_metodo(db)
+    resumen = service.build_resumen()
 
     return DashboardResumenResponse(
-        ventas_diarias=ventas_diarias,
-        ventas_semanales=ventas_semanales,
-        ventas_mensuales=ventas_mensuales,
-        transacciones_diarias=transacciones_diarias,
-        transacciones_semanales=transacciones_semanales,
-        transacciones_mensuales=transacciones_mensuales,
-        pagos_efectivo=pagos_efectivo,
-        pagos_transferencia=pagos_transferencia,
+        ventas_diarias=resumen.ventas_diarias,
+        ventas_semanales=resumen.ventas_semanales,
+        ventas_mensuales=resumen.ventas_mensuales,
+        transacciones_diarias=resumen.transacciones_diarias,
+        transacciones_semanales=resumen.transacciones_semanales,
+        transacciones_mensuales=resumen.transacciones_mensuales,
+        pagos_efectivo=resumen.pagos_efectivo,
+        pagos_transferencia=resumen.pagos_transferencia,
     )

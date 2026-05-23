@@ -34,7 +34,7 @@ const CarteraClientesSection = ({
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-gray-200">
-        <div className="overflow-x-auto">
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[880px] text-left text-sm">
             <thead className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50">
               <tr>
@@ -70,6 +70,34 @@ const CarteraClientesSection = ({
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="space-y-3 p-4 md:hidden">
+          {clientesCarteraFiltrados.map((cliente) => (
+            <div key={`card-${cliente.id}`} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-base font-semibold text-gray-900">{cliente.nombre}</p>
+                  <p className="mt-1 text-xs text-gray-500">Documento: {cliente.documento || '-'}</p>
+                  <p className="text-xs text-gray-500">WhatsApp: {cliente.telefono_whatsapp || '-'}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-gray-500">Deuda</p>
+                  <p className="text-base font-bold text-gray-900">{formatMoney(cliente.deuda_total)}</p>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button type="button" onClick={() => startEditingCliente(cliente)} className="rounded-lg border border-blue-300 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-50">Editar</button>
+                <button type="button" onClick={() => handleDeleteCliente(cliente)} className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">Eliminar</button>
+              </div>
+            </div>
+          ))}
+
+          {clientesCarteraFiltrados.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-5 text-center text-sm text-gray-500">
+              No hay clientes que coincidan con la búsqueda actual.
+            </div>
+          )}
         </div>
       </div>
     </section>

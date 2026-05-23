@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
@@ -13,8 +13,10 @@ from src.infrastructure.database.connection import get_db
 from src.infrastructure.database.models import AbonoCarteraModel, ClienteModel, DetalleVentaModel, VentaModel
 from src.api.routers.cartera_shared import build_cliente_page_response, normalize_naive_datetime, to_abono_response
 from src.api.schemas.cartera import (
+    AbonoCarteraCreateAdminRequest,
     AbonoCarteraCreateRequest,
     AbonoCarteraResponse,
+    AbonoCarteraUpdateRequest,
     CarteraResumenResponse,
     ClienteCarteraPageResponse,
     ClienteCobroResponse,
@@ -28,7 +30,7 @@ router = APIRouter(tags=["clientes-cartera-cobros"])
 @router.get("/api/cartera/resumen", response_model=CarteraResumenResponse)
 def cartera_resumen(
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> CarteraResumenResponse:
     row = db.execute(
         select(
@@ -68,7 +70,7 @@ def list_clientes_cartera_admin(
     limit: int = Query(default=20, ge=1, le=100),
     search: str | None = Query(default=None, min_length=1),
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> ClienteCarteraPageResponse:
     query = select(ClienteModel)
     normalized_search = search.strip() if search else None
@@ -92,7 +94,7 @@ def list_clientes_cartera(
     limit: int = Query(default=20, ge=1, le=100),
     search: str | None = Query(default=None, min_length=1),
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> ClienteCarteraPageResponse:
     query = select(ClienteModel).where(ClienteModel.deuda_total > 0)
     normalized_search = search.strip() if search else None
@@ -123,7 +125,7 @@ def list_cliente_movimientos(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=5, ge=1, le=100),
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> MovimientoClientePageResponse:
     cliente = db.execute(
         select(ClienteModel).where(ClienteModel.id == cliente_id),
@@ -204,12 +206,24 @@ def list_cliente_movimientos(
     )
 
 
+@router.get("/api/cartera/abonos", response_model=list[AbonoCarteraResponse])
+def list_abonos_cartera(
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+) -> list[AbonoCarteraResponse]:
+    abonos = db.execute(
+        select(AbonoCarteraModel).order_by(AbonoCarteraModel.fecha.desc()),
+    ).scalars().all()
+
+    return [to_abono_response(abono) for abono in abonos]
+
+
 @router.post("/api/cartera/clientes/{cliente_id}/abonos", response_model=AbonoCarteraResponse, status_code=201)
 def create_abono_cartera(
     cliente_id: int,
     payload: AbonoCarteraCreateRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> AbonoCarteraResponse:
     with db.begin():
         cliente = db.execute(
@@ -242,3 +256,83 @@ def create_abono_cartera(
 
     db.refresh(abono)
     return to_abono_response(abono)
+
+
+@router.post("/api/cartera/abonos", response_model=AbonoCarteraResponse, status_code=201)
+def create_abono_cartera_direct(
+    payload: AbonoCarteraCreateAdminRequest,
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+) -> AbonoCarteraResponse:
+    with db.begin():
+        cliente = db.execute(
+            select(ClienteModel)
+            .where(ClienteModel.id == payload.cliente_id)
+            .with_for_update(),
+        ).scalar_one_or_none()
+
+        if cliente is None:
+            raise HTTPException(status_code=404, detail="Cliente no encontrado")
+
+        monto = float(payload.monto)
+        if monto > float(cliente.deuda_total):
+            raise HTTPException(
+                status_code=400,
+                detail="El abono supera la deuda actual del cliente",
+            )
+
+        cliente.deuda_total = float(cliente.deuda_total - monto)
+        abono = AbonoCarteraModel(
+            cliente_id=cliente.id,
+            monto=monto,
+            metodo_pago=payload.metodo_pago,
+            saldo_cliente=cliente.deuda_total,
+            referencia=payload.referencia,
+            fecha=normalize_naive_datetime(payload.fecha) or datetime.now(UTC),
+        )
+        db.add(abono)
+        db.flush()
+
+    db.refresh(abono)
+    return to_abono_response(abono)
+
+
+@router.patch("/api/cartera/abonos/{abono_id}", response_model=AbonoCarteraResponse)
+def update_abono_cartera(
+    abono_id: int,
+    payload: AbonoCarteraUpdateRequest,
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+) -> AbonoCarteraResponse:
+    abono = db.execute(
+        select(AbonoCarteraModel).where(AbonoCarteraModel.id == abono_id),
+    ).scalar_one_or_none()
+    if abono is None:
+        raise HTTPException(status_code=404, detail="Abono no encontrado")
+
+    if payload.monto is not None:
+        abono.monto = payload.monto
+    if payload.metodo_pago is not None:
+        abono.metodo_pago = payload.metodo_pago
+    if payload.referencia is not None:
+        abono.referencia = payload.referencia
+
+    db.commit()
+    db.refresh(abono)
+    return to_abono_response(abono)
+
+
+@router.delete("/api/cartera/abonos/{abono_id}", status_code=204)
+def delete_abono_cartera(
+    abono_id: int,
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+) -> None:
+    abono = db.execute(
+        select(AbonoCarteraModel).where(AbonoCarteraModel.id == abono_id),
+    ).scalar_one_or_none()
+    if abono is None:
+        raise HTTPException(status_code=404, detail="Abono no encontrado")
+
+    db.delete(abono)
+    db.commit()

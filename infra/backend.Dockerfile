@@ -15,7 +15,12 @@ COPY apps/api/requirements.txt ./
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
 COPY apps/api/src ./src
+COPY apps/api/alembic ./alembic
+COPY apps/api/alembic.ini ./alembic.ini
+COPY scripts/release_api.sh ./scripts/release_api.sh
+
+RUN chmod +x ./scripts/release_api.sh
 
 EXPOSE 8000
 
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+ENTRYPOINT ["sh", "./scripts/release_api.sh"]

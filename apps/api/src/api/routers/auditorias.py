@@ -67,7 +67,7 @@ def _to_auditoria_response(auditoria: AuditoriaModel) -> AuditoriaResponse:
 def list_auditorias(
     modulo: str | None = Query(default=None),
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> list[AuditoriaResponse]:
     query = select(AuditoriaModel)
     if modulo:
@@ -83,7 +83,7 @@ def list_auditorias(
 def create_auditoria(
     payload: AuditoriaCreateRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> AuditoriaResponse:
     auditoria = AuditoriaModel(
         modulo=payload.modulo.strip(),
@@ -104,7 +104,7 @@ def update_auditoria(
     auditoria_id: int,
     payload: AuditoriaUpdateRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> AuditoriaResponse:
     auditoria = db.execute(
         select(AuditoriaModel).where(AuditoriaModel.id == auditoria_id),
@@ -142,7 +142,7 @@ def update_auditoria(
 def delete_auditoria(
     auditoria_id: int,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> Response:
     auditoria = db.execute(
         select(AuditoriaModel).where(AuditoriaModel.id == auditoria_id),

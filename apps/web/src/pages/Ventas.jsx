@@ -276,6 +276,25 @@ const Ventas = () => {
     });
   };
 
+  const handleRemoveProducto = (productoId) => {
+    setItems((current) => current.filter((item) => Number(item.producto_id) !== Number(productoId)));
+  };
+
+  const handleDecreaseProducto = (productoId) => {
+    setItems((current) => current.reduce((acc, item) => {
+      if (Number(item.producto_id) !== Number(productoId)) {
+        acc.push(item);
+        return acc;
+      }
+
+      const nextQty = Number(item.cantidad || 0) - 1;
+      if (nextQty > 0) {
+        acc.push({ ...item, cantidad: nextQty });
+      }
+      return acc;
+    }, []));
+  };
+
   const handleChangeQty = (index, delta) => {
     setItems((current) => current.reduce((acc, item, rowIndex) => {
       if (rowIndex !== index) {
@@ -327,6 +346,9 @@ const Ventas = () => {
           searchTerm={productSearch}
           onSearchChange={setProductSearch}
           onAddItem={handleQuickAddProducto}
+          onRemoveItem={handleRemoveProducto}
+          onIncreaseItem={handleQuickAddProducto}
+          onDecreaseItem={handleDecreaseProducto}
           cart={cartItems}
           onGoToTicket={goToTicket}
           formatMoney={formatMoney}
