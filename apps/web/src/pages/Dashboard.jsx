@@ -3,6 +3,7 @@ import { CalendarDays, ChartColumn, Clock3, ReceiptText } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { apiGet } from '../api/httpClient';
+import ErrorMessage from '../components/ErrorMessage'
 
 const MONEY_FORMATTER = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -146,11 +147,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-          {error}
-        </div>
-      )}
+      <ErrorMessage message={error} onDismiss={() => setError('')} />
 
       {isAdmin && (
         <section className="rounded-2xl border border-rosewood/20 bg-gradient-to-r from-blush-100 via-white to-gold-100 p-5 shadow-sm sm:p-6">

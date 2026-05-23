@@ -1,0 +1,40 @@
+# Git
+.git
+.gitignore
+
+# Python
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.venv
+**/venv
+**/*.egg-info
+
+# Node
+**/node_modules
+**/dist
+**/.vite
+
+# OS / Editor
+**/.DS_Store
+**/Thumbs.db
+**/.idea
+**/.vscode
+
+# Logs
+**/*.log
+
+# Tests/coverage artifacts
+**/.coverage
+**/htmlcov
+**/reporte.html
+**/resultados.xml
+
+# Environment files (fallback — Docker Compose uses --env-file)
+**/.env
+**/.env.*
+
+# Docker
+infra/.docker

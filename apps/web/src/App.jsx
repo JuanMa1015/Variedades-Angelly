@@ -28,6 +28,9 @@ import FacturasCompra from './pages/admin/FacturasCompra';
 import GastosAdmin from './pages/admin/GastosAdmin';
 import AbonosCartera from './pages/admin/AbonosCartera';
 import { getDefaultRouteForRole } from './auth/roleRoutes';
+import ErrorBoundary from './components/ErrorBoundary'
+import { ToastProvider } from './components/ToastContext'
+import ToastContainer from './components/ToastContainer'
 import './App.css';
 
 const LandingRedirect = () => {
@@ -47,10 +50,12 @@ const LandingRedirect = () => {
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<LandingRedirect />} />
-        <Route path="/login" element={<Login />} />
+    <ErrorBoundary>
+      <ToastProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<LandingRedirect />} />
+            <Route path="/login" element={<Login />} />
 
         <Route element={<PrivateRoute />}>
           <Route element={<MainLayout />}>
@@ -97,6 +102,9 @@ function App() {
         <Route path="*" element={<LandingRedirect />} />
       </Routes>
     </BrowserRouter>
+    <ToastContainer />
+      </ToastProvider>
+    </ErrorBoundary>
   );
 }
 

@@ -3,6 +3,8 @@ import { Save, Search, Trash2, UserRound } from 'lucide-react';
 import PaginationControls from '../components/PaginationControls';
 import { useAuth } from '../auth/AuthContext';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../api/httpClient';
+import ErrorMessage from '../components/ErrorMessage'
+import SuccessMessage from '../components/SuccessMessage'
 
 const PAGE_SIZE = 10;
 
@@ -170,17 +172,8 @@ const ClientesTienda = () => {
         </div>
       </div>
 
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-          {error}
-        </div>
-      )}
-
-      {success && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
-          {success}
-        </div>
-      )}
+      <ErrorMessage message={error} onDismiss={() => setError('')} />
+      <SuccessMessage message={success} onDismiss={() => setSuccess('')} />
 
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
         <h2 className="mb-4 text-xl font-bold text-gray-900">

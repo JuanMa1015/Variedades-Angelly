@@ -3,6 +3,7 @@ import { Lock, UserRound } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { getDefaultRouteForRole } from '../auth/roleRoutes';
+import ErrorMessage from '../components/ErrorMessage'
 
 const Login = () => {
   const { login, isAuthenticated, user } = useAuth();
@@ -94,11 +95,7 @@ const Login = () => {
             </div>
           </div>
 
-          {error && (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-700 font-medium text-sm">
-              {error}
-            </div>
-          )}
+          <ErrorMessage message={error} onDismiss={() => setError('')} />
 
           <button
             type="submit"

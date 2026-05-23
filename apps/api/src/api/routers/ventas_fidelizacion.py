@@ -316,12 +316,19 @@ def list_ventas(
             for cliente in clientes_tienda
         }
 
+    venta_ids = [venta.id for venta in ventas]
+    detalles_model = db.execute(
+        select(DetalleVentaModel).where(DetalleVentaModel.venta_id.in_(venta_ids)),
+    ).scalars().all()
+    detalles_por_venta: dict[int, list[VentaDetalleResponse]] = {}
+    for detalle in detalles_model:
+        detalles_por_venta.setdefault(detalle.venta_id, []).append(
+            _to_detalle_response(detalle),
+        )
+
     payload: list[VentaResponse] = []
     for venta in ventas:
-        detalles_model = db.execute(
-            select(DetalleVentaModel).where(DetalleVentaModel.venta_id == venta.id),
-        ).scalars().all()
-        detalles = [_to_detalle_response(detalle) for detalle in detalles_model]
+        detalles = detalles_por_venta.get(venta.id, [])
         if venta.cliente_id is not None:
             cliente_nombre = clientes_por_id.get(venta.cliente_id)
         elif venta.cliente_tienda_id is not None:

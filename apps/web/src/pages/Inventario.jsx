@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Barcode, Package, Plus, RotateCcw, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { apiGet, apiPatch, apiPost } from '../api/httpClient';
+import ErrorMessage from '../components/ErrorMessage';
+import SuccessMessage from '../components/SuccessMessage';
 
 const MONEY_FORMATTER = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -91,6 +93,15 @@ const Inventario = () => {
       return;
     }
 
+    if (
+      Number(manualForm.precio_costo) < 0 ||
+      Number(manualForm.precio_venta) < 0 ||
+      Number(manualForm.stock_actual) < 0
+    ) {
+      setError('Los valores numéricos no pueden ser negativos.');
+      return;
+    }
+
     try {
       setSaving(true);
       await createProducto({
@@ -125,6 +136,15 @@ const Inventario = () => {
     const code = barcodeForm.codigo_barras.trim();
     if (!code) {
       setError('Ingresa o escanea un código de barras');
+      return;
+    }
+
+    if (
+      Number(barcodeForm.precio_costo) < 0 ||
+      Number(barcodeForm.precio_venta) < 0 ||
+      Number(barcodeForm.stock_actual) < 0
+    ) {
+      setError('Los valores numéricos no pueden ser negativos.');
       return;
     }
 
@@ -192,17 +212,9 @@ const Inventario = () => {
         </div>
       </div>
 
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-          {error}
-        </div>
-      )}
+      <ErrorMessage message={error} onDismiss={() => setError('')} />
 
-      {success && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
-          {success}
-        </div>
-      )}
+      <SuccessMessage message={success} onDismiss={() => setSuccess('')} />
 
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">

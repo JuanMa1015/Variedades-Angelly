@@ -1,3 +1,6 @@
+import ErrorMessage from '../../components/ErrorMessage';
+import SuccessMessage from '../../components/SuccessMessage';
+
 const CheckoutView = ({
   totalEstimado,
   cambioContado,
@@ -73,17 +76,8 @@ const CheckoutView = ({
         </button>
       </div>
 
-      {error && (
-        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-          {error}
-        </div>
-      )}
-
-      {success && (
-        <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
-          {success}
-        </div>
-      )}
+      <ErrorMessage message={error} onDismiss={() => {}} />
+      <SuccessMessage message={success} onDismiss={() => {}} />
       {/* TODO: botón imprimir factura POS aquí */}
 
       <form className="space-y-4" onSubmit={onConfirmar}>
