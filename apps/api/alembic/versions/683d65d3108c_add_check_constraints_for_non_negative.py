@@ -1,7 +1,7 @@
 """add_check_constraints_for_non_negative
 
 Revision ID: 683d65d3108c
-Revises: 2b3c4d5e6f7a
+Revises: c9a7e5b2f1d4
 Create Date: 2026-05-23 00:29:49.891115
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '683d65d3108c'
-down_revision: Union[str, None] = '2b3c4d5e6f7a'
+down_revision: Union[str, None] = 'c9a7e5b2f1d4'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
