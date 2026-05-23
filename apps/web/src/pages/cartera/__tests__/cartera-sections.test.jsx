@@ -75,12 +75,12 @@ describe('Cartera sections smoke tests', () => {
     fireEvent.click(screen.getByRole('button', { name: /registrar cliente/i }));
     expect(startNewCliente).toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: /editar/i }));
+    fireEvent.click(screen.getAllByRole('button', { name: /editar/i })[0]);
     expect(startEditingCliente).toHaveBeenCalledWith(
       expect.objectContaining({ id: 1, nombre: 'Cliente A' }),
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /eliminar/i }));
+    fireEvent.click(screen.getAllByRole('button', { name: /eliminar/i })[0]);
     expect(handleDeleteCliente).toHaveBeenCalledWith(
       expect.objectContaining({ id: 1, nombre: 'Cliente A' }),
     );
