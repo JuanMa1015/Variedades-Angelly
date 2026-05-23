@@ -8,6 +8,7 @@ Sistema full-stack para ventas, cartera, inventario, proveedores, gastos, fideli
 - Danilo Tangarife Bustamante
 - Gilar Valentina Castaño
 
+
 ## Estructura Actual
 
 ```
@@ -61,11 +62,6 @@ VITE_COBRO_TITULAR_CUENTA=
 VITE_COBRO_NEQUI_NUMERO=
 VITE_COBRO_NEQUI_TITULAR=
 ```
-
-Notas:
-- No versionar archivos `.env` reales.
-- `JWT_SECRET_KEY` y credenciales bootstrap deben rotarse si estuvieron expuestas.
-- El frontend usa `VITE_API_URL`; las variables `VITE_COBRO_*` quedan para el texto de WhatsApp.
 
 ## Instalación
 
@@ -156,24 +152,12 @@ alembic current
 alembic history --verbose
 ```
 
-## Autenticación
-
-- Login: `POST /api/auth/login`
-- El backend retorna `access_token`, `role` y `username`
-- El frontend guarda el token en `localStorage`
-- El token expira según lo configurado en backend
-
 ## CI / CD
 
 El workflow de GitHub Actions vive en [.github/workflows/backend-ci.yml](.github/workflows/backend-ci.yml) y ejecuta:
 - backend tests y drift de Alembic
 - frontend lint, tests y build
 
-## Seguridad
-
-- [`.env`](.env) no debe estar versionado.
-- [.gitignore](.gitignore) excluye secretos y artefactos de build.
-- Si un secreto se publicó en GitHub, rotarlo de inmediato aunque luego se haya removido del tracking.
 
 ### Roles y Permisos
 
@@ -325,6 +309,7 @@ behave backend/features/clientes.feature
 **Estados Esperados:**
 - [OK] pytest: 37/37 tests pasando
 - [OK] behave: 12/12 escenarios pasando
+
 
 ---
 
@@ -496,6 +481,7 @@ Recomendación de seguridad:
 - No versionar `.env` con secretos. Mantén un `.env.example` en repo.
 - Para producción, utiliza el gestor de secretos de la plataforma (Vercel/Netlify env vars, AWS Secrets Manager, Azure Key Vault, GCP Secret Manager o el panel de Neon).
 - Evita mantener contraseñas reales en `AUTH_*` dentro del repo; usa un mecanismo de seed seguro y rota las contraseñas.
+
 
 
 
