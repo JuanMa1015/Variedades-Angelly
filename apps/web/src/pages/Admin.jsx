@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { Database, PencilLine, Plus, RefreshCw, Shield, Trash2, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { apiDelete, apiRequest } from '../api/httpClient';
+import ErrorMessage from '../components/ErrorMessage';
+import SuccessMessage from '../components/SuccessMessage';
 
 const MONEY_FORMATTER = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -280,6 +282,10 @@ const Admin = ({ moduleKey = null }) => {
   // Clientes cartera
   const handleCreateClienteCartera = async (event) => {
     event.preventDefault();
+    if (Number(clienteCarteraForm.limite_credito) < 0) {
+      notifyError('El limite de credito no puede ser negativo');
+      return;
+    }
     try {
       await request({
         endpoint: '/api/cartera/clientes',
@@ -398,6 +404,10 @@ const Admin = ({ moduleKey = null }) => {
   // Clientes fidelizacion
   const handleCreateClienteFidelizacion = async (event) => {
     event.preventDefault();
+    if (Number(clienteFidelizacionForm.puntos_acumulados) < 0) {
+      notifyError('Los puntos acumulados no pueden ser negativos');
+      return;
+    }
     try {
       await request({
         endpoint: '/api/fidelizacion/clientes',
@@ -424,6 +434,10 @@ const Admin = ({ moduleKey = null }) => {
     if (telefono === null) return;
     const puntos = window.prompt('Nuevos puntos', String(item.puntos_acumulados ?? ''));
     if (puntos === null) return;
+    if (Number(puntos) < 0) {
+      notifyError('Los puntos acumulados no pueden ser negativos');
+      return;
+    }
 
     try {
       await request({
@@ -627,6 +641,10 @@ const Admin = ({ moduleKey = null }) => {
   // Gastos
   const handleCreateGasto = async (event) => {
     event.preventDefault();
+    if (Number(gastoForm.monto) < 0) {
+      notifyError('El monto no puede ser negativo');
+      return;
+    }
     try {
       await request({
         endpoint: '/api/gastos',
@@ -653,6 +671,10 @@ const Admin = ({ moduleKey = null }) => {
     if (descripcion === null) return;
     const monto = window.prompt('Nuevo monto', String(item.monto ?? ''));
     if (monto === null) return;
+    if (Number(monto) < 0) {
+      notifyError('El monto no puede ser negativo');
+      return;
+    }
 
     try {
       await request({
@@ -844,6 +866,22 @@ const Admin = ({ moduleKey = null }) => {
   // Productos
   const handleCreateProducto = async (event) => {
     event.preventDefault();
+    if (Number(productoForm.precio_costo) < 0) {
+      notifyError('El precio de costo no puede ser negativo');
+      return;
+    }
+    if (Number(productoForm.precio_venta) < 0) {
+      notifyError('El precio de venta no puede ser negativo');
+      return;
+    }
+    if (Number(productoForm.stock_actual) < 0) {
+      notifyError('El stock actual no puede ser negativo');
+      return;
+    }
+    if (Number(productoForm.stock_minimo) < 0) {
+      notifyError('El stock minimo no puede ser negativo');
+      return;
+    }
     try {
       await request({
         endpoint: '/api/superadmin/productos',
@@ -872,6 +910,10 @@ const Admin = ({ moduleKey = null }) => {
     if (nombre === null) return;
     const precioVenta = window.prompt('Nuevo precio de venta', String(item.precio_venta ?? ''));
     if (precioVenta === null) return;
+    if (Number(precioVenta) < 0) {
+      notifyError('El precio de venta no puede ser negativo');
+      return;
+    }
 
     try {
       await request({
@@ -1058,17 +1100,8 @@ const Admin = ({ moduleKey = null }) => {
         </div>
       </section>
 
-      {error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-          {error}
-        </div>
-      )}
-
-      {success && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
-          {success}
-        </div>
-      )}
+      <ErrorMessage message={error} onDismiss={() => setError('')} />
+      <SuccessMessage message={success} onDismiss={() => setSuccess('')} />
 
       {!moduleKey && (
         <div className="rounded-2xl border border-[#eebbbb] bg-white/80 px-4 py-3 text-xs text-[#6a3f43]/80 shadow-sm sm:text-sm">
