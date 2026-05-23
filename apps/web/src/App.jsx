@@ -13,6 +13,20 @@ import Fidelizacion from './pages/Fidelizacion';
 import ClientesTienda from './pages/ClientesTienda';
 import Login from './pages/Login';
 import Admin from './pages/Admin';
+import VendedoresAdmin from './pages/admin/Vendedores';
+import AdminsAdmin from './pages/admin/Admins';
+import ProductosAdmin from './pages/admin/Productos';
+import ProveedoresAdmin from './pages/admin/Proveedores';
+import AuditoriasAdmin from './pages/admin/Auditorias';
+import InformesAdmin from './pages/admin/Informes';
+import ClientesCartera from './pages/admin/ClientesCartera';
+import ClientesTiendaAdmin from './pages/admin/ClientesTienda';
+import ClientesFidelizacionAdmin from './pages/admin/ClientesFidelizacion';
+import VentasAdmin from './pages/admin/VentasAdmin';
+import PedidosProveedor from './pages/admin/PedidosProveedor';
+import FacturasCompra from './pages/admin/FacturasCompra';
+import GastosAdmin from './pages/admin/GastosAdmin';
+import AbonosCartera from './pages/admin/AbonosCartera';
 import { getDefaultRouteForRole } from './auth/roleRoutes';
 import './App.css';
 
@@ -41,10 +55,21 @@ function App() {
         <Route element={<PrivateRoute />}>
           <Route element={<MainLayout />}>
             <Route element={<PrivateRoute allowedRoles={['superadmin']} />}>
-              <Route path="/admin" element={<Admin />} />
-              <Route path="/gastos" element={<Gastos />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/facturas" element={<Facturas />} />
+              <Route path="/admin" element={<Navigate to="/admin/vendedores" replace />} />
+              <Route path="/admin/admins" element={<AdminsAdmin />} />
+              <Route path="/admin/vendedores" element={<VendedoresAdmin />} />
+              <Route path="/admin/productos" element={<ProductosAdmin />} />
+              <Route path="/admin/clientes-cartera" element={<ClientesCartera />} />
+              <Route path="/admin/clientes-tienda" element={<ClientesTiendaAdmin />} />
+              <Route path="/admin/clientes-fidelizacion" element={<ClientesFidelizacionAdmin />} />
+              <Route path="/admin/ventas" element={<VentasAdmin />} />
+              <Route path="/admin/proveedores" element={<ProveedoresAdmin />} />
+              <Route path="/admin/pedidos-proveedor" element={<PedidosProveedor />} />
+              <Route path="/admin/facturas-compra" element={<FacturasCompra />} />
+              <Route path="/admin/gastos" element={<GastosAdmin />} />
+              <Route path="/admin/abonos-cartera" element={<AbonosCartera />} />
+              <Route path="/admin/auditorias" element={<AuditoriasAdmin />} />
+              <Route path="/admin/informes" element={<InformesAdmin />} />
             </Route>
 
             <Route element={<PrivateRoute allowedRoles={['admin', 'superadmin']} />}>
@@ -56,12 +81,15 @@ function App() {
               <Route path="/cartera/cobrar" element={<Cartera />} />
             </Route>
 
-            <Route element={<PrivateRoute allowedRoles={['superadmin', 'vendedor']} />}>
+            <Route element={<PrivateRoute allowedRoles={['vendedor', 'superadmin']} />}>
               <Route path="/proveedores" element={<Proveedores />} />
               <Route path="/inventario" element={<Inventario />} />
               <Route path="/fidelizacion" element={<Fidelizacion />} />
               <Route path="/ventas" element={<Ventas />} />
               <Route path="/clientes" element={<ClientesTienda />} />
+              <Route path="/facturas" element={<Facturas />} />
+              <Route path="/gastos" element={<Gastos />} />
+              <Route path="/dashboard" element={<Dashboard />} />
             </Route>
           </Route>
         </Route>

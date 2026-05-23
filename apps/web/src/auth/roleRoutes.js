@@ -1,7 +1,7 @@
 export const ROLE_DEFAULT_ROUTES = {
   vendedor: '/ventas',
   admin: '/cartera/venta',
-  superadmin: '/dashboard',
+  superadmin: '/admin/vendedores',
 };
 
 export const getDefaultRouteForRole = (role) => {

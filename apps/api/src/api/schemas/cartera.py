@@ -161,6 +161,24 @@ class AbonoCarteraCreateRequest(BaseModel):
     referencia: Annotated[str | None, Field(max_length=255)] = None
 
 
+class AbonoCarteraCreateAdminRequest(BaseModel):
+    """Entrada para registrar abonos desde admin (incluye cliente_id)."""
+
+    cliente_id: Annotated[int, Field(gt=0)]
+    monto: Annotated[float, Field(gt=0)]
+    metodo_pago: MetodoPago = "efectivo"
+    fecha: datetime | None = None
+    referencia: Annotated[str | None, Field(max_length=255)] = None
+
+
+class AbonoCarteraUpdateRequest(BaseModel):
+    """Entrada para editar un abono de cartera."""
+
+    monto: Annotated[float | None, Field(gt=0)] = None
+    metodo_pago: MetodoPago | None = None
+    referencia: Annotated[str | None, Field(max_length=255)] = None
+
+
 class AbonoCarteraResponse(BaseModel):
     """Salida de abonos registrados en cartera."""
 

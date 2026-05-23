@@ -1,5 +1,8 @@
 name: Monorepo CI
 
+permissions:
+  contents: read
+
 on:
   pull_request:
     paths:
@@ -55,17 +58,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run Alembic drift guard
-        run: python -m pytest tests/test_alembic_drift.py -q
-
-      - name: Run backend contract suites
-        run: |
-          python -m pytest tests/test_apply_migration_runner.py -q
-          python -m pytest tests/test_auth_api.py -q
-          python -m pytest tests/test_cartera_contract.py -q
-          python -m pytest tests/test_operaciones_contract.py -q
-          python -m pytest tests/test_inventario_contract.py -q
-          python -m pytest tests/test_router_split_contract.py -q
+      - name: Run backend tests
+        run: python -m pytest -q
 
   frontend-tests:
     runs-on: ubuntu-latest

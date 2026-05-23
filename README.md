@@ -455,3 +455,48 @@ app.include_router(reportes_router)
 
 
 
+## Despliegue
+
+Breve guía para desplegar la aplicación via Docker (self-host) o plataformas serverless (Vercel/Netlify para frontend, backend en un host o serverless con Neon como BD).
+
+- Docker (local / staging):
+
+```powershell
+# desde la carpeta raíz del repo
+Set-Location infra
+docker compose up -d --build
+```
+
+- Variables de entorno mínimas (crear en el servicio / panel de la plataforma):
+
+  - `DATABASE_URL` : URL de Postgres/Neon. Ejemplo: `postgresql://USER:PASSWORD@HOST/DBNAME?sslmode=require`
+  - `JWT_SECRET_KEY` : clave secreta para firmar JWT (HS256).
+  - `APP_ENV` : `production` o `development`.
+  - `AUTH_BOOTSTRAP_ENABLED` : `true|false` (habilita seed de usuarios iniciales).
+  - `AUTH_SUPERADMIN_USERNAME`, `AUTH_SUPERADMIN_PASSWORD` (solo para bootstrap; no los guardes en el repo si son secretos)
+  - `AUTH_ADMIN_USERNAME`, `AUTH_ADMIN_PASSWORD`
+  - `AUTH_SELLER_USERNAME`, `AUTH_SELLER_PASSWORD`
+  - `CORS_ALLOW_ORIGINS` : dominios permitidos por backend (coma-separados). Ej: `https://mi-app.vercel.app`
+  - `VITE_API_URL` : URL pública del backend que debe usar el frontend (p. ej. `https://api.mi-app.com`).
+  - `VITE_COBRO_*` : valores públicos para texto de cobro (opcionales).
+
+- Vercel / Netlify (Frontend):
+
+  - Configura `VITE_API_URL` en el panel de variables de entorno de la plataforma.
+  - No incluyas secrets sensibles en el cliente; el frontend solo debe exponer URLs públicas.
+  - Para builds en Vercel/Netlify, define `NODE_ENV=production` y `VITE_API_URL`.
+
+- Backend en hosting/containers:
+
+  - Configura `DATABASE_URL`, `JWT_SECRET_KEY` y `CORS_ALLOW_ORIGINS` en el entorno del servidor.
+  - Si usas Neon, crea una `DATABASE_URL` con los permisos mínimos necesarios.
+
+Recomendación de seguridad:
+
+- No versionar `.env` con secretos. Mantén un `.env.example` en repo.
+- Para producción, utiliza el gestor de secretos de la plataforma (Vercel/Netlify env vars, AWS Secrets Manager, Azure Key Vault, GCP Secret Manager o el panel de Neon).
+- Evita mantener contraseñas reales en `AUTH_*` dentro del repo; usa un mecanismo de seed seguro y rota las contraseñas.
+
+
+
+

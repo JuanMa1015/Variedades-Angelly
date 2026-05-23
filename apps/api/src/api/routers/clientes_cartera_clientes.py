@@ -21,7 +21,7 @@ router = APIRouter(tags=["clientes-cartera-clientes"])
 @router.get("/api/clientes", response_model=list[ClienteResponse])
 def list_clientes(
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> list[ClienteResponse]:
     clientes = db.execute(
         select(ClienteModel).order_by(ClienteModel.nombre.asc()),
@@ -58,7 +58,7 @@ def list_clientes(
 def create_cliente(
     payload: ClienteCreateRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> ClienteResponse:
     nombre_normalizado = payload.nombre.strip()
     if not nombre_normalizado:
@@ -100,7 +100,7 @@ def update_cliente_cartera(
     cliente_id: int,
     payload: ClienteUpdateRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> ClienteResponse:
     cliente = db.execute(
         select(ClienteModel).where(ClienteModel.id == cliente_id),
@@ -159,7 +159,7 @@ def update_cliente_cartera(
 def delete_cliente_cartera(
     cliente_id: int,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> Response:
     cliente = db.execute(
         select(ClienteModel).where(ClienteModel.id == cliente_id),
@@ -193,7 +193,7 @@ def delete_cliente_cartera(
 def get_cliente_por_nombre(
     nombre: str,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> ClienteResponse:
     repository = SqlAlchemyClienteRepository(db)
     cliente = repository.get_by_nombre(nombre)

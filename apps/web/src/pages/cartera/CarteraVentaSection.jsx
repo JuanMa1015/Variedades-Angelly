@@ -35,7 +35,7 @@ const CarteraVentaSection = ({
   return (
     <section className="space-y-6">
       <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-xl font-bold text-gray-900">Registro de venta de cartera</h2>
             <p className="text-sm text-gray-600">Selecciona cliente, fecha, método de pago y los artículos de la venta.</p>
@@ -48,7 +48,7 @@ const CarteraVentaSection = ({
               Ver historial de ventas
             </button>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={startNewCliente}
