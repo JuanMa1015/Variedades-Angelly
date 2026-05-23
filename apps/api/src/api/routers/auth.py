@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -113,11 +113,23 @@ def list_vendedores(
 
 
 @router.post("/api/usuarios/vendedores", response_model=VendedorUsuarioResponse, status_code=201)
-def create_vendedor(
-    payload: VendedorUsuarioCreateRequest,
+async def create_vendedor(
+    request: Request,
     db: Session = Depends(get_db),
     _: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> VendedorUsuarioResponse:
+    # Accept either application/json or form-encoded payloads.
+    try:
+        data = await request.json()
+    except Exception:
+        form = await request.form()
+        data = dict(form)
+
+    try:
+        payload = VendedorUsuarioCreateRequest(**data)
+    except ValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.errors())
+
     username = payload.username.strip()
     if not username:
         raise HTTPException(status_code=400, detail="Username requerido")

@@ -102,7 +102,7 @@ def _to_detalle_response(detalle: DetalleVentaModel) -> VentaDetalleResponse:
 def create_venta(
     payload: VentaCreateRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> VentaResponse:
     total = 0.0
     detalle_payload: list[VentaDetalleResponse] = []
@@ -227,6 +227,7 @@ def create_venta(
                     saldo_pendiente = float(total - abono_inicial)
 
             venta = VentaModel(
+                creado_por=current_user.username,
                 cliente_id=cliente.id if cliente is not None else None,
                 cliente_tienda_id=cliente_tienda.id if cliente_tienda is not None else None,
                 tipo_fiado=fiado_origen,
@@ -284,7 +285,7 @@ def create_venta(
 @router.get("/api/ventas", response_model=list[VentaResponse])
 def list_ventas(
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> list[VentaResponse]:
     ventas = db.execute(
         select(VentaModel).order_by(VentaModel.fecha.desc()),
@@ -359,7 +360,7 @@ def update_venta(
     venta_id: int,
     payload: VentaUpdateRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> VentaResponse:
     campos = payload.model_fields_set
     if not campos:
@@ -502,7 +503,7 @@ def update_venta(
 def delete_venta(
     venta_id: int,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> Response:
     with db.begin():
         venta = db.execute(

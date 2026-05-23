@@ -46,7 +46,7 @@ class ClienteFidelizacionUpdateRequest(BaseModel):
 @router.get("/api/fidelizacion/clientes", response_model=list[ClienteFidelizacionResponse])
 def list_clientes_fidelizacion(
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> list[ClienteFidelizacionResponse]:
     clientes = db.execute(
         select(ClienteFidelizacionModel).order_by(
@@ -70,7 +70,7 @@ def list_clientes_fidelizacion(
 def create_cliente_fidelizacion(
     payload: ClienteFidelizacionCreateRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> ClienteFidelizacionResponse:
     existente = db.execute(
         select(ClienteFidelizacionModel).where(
@@ -102,7 +102,7 @@ def update_cliente_fidelizacion(
     cliente_id: int,
     payload: ClienteFidelizacionUpdateRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> ClienteFidelizacionResponse:
     cliente = db.execute(
         select(ClienteFidelizacionModel).where(ClienteFidelizacionModel.id == cliente_id),
@@ -148,7 +148,7 @@ def update_cliente_fidelizacion(
 def delete_cliente_fidelizacion(
     cliente_id: int,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> Response:
     cliente = db.execute(
         select(ClienteFidelizacionModel).where(ClienteFidelizacionModel.id == cliente_id),
@@ -165,7 +165,7 @@ def delete_cliente_fidelizacion(
 def canjear_bono_fidelizacion(
     cliente_id: int,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> ClienteFidelizacionResponse:
     cliente = db.execute(
         select(ClienteFidelizacionModel)

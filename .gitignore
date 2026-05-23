@@ -12,6 +12,7 @@ apps/api/.venv/
 # Tool caches
 .pytest_cache/
 .mypy_cache/
+.coverage
 
 # OS/editor noise
 .DS_Store
@@ -20,11 +21,11 @@ Thumbs.db
 
 # Environment variables (secrets, credentials)
 .env
+.env.example
 backend/.env
 frontend/.env
 apps/api/.env
 apps/web/.env
-env.local
 *.env.local
 
 # Frontend build artifacts
@@ -32,7 +33,6 @@ node_modules/
 dist/
 .vite/
 
-.env
-.coverage
-pytest.ini
-behave.ini
+# Reports
+apps/api/reporte.html
+apps/api/resultados.xml

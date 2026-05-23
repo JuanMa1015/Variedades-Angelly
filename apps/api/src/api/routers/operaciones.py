@@ -151,6 +151,12 @@ class FacturaCompraResponse(BaseModel):
     items: list[FacturaDetalleResponse]
 
 
+class FacturaCompraUpdateRequest(BaseModel):
+    """Entrada para editar una factura de compra."""
+
+    total_factura: Annotated[float | None, Field(gt=0)] = None
+
+
 def _to_proveedor_response(proveedor: ProveedorModel) -> ProveedorResponse:
     return ProveedorResponse(
         id=proveedor.id,
@@ -210,7 +216,7 @@ def _to_factura_response(
 @router.get("/api/proveedores", response_model=list[ProveedorResponse])
 def list_proveedores(
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> list[ProveedorResponse]:
     proveedores = db.execute(
         select(ProveedorModel).order_by(ProveedorModel.nombre.asc()),
@@ -222,7 +228,7 @@ def list_proveedores(
 def create_proveedor(
     payload: ProveedorCreateRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> ProveedorResponse:
     existente = db.execute(
         select(ProveedorModel).where(ProveedorModel.nombre == payload.nombre),
@@ -247,7 +253,7 @@ def update_proveedor(
     proveedor_id: int,
     payload: ProveedorUpdateRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> ProveedorResponse:
     proveedor = db.execute(
         select(ProveedorModel).where(ProveedorModel.id == proveedor_id),
@@ -293,7 +299,7 @@ def update_proveedor(
 def delete_proveedor(
     proveedor_id: int,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> Response:
     proveedor = db.execute(
         select(ProveedorModel).where(ProveedorModel.id == proveedor_id),
@@ -320,7 +326,7 @@ def delete_proveedor(
 @router.get("/api/proveedores/pedidos", response_model=list[PedidoProveedorResponse])
 def list_pedidos_proveedor(
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> list[PedidoProveedorResponse]:
     pedidos = db.execute(
         select(PedidoProveedorModel).order_by(PedidoProveedorModel.fecha_creacion.desc()),
@@ -351,7 +357,7 @@ def list_pedidos_proveedor(
 def create_pedido_proveedor(
     payload: PedidoProveedorCreateRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> PedidoProveedorResponse:
     proveedor = db.execute(
         select(ProveedorModel).where(ProveedorModel.id == payload.proveedor_id),
@@ -383,7 +389,7 @@ def update_pedido_proveedor(
     pedido_id: int,
     payload: PedidoProveedorUpdateRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> PedidoProveedorResponse:
     pedido = db.execute(
         select(PedidoProveedorModel).where(PedidoProveedorModel.id == pedido_id),
@@ -416,7 +422,7 @@ def update_pedido_proveedor(
 def delete_pedido_proveedor(
     pedido_id: int,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> Response:
     pedido = db.execute(
         select(PedidoProveedorModel).where(PedidoProveedorModel.id == pedido_id),
@@ -432,7 +438,7 @@ def delete_pedido_proveedor(
 @router.get("/api/gastos", response_model=list[GastoResponse])
 def list_gastos(
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> list[GastoResponse]:
     gastos = db.execute(
         select(GastoModel).order_by(GastoModel.fecha.desc()),
@@ -453,7 +459,7 @@ def list_gastos(
 @router.get("/api/facturas-compra", response_model=list[FacturaCompraResponse])
 def list_facturas_compra(
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> list[FacturaCompraResponse]:
     facturas = db.execute(
         select(FacturaCompraModel).order_by(FacturaCompraModel.fecha_creacion.desc()),
@@ -491,7 +497,7 @@ def list_facturas_compra(
 def create_factura_compra(
     payload: FacturaCompraCreateRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> FacturaCompraResponse:
     proveedor = db.execute(
         select(ProveedorModel).where(ProveedorModel.id == payload.proveedor_id),
@@ -565,11 +571,69 @@ def create_factura_compra(
     )
 
 
+@router.patch("/api/facturas-compra/{factura_id}", response_model=FacturaCompraResponse)
+def update_factura_compra(
+    factura_id: int,
+    payload: FacturaCompraUpdateRequest,
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+) -> FacturaCompraResponse:
+    factura = db.execute(
+        select(FacturaCompraModel).where(FacturaCompraModel.id == factura_id),
+    ).scalar_one_or_none()
+    if factura is None:
+        raise HTTPException(status_code=404, detail="Factura no encontrada")
+
+    if payload.total_factura is not None:
+        factura.total_factura = payload.total_factura
+
+    db.commit()
+    db.refresh(factura)
+
+    proveedor = db.execute(
+        select(ProveedorModel).where(ProveedorModel.id == factura.proveedor_id),
+    ).scalar_one_or_none()
+    detalles = db.execute(
+        select(FacturaCompraDetalleModel).where(
+            FacturaCompraDetalleModel.factura_id == factura.id,
+        ),
+    ).scalars().all()
+
+    return _to_factura_response(
+        factura,
+        proveedor_nombre=proveedor.nombre if proveedor else "Proveedor",
+        items=detalles,
+    )
+
+
+@router.delete("/api/facturas-compra/{factura_id}", status_code=204)
+def delete_factura_compra(
+    factura_id: int,
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+) -> None:
+    factura = db.execute(
+        select(FacturaCompraModel).where(FacturaCompraModel.id == factura_id),
+    ).scalar_one_or_none()
+    if factura is None:
+        raise HTTPException(status_code=404, detail="Factura no encontrada")
+
+    detalles = db.execute(
+        select(FacturaCompraDetalleModel).where(
+            FacturaCompraDetalleModel.factura_id == factura.id,
+        ),
+    ).scalars().all()
+    for detalle in detalles:
+        db.delete(detalle)
+    db.delete(factura)
+    db.commit()
+
+
 @router.post("/api/gastos", response_model=GastoResponse, status_code=201)
 def create_gasto(
     payload: GastoCreateRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> GastoResponse:
     gasto = GastoModel(
         categoria=payload.categoria,
@@ -596,7 +660,7 @@ def update_gasto(
     gasto_id: int,
     payload: GastoUpdateRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> GastoResponse:
     gasto = db.execute(
         select(GastoModel).where(GastoModel.id == gasto_id),
@@ -635,7 +699,7 @@ def update_gasto(
 def delete_gasto(
     gasto_id: int,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> Response:
     gasto = db.execute(
         select(GastoModel).where(GastoModel.id == gasto_id),

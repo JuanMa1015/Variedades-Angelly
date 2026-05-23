@@ -94,7 +94,7 @@ def _to_producto_response(producto: Producto) -> ProductoResponse:
 def list_productos(
     db: Session = Depends(get_db),
     catalogo: str = Query("todos", pattern="^(todos|tienda|cartera)$"),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> list[ProductoResponse]:
     """Lista todos los productos del inventario."""
     repository = SqlAlchemyProductoRepository(db)
@@ -108,7 +108,7 @@ def list_productos(
 def create_producto(
     payload: ProductoCreateRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> ProductoResponse:
     """Crea un producto nuevo para inventario."""
     repository = SqlAlchemyProductoRepository(db)
@@ -148,7 +148,7 @@ def update_producto(
     producto_id: int,
     payload: ProductoUpdateRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> ProductoResponse:
     """Edita datos de producto en inventario."""
     producto = db.query(ProductoModel).filter(ProductoModel.id == producto_id).first()
@@ -221,7 +221,7 @@ def update_producto(
 def delete_producto(
     producto_id: int,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> Response:
     """Elimina un producto sin historial de ventas asociado."""
     producto = db.query(ProductoModel).filter(ProductoModel.id == producto_id).first()
@@ -249,7 +249,7 @@ def patch_producto_stock(
     producto_id: int,
     payload: ProductoStockPatchRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> ProductoResponse:
     """Ajusta stock de forma rapida sumando o restando unidades."""
     repository = SqlAlchemyProductoRepository(db)
@@ -270,7 +270,7 @@ def patch_producto_precio_venta(
     producto_id: int,
     payload: ProductoPrecioPatchRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> ProductoResponse:
     """Permite editar precio de venta en modo inline desde el dashboard."""
     repository = SqlAlchemyProductoRepository(db)

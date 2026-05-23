@@ -31,7 +31,7 @@ FIADO_ORIGEN_CARTERA = "cartera"
 def create_cartera_venta(
     payload: CarteraVentaCreateRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> VentaResponse:
     total = 0.0
     detalle_payload: list[VentaDetalleResponse] = []
@@ -169,7 +169,7 @@ def create_cartera_venta(
 def list_cartera_ventas_historial(
     limit: int = Query(default=60, ge=1, le=500),
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> list[CarteraVentaHistorialItemResponse]:
     ventas = db.execute(
         select(VentaModel, ClienteModel.nombre)

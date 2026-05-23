@@ -105,6 +105,7 @@ class VentaModel(Base):
     __tablename__ = "ventas"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    creado_por: Mapped[str | None] = mapped_column(String(50), nullable=True)
     cliente_id: Mapped[int | None] = mapped_column(ForeignKey("clientes.id"), nullable=True)
     cliente_tienda_id: Mapped[int | None] = mapped_column(
         ForeignKey("clientes_fiado_tienda.id"),

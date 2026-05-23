@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Search, ShoppingCart } from 'lucide-react';
+import { Search, ShoppingCart, Minus, Trash2 } from 'lucide-react';
 
 const PRODUCT_ICON_RULES = [
   { match: /arroz|grano|lenteja/i, icon: '🍚' },
@@ -31,6 +31,8 @@ const ProductSelectionView = ({
   onGoToTicket,
   formatMoney,
   loading,
+  onRemoveItem,
+  onDecreaseItem,
 }) => {
   const [activeCategory, setActiveCategory] = useState('Todas');
 
@@ -102,8 +104,8 @@ const ProductSelectionView = ({
       )}
 
       {!loading && visibleProducts.length > 0 && (
-        <div className="grid grid-cols-2 gap-3">
-          {visibleProducts.map((producto) => {
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+            {visibleProducts.map((producto) => {
             const stock = Number(producto.stock_actual || 0);
             const lowStock = stock < 5;
             const qtyInCart = cart.find(
@@ -111,11 +113,18 @@ const ProductSelectionView = ({
             )?.cantidad || 0;
 
             return (
-              <button
+              <div
                 key={producto.id}
-                type="button"
+                role="button"
+                tabIndex={0}
                 onClick={() => onAddItem(producto.id)}
-                className={`relative rounded-2xl border p-3 text-left shadow-sm transition active:scale-[0.99] ${
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    onAddItem(producto.id);
+                  }
+                }}
+                className={`relative cursor-pointer rounded-2xl border pt-10 p-3 text-left shadow-sm transition active:scale-[0.99] sm:pt-4 sm:p-4 ${
                   qtyInCart > 0
                     ? 'border-rosewood bg-blush-50'
                     : lowStock
@@ -123,19 +132,60 @@ const ProductSelectionView = ({
                       : 'border-gray-200 bg-white hover:border-rosewood hover:bg-blush-100'
                 }`}
               >
+                {/* Top-left trash and top-right red counter */}
                 {qtyInCart > 0 && (
-                  <span className="absolute -right-1.5 -top-1.5 inline-flex h-6 min-w-[24px] items-center justify-center rounded-full bg-red-600 px-1 text-xs font-bold text-white shadow-sm">
-                    {qtyInCart}
-                  </span>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); if (typeof onRemoveItem === 'function') onRemoveItem(producto.id); }}
+                    className="absolute left-1 top-1 z-10 inline-flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-gray-50"
+                    aria-label={`Eliminar ${producto.nombre}`}
+                    title="Descartar"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 )}
-                <div className="mb-2 text-2xl">{getProductIcon(producto.nombre)}</div>
-                <p className="truncate text-sm font-bold text-gray-900">{producto.nombre}</p>
-                <p className="mt-1 text-sm font-semibold text-rosewood">{formatMoney(producto.precio_venta)}</p>
+
+                {qtyInCart > 0 && (
+                  <div className="absolute right-1 top-1 z-10 flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (qtyInCart > 1) {
+                          if (typeof onDecreaseItem === 'function') onDecreaseItem(producto.id);
+                        } else {
+                          if (typeof onRemoveItem === 'function') onRemoveItem(producto.id);
+                        }
+                      }}
+                      className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-gray-200 bg-white text-rosewood shadow-sm hover:bg-gray-50"
+                      aria-label={`Disminuir ${producto.nombre}`}
+                      title="Disminuir"
+                    >
+                      <Minus className="h-4 w-4" />
+                    </button>
+
+                    <div className="inline-flex h-6 min-w-[26px] items-center justify-center rounded-full bg-rosewood px-2 text-[11px] font-semibold text-white shadow">
+                      x {qtyInCart}
+                    </div>
+                  </div>
+                )}
+                <div className="mb-2 flex items-start gap-3">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="text-2xl">{getProductIcon(producto.nombre)}</div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-gray-900">{producto.nombre}</p>
+                      <p className="mt-1 text-xs text-gray-500">{formatMoney(producto.precio_venta)}</p>
+                    </div>
+                  </div>
+
+                    <div className="w-6 flex-shrink-0" />
+                </div>
                 <p className={`mt-1 text-xs font-medium ${lowStock ? 'text-amber-800' : 'text-gray-500'}`}>
                   Stock: {stock}
                   {lowStock ? ' · Bajo' : ''}
                 </p>
-              </button>
+                {/* fallback controls (previously duplicated) removed to simplify mobile layout */}
+              </div>
             );
           })}
         </div>
