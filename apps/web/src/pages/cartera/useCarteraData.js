@@ -5,6 +5,7 @@ import useConfirm from '../../components/useConfirm';
 import {
   deleteCarteraCliente,
   fetchCarteraInitialData,
+  fetchCarteraMovimientos,
   fetchCarteraVentasHistorial,
   saveCarteraAbono,
   saveCarteraCliente,
@@ -367,7 +368,7 @@ export const useCarteraData = () => {
     }
   };
 
-  const handleAbrirWhatsapp = (cliente) => {
+  const handleAbrirWhatsapp = async (cliente) => {
     const telefono = normalizeWhatsappNumber(cliente?.telefono_whatsapp);
     if (!telefono) {
       setError('Este cliente no tiene un WhatsApp válido');
@@ -376,29 +377,39 @@ export const useCarteraData = () => {
 
     const deuda = Number(cliente?.deuda_total || 0);
     const nombre = String(cliente?.nombre || '').trim();
-    const mensaje = encodeURIComponent(
-      [
-        `Hola ${nombre || 'cliente'}, esperamos que estés muy bien. Te escribe Tienda Angelly.`,
-        '',
-        `Te escribimos para recordarte tu saldo pendiente de pago por ${formatMoneyWhatsapp(deuda)}.`,
-        '',
-        'Si lo prefieres, puedes realizar un abono parcial y con gusto lo registramos.',
-        '',
-        `Si deseas pagar por transferencia:`,
-        ` Banco: ${import.meta.env.VITE_COBRO_BANCO || 'Bancolombia'}.`,
-        ` Tipo de cuenta: ${import.meta.env.VITE_COBRO_TIPO_CUENTA || 'Ahorros'}.`,
-        ` Número de cuenta: ${import.meta.env.VITE_COBRO_NUMERO_CUENTA || '58440719897'}.`,
-        ` Titular: ${import.meta.env.VITE_COBRO_TITULAR_CUENTA || 'Juan Gonzalez'}.`,
-        '',
-        'Si deseas pagar por Nequi:',
-        ` Número Nequi: ${import.meta.env.VITE_COBRO_NEQUI_NUMERO || '3226515399'}.`,
-        ' Titular Nequi: Juan Londono.',
-        '',
-        'Por favor comparte el comprobante para aplicar el abono.',
-        'Gracias por tu confianza.',
-      ].join('\n'),
-    );
 
+    let productosPendientes = '';
+    try {
+      const movimientos = await fetchCarteraMovimientos({ clienteId: cliente.id, page: 1, limit: 20 });
+      const ventas = (movimientos?.data || []).filter((m) => m.tipo === 'Venta');
+      if (ventas.length > 0) {
+        productosPendientes = ventas
+          .filter((v) => v.articulo)
+          .slice(0, 5)
+          .map((v) => `- ${v.articulo} (${v.cantidad ? `x${v.cantidad}` : ''} $${v.monto ? Number(v.monto).toLocaleString('es-CO') : '?'})`)
+          .join('\n');
+      }
+    } catch {
+      // si falla la consulta, solo omitimos el detalle
+    }
+
+    const lineas = [];
+    lineas.push(`${nombre}, tu saldo pendiente es de ${formatMoneyWhatsapp(deuda)}.`);
+
+    if (productosPendientes) {
+      lineas.push('');
+      lineas.push('Productos pendientes:');
+      lineas.push(productosPendientes);
+    }
+
+    lineas.push('');
+    lineas.push('Formas de pago:');
+    lineas.push(`- Transferencia: ${import.meta.env.VITE_COBRO_BANCO || 'Bancolombia'} ${import.meta.env.VITE_COBRO_TIPO_CUENTA || 'Ahorros'} ${import.meta.env.VITE_COBRO_NUMERO_CUENTA || '58440719897'}`);
+    lineas.push(`- Nequi: ${import.meta.env.VITE_COBRO_NEQUI_NUMERO || '3226515399'}`);
+    lineas.push('');
+    lineas.push('Comparte el comprobante para aplicar el abono. Gracias!');
+
+    const mensaje = encodeURIComponent(lineas.join('\n'));
     window.open(`https://wa.me/${telefono}?text=${mensaje}`, '_blank', 'noopener,noreferrer');
   };
 
