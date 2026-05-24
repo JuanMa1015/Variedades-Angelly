@@ -344,6 +344,45 @@ def create_producto(payload: ProductoCreateUpdate, db: Session = Depends(get_db)
     )
 
 
+@router.patch("/api/superadmin/productos/{producto_id}", response_model=ProductoSchema)
+def update_producto(
+    producto_id: int,
+    payload: ProductoCreateUpdate,
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("superadmin")),
+):
+    producto = db.execute(select(ProductoModel).where(ProductoModel.id == producto_id)).scalar_one_or_none()
+    if producto is None:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    producto.nombre = payload.nombre.strip()
+    producto.codigo_barras = payload.codigo_barras
+    producto.precio_costo = payload.precio_costo
+    producto.precio_venta = payload.precio_venta
+    producto.catalogo = payload.catalogo
+    producto.stock_actual = payload.stock_actual
+    producto.stock_minimo = payload.stock_minimo
+    db.commit()
+    db.refresh(producto)
+    return ProductoSchema(
+        id=producto.id, nombre=producto.nombre, codigo_barras=producto.codigo_barras,
+        precio_costo=producto.precio_costo, precio_venta=producto.precio_venta,
+        catalogo=producto.catalogo, stock_actual=producto.stock_actual, stock_minimo=producto.stock_minimo,
+    )
+
+
+@router.delete("/api/superadmin/productos/{producto_id}", status_code=204)
+def delete_producto(
+    producto_id: int,
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("superadmin")),
+):
+    producto = db.execute(select(ProductoModel).where(ProductoModel.id == producto_id)).scalar_one_or_none()
+    if producto is None:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    db.delete(producto)
+    db.commit()
+
+
 # --- Proveedores ---
 @router.get("/api/superadmin/proveedores", response_model=list[ProveedorSchema])
 def list_proveedores(db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_roles("superadmin"))):
@@ -363,6 +402,38 @@ def create_proveedor(payload: ProveedorCreateUpdate, db: Session = Depends(get_d
     return ProveedorSchema(id=prov.id, nombre=prov.nombre, contacto=prov.contacto, telefono=prov.telefono, activo=prov.activo)
 
 
+@router.patch("/api/superadmin/proveedores/{proveedor_id}", response_model=ProveedorSchema)
+def update_proveedor(
+    proveedor_id: int,
+    payload: ProveedorCreateUpdate,
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("superadmin")),
+):
+    prov = db.execute(select(ProveedorModel).where(ProveedorModel.id == proveedor_id)).scalar_one_or_none()
+    if prov is None:
+        raise HTTPException(status_code=404, detail="Proveedor no encontrado")
+    prov.nombre = payload.nombre.strip()
+    prov.contacto = payload.contacto
+    prov.telefono = payload.telefono
+    prov.activo = payload.activo
+    db.commit()
+    db.refresh(prov)
+    return ProveedorSchema(id=prov.id, nombre=prov.nombre, contacto=prov.contacto, telefono=prov.telefono, activo=prov.activo)
+
+
+@router.delete("/api/superadmin/proveedores/{proveedor_id}", status_code=204)
+def delete_proveedor(
+    proveedor_id: int,
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("superadmin")),
+):
+    prov = db.execute(select(ProveedorModel).where(ProveedorModel.id == proveedor_id)).scalar_one_or_none()
+    if prov is None:
+        raise HTTPException(status_code=404, detail="Proveedor no encontrado")
+    db.delete(prov)
+    db.commit()
+
+
 # --- Auditorias ---
 @router.get("/api/superadmin/auditorias", response_model=list[AuditoriaSchema])
 def list_auditorias(db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_roles("superadmin"))):
@@ -377,6 +448,40 @@ def create_auditoria(payload: AuditoriaCreate, db: Session = Depends(get_db), _:
     db.commit()
     db.refresh(a)
     return AuditoriaSchema(id=a.id, modulo=a.modulo, entidad=a.entidad, entidad_id=a.entidad_id, accion=a.accion, detalle=a.detalle, usuario=a.usuario, fecha=a.fecha)
+
+
+@router.patch("/api/superadmin/auditorias/{auditoria_id}", response_model=AuditoriaSchema)
+def update_auditoria(
+    auditoria_id: int,
+    payload: AuditoriaCreate,
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("superadmin")),
+):
+    a = db.execute(select(AuditoriaModel).where(AuditoriaModel.id == auditoria_id)).scalar_one_or_none()
+    if a is None:
+        raise HTTPException(status_code=404, detail="Auditoria no encontrada")
+    a.modulo = payload.modulo
+    a.entidad = payload.entidad
+    a.entidad_id = payload.entidad_id
+    a.accion = payload.accion
+    a.detalle = payload.detalle
+    a.usuario = payload.usuario
+    db.commit()
+    db.refresh(a)
+    return AuditoriaSchema(id=a.id, modulo=a.modulo, entidad=a.entidad, entidad_id=a.entidad_id, accion=a.accion, detalle=a.detalle, usuario=a.usuario, fecha=a.fecha)
+
+
+@router.delete("/api/superadmin/auditorias/{auditoria_id}", status_code=204)
+def delete_auditoria(
+    auditoria_id: int,
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("superadmin")),
+):
+    a = db.execute(select(AuditoriaModel).where(AuditoriaModel.id == auditoria_id)).scalar_one_or_none()
+    if a is None:
+        raise HTTPException(status_code=404, detail="Auditoria no encontrada")
+    db.delete(a)
+    db.commit()
 
 
 @router.get("/api/superadmin/informes", response_model=InformesSuperadminResponse)

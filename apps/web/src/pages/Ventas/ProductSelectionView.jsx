@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Search, ShoppingCart, Minus, Trash2 } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
+import { Barcode, Search, ShoppingCart, Minus, Trash2 } from 'lucide-react';
 import Skeleton from '../../components/Skeleton';
 
 const PRODUCT_ICON_RULES = [
@@ -36,6 +36,7 @@ const ProductSelectionView = ({
   onDecreaseItem,
 }) => {
   const [activeCategory, setActiveCategory] = useState('Todas');
+  const barcodeRef = useRef(null);
 
   const categories = useMemo(() => {
     const categorySet = new Set(productos.map(getCategoryName));
@@ -59,7 +60,26 @@ const ProductSelectionView = ({
         <p className="text-sm text-gray-500">Selecciona productos para construir el ticket.</p>
       </div>
 
-      {/* TODO: scanner de código de barras aquí */}
+      <label className="relative mb-2 block">
+        <Barcode className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+        <input
+          ref={barcodeRef}
+          type="text"
+          placeholder="Escanear código de barras..."
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              const code = e.target.value.trim();
+              if (!code) return;
+              const product = productos.find((p) => p.codigo_barras === code);
+              if (product) {
+                onAddItem(product);
+                e.target.value = '';
+              }
+            }
+          }}
+          className="w-full rounded-xl border border-gray-300 bg-white py-3 pl-10 pr-4 text-sm focus:border-rosewood focus:outline-none"
+        />
+      </label>
       <label className="relative mb-4 block">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
         <input

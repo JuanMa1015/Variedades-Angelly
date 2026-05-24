@@ -1,5 +1,6 @@
 import ErrorMessage from '../../components/ErrorMessage';
 import SuccessMessage from '../../components/SuccessMessage';
+import { Receipt } from 'lucide-react';
 
 const CheckoutView = ({
   totalEstimado,
@@ -78,7 +79,15 @@ const CheckoutView = ({
 
       <ErrorMessage message={error} onDismiss={() => {}} />
       <SuccessMessage message={success} onDismiss={() => {}} />
-      {/* TODO: botón imprimir factura POS aquí */}
+
+      <button
+        type="button"
+        onClick={() => window.print()}
+        className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50"
+      >
+        <Receipt className="h-4 w-4" />
+        Imprimir factura
+      </button>
 
       <form className="space-y-4" onSubmit={onConfirmar}>
         {!esFiado && (
