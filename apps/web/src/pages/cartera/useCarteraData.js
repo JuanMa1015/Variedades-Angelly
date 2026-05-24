@@ -86,6 +86,8 @@ export const useCarteraData = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
+  const { confirm, ConfirmModal } = useConfirm();
+
   const [clientes, setClientes] = useState([]);
   const [clientesCatalogo, setClientesCatalogo] = useState([]);
   const [productosCartera, setProductosCartera] = useState([]);

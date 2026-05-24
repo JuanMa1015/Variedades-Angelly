@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Barcode, Package, Plus, RotateCcw, Search, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { apiGet, apiPatch, apiPost } from '../api/httpClient';
@@ -42,8 +42,6 @@ const Inventario = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const searchRef = useRef(null);
-
   const clearMessages = () => {
     setError('');
     setSuccess('');

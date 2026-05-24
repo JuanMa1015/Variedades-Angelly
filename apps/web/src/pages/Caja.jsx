@@ -87,11 +87,6 @@ const Caja = () => {
     return Number(cajaActual.saldo_esperado || 0);
   }, [cajaActual]);
 
-  const totalIngresos = useMemo(() => {
-    if (!cajaActual) return 0;
-    return Number(cajaActual.total_ingresos || 0);
-  }, [cajaActual]);
-
   const handleAbrirCaja = async (event) => {
     event.preventDefault();
     setError('');

@@ -46,7 +46,7 @@ const normalizeUser = (rawUser) => {
 
 export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
-  const [refreshToken, setRefreshToken] = useState(null);
+  const [, setRefreshToken] = useState(null);
   const [user, setUser] = useState(null);
   const [bootstrapped, setBootstrapped] = useState(false);
   const refreshTimerRef = useRef(null);
