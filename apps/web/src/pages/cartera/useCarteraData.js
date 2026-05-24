@@ -394,7 +394,9 @@ export const useCarteraData = () => {
     }
 
     const lineas = [];
-    lineas.push(`${nombre}, tu saldo pendiente es de ${formatMoneyWhatsapp(deuda)}.`);
+    lineas.push(`Hola ${nombre}, un saludo de Tienda Angelly.`);
+    lineas.push('');
+    lineas.push(`Tu saldo pendiente es de ${formatMoneyWhatsapp(deuda)}.`);
 
     if (productosPendientes) {
       lineas.push('');
