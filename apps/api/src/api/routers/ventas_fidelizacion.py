@@ -5,13 +5,14 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.api.dependencies import AuthenticatedUser, require_roles
+from src.api.pagination import PageInfo, build_page
 from src.application.services.ventas_service import (
     build_recibo_text,
 )
@@ -86,6 +87,13 @@ class VentaResponse(BaseModel):
     fecha: datetime
     detalles: list[VentaDetalleResponse]
     resumen_recibo: str
+
+
+class VentaPageResponse(BaseModel):
+    """Respuesta paginada de ventas."""
+
+    data: list[VentaResponse]
+    page: PageInfo
 
 
 def _to_detalle_response(detalle: DetalleVentaModel) -> VentaDetalleResponse:
@@ -285,12 +293,49 @@ def create_venta(
 @router.get("/api/ventas", response_model=list[VentaResponse])
 def list_ventas(
     db: Session = Depends(get_db),
+    fecha_desde: datetime | None = Query(default=None),
+    fecha_hasta: datetime | None = Query(default=None),
     _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> list[VentaResponse]:
+    query = select(VentaModel)
+    if fecha_desde:
+        query = query.where(VentaModel.fecha >= fecha_desde)
+    if fecha_hasta:
+        query = query.where(VentaModel.fecha <= fecha_hasta)
     ventas = db.execute(
-        select(VentaModel).order_by(VentaModel.fecha.desc()),
+        query.order_by(VentaModel.fecha.desc()),
     ).scalars().all()
 
+    return _build_venta_responses(ventas, db)
+
+
+@router.get("/api/ventas/paginadas", response_model=VentaPageResponse)
+def list_ventas_paginadas(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=200),
+    fecha_desde: datetime | None = Query(default=None),
+    fecha_hasta: datetime | None = Query(default=None),
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+) -> VentaPageResponse:
+    """Lista paginada de ventas."""
+    query = select(VentaModel)
+    if fecha_desde:
+        query = query.where(VentaModel.fecha >= fecha_desde)
+    if fecha_hasta:
+        query = query.where(VentaModel.fecha <= fecha_hasta)
+    items, page_info = build_page(db, query, page, limit, VentaModel.fecha.desc())
+
+    return VentaPageResponse(
+        data=_build_venta_responses(list(items), db),
+        page=page_info,
+    )
+
+
+def _build_venta_responses(
+    ventas: list[VentaModel],
+    db: Session,
+) -> list[VentaResponse]:
     cliente_ids = {venta.cliente_id for venta in ventas if venta.cliente_id is not None}
     clientes_por_id: dict[int, str] = {}
     if cliente_ids:

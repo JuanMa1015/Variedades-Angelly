@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from src.api.dependencies import AuthenticatedUser, require_roles
+from src.api.pagination import PageInfo, build_page
 from src.infrastructure.database.connection import get_db
 from src.infrastructure.database.models import (
     FacturaCompraDetalleModel,
@@ -34,6 +35,11 @@ class ProveedorResponse(BaseModel):
     contacto: str | None
     telefono: str | None
     activo: bool
+
+
+class ProveedorPageResponse(BaseModel):
+    data: list[ProveedorResponse]
+    page: PageInfo
 
 
 class ProveedorCreateRequest(BaseModel):
@@ -76,6 +82,11 @@ class PedidoProveedorCreateRequest(BaseModel):
     monto_estimado: Annotated[float, Field(gt=0)]
 
 
+class PedidoProveedorPageResponse(BaseModel):
+    data: list[PedidoProveedorResponse]
+    page: PageInfo
+
+
 class PedidoProveedorUpdateRequest(BaseModel):
     """Entrada para editar pedido a proveedor."""
 
@@ -92,6 +103,11 @@ class GastoResponse(BaseModel):
     monto: float
     fecha: datetime
     registrado_por: str
+
+
+class GastoPageResponse(BaseModel):
+    data: list[GastoResponse]
+    page: PageInfo
 
 
 class GastoCreateRequest(BaseModel):
@@ -149,6 +165,11 @@ class FacturaCompraResponse(BaseModel):
     total_factura: float
     fecha_creacion: datetime
     items: list[FacturaDetalleResponse]
+
+
+class FacturaCompraPageResponse(BaseModel):
+    data: list[FacturaCompraResponse]
+    page: PageInfo
 
 
 class FacturaCompraUpdateRequest(BaseModel):
@@ -216,12 +237,34 @@ def _to_factura_response(
 @router.get("/api/proveedores", response_model=list[ProveedorResponse])
 def list_proveedores(
     db: Session = Depends(get_db),
+    include_inactivos: bool = Query(default=False),
     _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> list[ProveedorResponse]:
+    query = select(ProveedorModel)
+    if not include_inactivos:
+        query = query.where(ProveedorModel.activo == True)
     proveedores = db.execute(
-        select(ProveedorModel).order_by(ProveedorModel.nombre.asc()),
+        query.order_by(ProveedorModel.nombre.asc()),
     ).scalars().all()
     return [_to_proveedor_response(item) for item in proveedores]
+
+
+@router.get("/api/proveedores/paginados", response_model=ProveedorPageResponse)
+def list_proveedores_paginados(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=200),
+    include_inactivos: bool = Query(default=False),
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+) -> ProveedorPageResponse:
+    query = select(ProveedorModel)
+    if not include_inactivos:
+        query = query.where(ProveedorModel.activo == True)
+    items, page_info = build_page(db, query, page, limit, ProveedorModel.nombre.asc())
+    return ProveedorPageResponse(
+        data=[_to_proveedor_response(item) for item in items],
+        page=page_info,
+    )
 
 
 @router.post("/api/proveedores", response_model=ProveedorResponse, status_code=201)
@@ -349,6 +392,36 @@ def list_pedidos_proveedor(
     ]
 
 
+@router.get("/api/proveedores/pedidos/paginados", response_model=PedidoProveedorPageResponse)
+def list_pedidos_proveedor_paginados(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=200),
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+) -> PedidoProveedorPageResponse:
+    query = select(PedidoProveedorModel)
+    items, page_info = build_page(db, query, page, limit, PedidoProveedorModel.fecha_creacion.desc())
+
+    proveedor_ids = {pedido.proveedor_id for pedido in items}
+    proveedores_map: dict[int, str] = {}
+    if proveedor_ids:
+        proveedores = db.execute(
+            select(ProveedorModel).where(ProveedorModel.id.in_(proveedor_ids)),
+        ).scalars().all()
+        proveedores_map = {item.id: item.nombre for item in proveedores}
+
+    return PedidoProveedorPageResponse(
+        data=[
+            _to_pedido_proveedor_response(
+                pedido,
+                proveedor_nombre=proveedores_map.get(pedido.proveedor_id, "Proveedor"),
+            )
+            for pedido in items
+        ],
+        page=page_info,
+    )
+
+
 @router.post(
     "/api/proveedores/pedidos",
     response_model=PedidoProveedorResponse,
@@ -438,10 +511,17 @@ def delete_pedido_proveedor(
 @router.get("/api/gastos", response_model=list[GastoResponse])
 def list_gastos(
     db: Session = Depends(get_db),
+    fecha_desde: date | None = Query(default=None),
+    fecha_hasta: date | None = Query(default=None),
     _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> list[GastoResponse]:
+    query = select(GastoModel)
+    if fecha_desde:
+        query = query.where(GastoModel.fecha >= fecha_desde)
+    if fecha_hasta:
+        query = query.where(GastoModel.fecha <= fecha_hasta)
     gastos = db.execute(
-        select(GastoModel).order_by(GastoModel.fecha.desc()),
+        query.order_by(GastoModel.fecha.desc()),
     ).scalars().all()
     return [
         GastoResponse(
@@ -456,13 +536,51 @@ def list_gastos(
     ]
 
 
+@router.get("/api/gastos/paginados", response_model=GastoPageResponse)
+def list_gastos_paginados(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=200),
+    fecha_desde: date | None = Query(default=None),
+    fecha_hasta: date | None = Query(default=None),
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+) -> GastoPageResponse:
+    query = select(GastoModel)
+    if fecha_desde:
+        query = query.where(GastoModel.fecha >= fecha_desde)
+    if fecha_hasta:
+        query = query.where(GastoModel.fecha <= fecha_hasta)
+    items, page_info = build_page(db, query, page, limit, GastoModel.fecha.desc())
+    return GastoPageResponse(
+        data=[
+            GastoResponse(
+                id=gasto.id,
+                categoria=gasto.categoria,
+                descripcion=gasto.descripcion,
+                monto=gasto.monto,
+                fecha=gasto.fecha,
+                registrado_por=gasto.registrado_por,
+            )
+            for gasto in items
+        ],
+        page=page_info,
+    )
+
+
 @router.get("/api/facturas-compra", response_model=list[FacturaCompraResponse])
 def list_facturas_compra(
     db: Session = Depends(get_db),
+    fecha_desde: date | None = Query(default=None),
+    fecha_hasta: date | None = Query(default=None),
     _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> list[FacturaCompraResponse]:
+    query = select(FacturaCompraModel)
+    if fecha_desde:
+        query = query.where(FacturaCompraModel.fecha_creacion >= fecha_desde)
+    if fecha_hasta:
+        query = query.where(FacturaCompraModel.fecha_creacion <= fecha_hasta)
     facturas = db.execute(
-        select(FacturaCompraModel).order_by(FacturaCompraModel.fecha_creacion.desc()),
+        query.order_by(FacturaCompraModel.fecha_creacion.desc()),
     ).scalars().all()
 
     if not facturas:
@@ -491,6 +609,53 @@ def list_facturas_compra(
         )
         for factura in facturas
     ]
+
+
+@router.get("/api/facturas-compra/paginadas", response_model=FacturaCompraPageResponse)
+def list_facturas_compra_paginadas(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=200),
+    fecha_desde: date | None = Query(default=None),
+    fecha_hasta: date | None = Query(default=None),
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+) -> FacturaCompraPageResponse:
+    query = select(FacturaCompraModel)
+    if fecha_desde:
+        query = query.where(FacturaCompraModel.fecha_creacion >= fecha_desde)
+    if fecha_hasta:
+        query = query.where(FacturaCompraModel.fecha_creacion <= fecha_hasta)
+    items, page_info = build_page(db, query, page, limit, FacturaCompraModel.fecha_creacion.desc())
+
+    if not items:
+        return FacturaCompraPageResponse(data=[], page=page_info)
+
+    proveedor_ids = {factura.proveedor_id for factura in items}
+    proveedores = db.execute(
+        select(ProveedorModel).where(ProveedorModel.id.in_(proveedor_ids)),
+    ).scalars().all()
+    proveedor_map = {proveedor.id: proveedor.nombre for proveedor in proveedores}
+
+    factura_ids = [factura.id for factura in items]
+    detalles = db.execute(
+        select(FacturaCompraDetalleModel).where(FacturaCompraDetalleModel.factura_id.in_(factura_ids)),
+    ).scalars().all()
+
+    detalles_map: dict[int, list[FacturaCompraDetalleModel]] = {}
+    for detalle in detalles:
+        detalles_map.setdefault(detalle.factura_id, []).append(detalle)
+
+    return FacturaCompraPageResponse(
+        data=[
+            _to_factura_response(
+                factura,
+                proveedor_nombre=proveedor_map.get(factura.proveedor_id, "Proveedor"),
+                items=detalles_map.get(factura.id, []),
+            )
+            for factura in items
+        ],
+        page=page_info,
+    )
 
 
 @router.post("/api/facturas-compra", response_model=FacturaCompraResponse, status_code=201)

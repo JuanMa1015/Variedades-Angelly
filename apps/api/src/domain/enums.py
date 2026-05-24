@@ -4,8 +4,10 @@ from enum import Enum
 class RolUsuario(Enum):
     """Roles disponibles para el acceso al sistema."""
 
+    SUPERADMIN = "SUPERADMIN"
     ADMIN = "ADMIN"
-    TRABAJADOR = "TRABAJADOR"
+    VENDEDOR = "VENDEDOR"
+    TRABAJADOR = "TRABAJADOR"  # retrocompatibilidad"
 
 
 class CategoriaGasto(Enum):

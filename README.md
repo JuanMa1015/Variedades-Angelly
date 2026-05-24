@@ -281,7 +281,7 @@ curl -X POST http://127.0.0.1:8000/api/productos \
 ### Unit Tests (pytest)
 ```powershell
 # Ejecutar todos los tests
-cd backend
+cd apps/api
 pytest
 
 # Ejecutar con cobertura
@@ -297,13 +297,13 @@ pytest-watch tests/
 ### BDD (Behave)
 ```powershell
 # Desde raíz del proyecto
-behave
+behave apps/api
 
 # Modo verbose
 behave -v
 
 # Solo features específicas
-behave backend/features/clientes.feature
+behave apps/api/features/clientes.feature
 ```
 
 **Estados Esperados:**
@@ -326,7 +326,7 @@ JWT_SECRET_KEY=angelly-local-jwt-secret-2026-very-strong
 **Causa**: Backend no está corriendo
 ```bash
 # Solución: Iniciar backend
-cd backend
+cd apps/api
 uvicorn src.main:app --reload
 ```
 
@@ -400,7 +400,7 @@ git commit -m "feat: agregar endpoint de reportes montlies"
 
 **Ejemplo: Crear endpoint de reporte**
 
-1. Crear archivo en `backend/src/api/routers/reportes.py`:
+1. Crear archivo en `apps/api/src/api/routers/reportes.py`:
 ```python
 from fastapi import APIRouter, Depends
 from src.api.dependencies import get_current_user
@@ -414,14 +414,14 @@ async def get_reportes_diarios(current_user = Depends(get_current_user)):
     return {}
 ```
 
-2. Registrar en `backend/src/main.py`:
+2. Registrar en `apps/api/src/main.py`:
 ```python
 from src.api.routers.reportes import router as reportes_router
 # ...
 app.include_router(reportes_router)
 ```
 
-3. Crear tests en `backend/tests/test_reportes.py`
+3. Crear tests en `apps/api/tests/test_reportes.py`
 
 
 ## Status del Proyecto

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { fetchCarteraMovimientos } from '../api/carteraApi';
 import ErrorMessage from './ErrorMessage';
 import SuccessMessage from './SuccessMessage';
+import Skeleton from './Skeleton';
 
 const MOVIMIENTOS_PAGE_SIZE = 5;
 
@@ -108,7 +109,7 @@ const VerDetalleModal = ({ cliente, isOpen, onClose }) => {
                 {loading && (
                   <tr>
                     <td colSpan="5" className="px-4 py-6 text-center text-gray-500 font-semibold">
-                      Cargando movimientos...
+                      <Skeleton lines={1} />
                     </td>
                   </tr>
                 )}

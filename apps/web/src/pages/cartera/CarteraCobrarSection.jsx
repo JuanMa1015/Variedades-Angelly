@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronUp, Search } from 'lucide-react';
 import PaginationControls from '../../components/PaginationControls';
+import { SkeletonCard } from '../../components/Skeleton';
 
 const CarteraCobrarSection = ({
   clientes,
@@ -43,8 +44,8 @@ const CarteraCobrarSection = ({
       </div>
 
       {loading && (
-        <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center text-gray-600 shadow-sm">
-          Cargando clientes...
+        <div className="rounded-2xl border border-gray-200 bg-white p-10 shadow-sm">
+          <SkeletonCard />
         </div>
       )}
 

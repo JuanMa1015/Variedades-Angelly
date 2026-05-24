@@ -32,7 +32,7 @@ class DetalleVenta:
     ) -> None:
         if producto_id <= 0:
             raise ValueError("producto_id invalido")
-        if not nombre_producto.strip():
+        if not nombre_producto or not nombre_producto.strip():
             raise ValueError("El nombre del producto es obligatorio")
         if cantidad <= 0:
             raise ValueError("La cantidad debe ser mayor a cero")
@@ -94,8 +94,14 @@ class Gasto(Transaccion):
     """Registro de egresos del negocio."""
 
     def __init__(self, concepto: str, monto: float, categoria: CategoriaGasto) -> None:
+        if not concepto or not concepto.strip():
+            raise ValueError("El concepto del gasto es obligatorio")
+        if monto < 0:
+            raise ValueError("El monto del gasto no puede ser negativo")
+        if not isinstance(categoria, CategoriaGasto):
+            raise ValueError("Categoría de gasto inválida")
         super().__init__(concepto)
-        self._monto = monto
+        self._monto = float(monto)
         self.categoria = categoria
 
     def obtener_total(self) -> float:

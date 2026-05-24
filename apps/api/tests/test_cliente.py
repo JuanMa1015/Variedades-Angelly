@@ -54,3 +54,35 @@ def test_abono_mayor_a_deuda_lanza_error(cliente_con_deuda: Cliente) -> None:
 
     assert cliente_con_deuda.deuda_total == pytest.approx(7000.0)
     assert len(cliente_con_deuda.abonos) == 0
+
+
+def test_abono_con_monto_negativo_lanza_error(cliente_con_deuda: Cliente) -> None:
+    """Valida que abono con monto <= 0 sea rechazado."""
+    from src.domain.cliente import Abono
+
+    with pytest.raises(ValueError, match="positivo"):
+        Abono(monto=-100.0)
+
+    with pytest.raises(ValueError, match="positivo"):
+        Abono(monto=0.0)
+
+
+def test_establecer_deuda_negativa_lanza_error() -> None:
+    """Valida que deuda negativa sea rechazada."""
+    cliente = Cliente(nombre="Test", limite_credito=50000.0)
+    with pytest.raises(ValueError, match="negativa"):
+        cliente.establecer_deuda(-100.0)
+
+
+def test_registrar_venta_no_credito_lanza_error() -> None:
+    """Valida que solo ventas marcadas como credito sean registrables."""
+    from src.domain.transaccion import Venta
+    from src.domain.producto import ItemVenta, Producto
+
+    cliente = Cliente(nombre="Test", limite_credito=50000.0)
+    producto = Producto(nombre="Test", precio_costo=1000.0, precio_venta=2000.0)
+    venta = Venta(concepto="Contado", es_credito=False)
+    venta.agregar_item(ItemVenta(producto=producto, cantidad=1))
+
+    with pytest.raises(ValueError, match="crédito"):
+        cliente.registrar_venta_credito(venta)

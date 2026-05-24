@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -21,10 +21,14 @@ router = APIRouter(tags=["clientes-cartera-clientes"])
 @router.get("/api/clientes", response_model=list[ClienteResponse])
 def list_clientes(
     db: Session = Depends(get_db),
+    include_inactivos: bool = Query(default=False),
     _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> list[ClienteResponse]:
+    query = select(ClienteModel)
+    if not include_inactivos:
+        query = query.where(ClienteModel.activo == True)
     clientes = db.execute(
-        select(ClienteModel).order_by(ClienteModel.nombre.asc()),
+        query.order_by(ClienteModel.nombre.asc()),
     ).scalars().all()
 
     compras_por_cliente_rows = db.execute(

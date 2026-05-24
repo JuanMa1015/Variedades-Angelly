@@ -46,7 +46,7 @@ class Usuario:
     @email.setter
     def email(self, valor: str) -> None:
         """Valida que el correo contenga los caracteres básicos."""
-        if "@" not in valor or "." not in valor:
+        if not valor or "@" not in valor or "." not in valor:
             raise ValueError(f"Email inválido: {valor}")
         self._email = valor
 

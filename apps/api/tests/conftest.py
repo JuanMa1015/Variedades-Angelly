@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
+
+# Asegurar que rate limiting no se active en pruebas
+os.environ.setdefault("APP_ENV", "test")
 
 import pytest
 

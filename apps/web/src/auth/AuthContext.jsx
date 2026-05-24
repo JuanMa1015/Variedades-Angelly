@@ -1,8 +1,9 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { apiPost } from '../api/httpClient';
 
 const TOKEN_STORAGE_KEY = 'angelly.auth.token';
+const REFRESH_TOKEN_KEY = 'angelly.auth.refresh_token';
 const USER_STORAGE_KEY = 'angelly.auth.user';
 const AuthContext = createContext(null);
 
@@ -45,20 +46,26 @@ const normalizeUser = (rawUser) => {
 
 export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
+  const [, setRefreshToken] = useState(null);
   const [user, setUser] = useState(null);
   const [bootstrapped, setBootstrapped] = useState(false);
+  const refreshTimerRef = useRef(null);
 
   const clearAuth = useCallback(() => {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(USER_STORAGE_KEY);
     setToken(null);
+    setRefreshToken(null);
     setUser(null);
   }, []);
 
-  const persistAuth = useCallback((nextToken, nextUser) => {
+  const persistAuth = useCallback((nextToken, nextRefreshToken, nextUser) => {
     localStorage.setItem(TOKEN_STORAGE_KEY, nextToken);
+    if (nextRefreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, nextRefreshToken);
     localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(nextUser));
     setToken(nextToken);
+    setRefreshToken(nextRefreshToken);
     setUser(nextUser);
   }, []);
 
@@ -110,13 +117,63 @@ export const AuthProvider = ({ children }) => {
       throw new Error('Respuesta de autenticación inválida');
     }
 
-    persistAuth(payload.access_token, nextUser);
+    persistAuth(payload.access_token, payload.refresh_token, nextUser);
     return nextUser;
   }, [persistAuth]);
 
   const logout = useCallback(() => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
     clearAuth();
   }, [clearAuth]);
+
+  // Auto-refresh: when token is close to expiring, refresh it proactively
+  useEffect(() => {
+    if (!token) return;
+
+    const payload = parseTokenPayload(token);
+    if (!payload || typeof payload.exp !== 'number') return;
+
+    const expirationMs = payload.exp * 1000;
+    const now = Date.now();
+    const timeUntilExpiry = expirationMs - now;
+    const refreshBuffer = 5 * 60 * 1000; // 5 minutes before expiry
+    const refreshIn = Math.max(0, timeUntilExpiry - refreshBuffer);
+
+    if (timeUntilExpiry <= 0) {
+      // Already expired, try immediate refresh
+      const doRefresh = async () => {
+        const storedRefresh = localStorage.getItem(REFRESH_TOKEN_KEY);
+        if (!storedRefresh) return;
+        try {
+          const payload2 = await apiPost('/api/auth/refresh', { refresh_token: storedRefresh }, { includeAuth: true });
+          if (payload2.access_token) {
+            persistAuth(payload2.access_token, null, user);
+          }
+        } catch {
+          clearAuth();
+        }
+      };
+      doRefresh();
+      return;
+    }
+
+    refreshTimerRef.current = setTimeout(async () => {
+      const storedRefresh = localStorage.getItem(REFRESH_TOKEN_KEY);
+      if (!storedRefresh) return;
+      try {
+        const payload2 = await apiPost('/api/auth/refresh', { refresh_token: storedRefresh }, { includeAuth: true });
+        if (payload2.access_token) {
+          persistAuth(payload2.access_token, null, user);
+        }
+      } catch {
+        // Silently fail; the 401 interceptor will handle it later
+      }
+    }, refreshIn);
+
+    return () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    };
+  }, [token, user, persistAuth, clearAuth]);
 
   const value = useMemo(
     () => ({

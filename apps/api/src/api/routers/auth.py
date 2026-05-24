@@ -11,9 +11,10 @@ from sqlalchemy.orm import Session
 
 from src.api.dependencies import AuthenticatedUser, require_roles
 from src.auth.bootstrap import ensure_default_auth_users
-from src.auth.security import create_access_token, hash_password, verify_password
+from src.auth.security import create_access_token, create_refresh_token, decode_access_token, hash_password, verify_password
 from src.infrastructure.database.connection import get_db
 from src.infrastructure.database.models import UsuarioModel
+from src.api.limiter import limiter, login_rate_limit
 
 router = APIRouter(tags=["auth"])
 
@@ -29,9 +30,24 @@ class LoginResponse(BaseModel):
     """Respuesta de autenticacion con token JWT."""
 
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
     role: str
     username: str
+    expires_in: int
+
+
+class RefreshRequest(BaseModel):
+    """Solicitud de refresco de token."""
+
+    refresh_token: str
+
+
+class RefreshResponse(BaseModel):
+    """Respuesta con nuevo access token."""
+
+    access_token: str
+    token_type: str = "bearer"
     expires_in: int
 
 
@@ -59,7 +75,9 @@ class VendedorUsuarioUpdateRequest(BaseModel):
 
 
 @router.post("/api/auth/login", response_model=LoginResponse)
+@limiter.limit(login_rate_limit())
 def auth_login(
+    request: Request,
     payload: LoginRequest,
     db: Session = Depends(get_db),
 ) -> LoginResponse:
@@ -82,11 +100,47 @@ def auth_login(
 
     role = normalized_role
     token, expires_in = create_access_token(username=usuario.username, role=role)
+    refresh_token, _ = create_refresh_token(username=usuario.username, role=role)
 
     return LoginResponse(
         access_token=token,
+        refresh_token=refresh_token,
         role=role,
         username=usuario.username,
+        expires_in=expires_in,
+    )
+
+
+@router.post("/api/auth/refresh", response_model=RefreshResponse)
+def auth_refresh(
+    payload: RefreshRequest,
+) -> RefreshResponse:
+    """Valida refresh token y emite un nuevo access token."""
+    decoded = decode_access_token(payload.refresh_token)
+    if decoded is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token invalido o expirado",
+        )
+
+    token_type = str(decoded.get("type", "")).strip()
+    if token_type != "refresh":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Tipo de token incorrecto",
+        )
+
+    username = str(decoded.get("sub", ""))
+    role = str(decoded.get("role", ""))
+    if not username or not role:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token invalido",
+        )
+
+    new_token, expires_in = create_access_token(username=username, role=role)
+    return RefreshResponse(
+        access_token=new_token,
         expires_in=expires_in,
     )
 

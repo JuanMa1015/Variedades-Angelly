@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { apiGet, apiRequest } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage'
+import Skeleton from '../components/Skeleton'
 
 const UMBRAL_BONO = 100;
 
@@ -115,7 +116,7 @@ const Fidelizacion = () => {
               {loading && (
                 <tr>
                   <td colSpan="4" className="px-4 py-8 text-center text-gray-500">
-                    Cargando clientes de fidelización...
+                    <Skeleton lines={1} />
                   </td>
                 </tr>
               )}

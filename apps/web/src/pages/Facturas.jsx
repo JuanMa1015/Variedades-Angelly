@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext';
 import { apiGet, apiPost } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage'
 import SuccessMessage from '../components/SuccessMessage'
+import Skeleton from '../components/Skeleton'
 
 const MONEY_FORMATTER = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -305,7 +306,7 @@ const Facturas = () => {
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan="6" className="px-3 py-8 text-center text-gray-500">Cargando facturas...</td>
+                  <td colSpan="6" className="px-3 py-8"><Skeleton lines={1} /></td>
                 </tr>
               )}
 
