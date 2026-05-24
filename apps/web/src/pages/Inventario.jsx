@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Barcode, Package, Plus, RotateCcw, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AlertTriangle, Barcode, Package, Plus, RotateCcw, Search, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { apiGet, apiPatch, apiPost } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage';
 import SuccessMessage from '../components/SuccessMessage';
+import Skeleton, { SkeletonCard } from '../components/Skeleton';
 
 const MONEY_FORMATTER = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -40,6 +41,8 @@ const Inventario = () => {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const searchRef = useRef(null);
 
   const clearMessages = () => {
     setError('');
@@ -190,6 +193,14 @@ const Inventario = () => {
       setSaving(false);
     }
   };
+
+  const filtered = useMemo(() => {
+    if (!searchTerm.trim()) return productos;
+    const q = searchTerm.trim().toLowerCase();
+    return productos.filter(
+      (p) => p.nombre.toLowerCase().includes(q) || (p.codigo_barras && p.codigo_barras.toLowerCase().includes(q)),
+    );
+  }, [productos, searchTerm]);
 
   const resumen = useMemo(() => {
     const totalStock = productos.reduce((sum, producto) => sum + Number(producto.stock_actual || 0), 0);
@@ -384,36 +395,67 @@ const Inventario = () => {
       )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Productos</p>
-          <p className="mt-2 text-3xl font-bold text-gray-900">{loading ? '...' : resumen.productos}</p>
-        </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Stock total</p>
-          <p className="mt-2 text-3xl font-bold text-gray-900">{loading ? '...' : `${resumen.totalStock} u`}</p>
-        </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Bajo stock</p>
-              <p className="mt-2 text-3xl font-bold text-orange-600">{loading ? '...' : resumen.bajoStock}</p>
+        {loading ? (
+          <>
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </>
+        ) : (
+          <>
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Productos</p>
+              <p className="mt-2 text-3xl font-bold text-gray-900">{resumen.productos}</p>
             </div>
-            <AlertTriangle className="h-6 w-6 text-orange-500" />
-          </div>
-        </div>
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Stock total</p>
+              <p className="mt-2 text-3xl font-bold text-gray-900">{`${resumen.totalStock} u`}</p>
+            </div>
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Bajo stock</p>
+                  <p className="mt-2 text-3xl font-bold text-orange-600">{resumen.bajoStock}</p>
+                </div>
+                <AlertTriangle className="h-6 w-6 text-orange-500" />
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-        <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-bold text-gray-900">Productos de tienda</h2>
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-          >
-            <RotateCcw className="h-4 w-4" />
-            Recargar
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Buscar por nombre o código..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-56 rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-rosewood focus:outline-none"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Recargar
+            </button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -428,14 +470,20 @@ const Inventario = () => {
               </tr>
             </thead>
             <tbody>
-              {productos.length === 0 && !loading ? (
+              {loading ? (
+                <tr>
+                  <td colSpan="5" className="px-4 py-6">
+                    <Skeleton lines={4} />
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
                 <tr className="border-b border-gray-100 hover:bg-gray-50">
                   <td colSpan="5" className="py-8 text-center text-gray-500">
-                    No hay productos registrados en el catálogo de tienda
+                    {searchTerm ? 'No se encontraron productos con ese criterio' : 'No hay productos registrados en el catálogo de tienda'}
                   </td>
                 </tr>
               ) : (
-                productos.map((producto) => (
+                filtered.map((producto) => (
                   <tr key={producto.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-900">{producto.nombre}</td>
                     <td className="px-4 py-3 text-gray-700">{producto.codigo_barras || '-'}</td>

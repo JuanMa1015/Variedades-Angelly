@@ -61,3 +61,46 @@ def test_gasto_en_cero_se_permite_como_caso_borde() -> None:
     )
 
     assert gasto.obtener_total() == pytest.approx(0.0)
+
+
+def test_gasto_monto_negativo_lanza_error() -> None:
+    """Verifica que no se permitan gastos con monto negativo."""
+    with pytest.raises(ValueError, match="negativo"):
+        Gasto(
+            concepto="Gasto invalido",
+            monto=-100.0,
+            categoria=CategoriaGasto.OTROS,
+        )
+
+
+def test_gasto_concepto_vacio_lanza_error() -> None:
+    """Verifica que el concepto del gasto sea obligatorio."""
+    with pytest.raises(ValueError, match="concepto"):
+        Gasto(
+            concepto="",
+            monto=100.0,
+            categoria=CategoriaGasto.OTROS,
+        )
+
+
+def test_gasto_categoria_invalida_lanza_error() -> None:
+    """Verifica que la categoria sea un CategoriaGasto valido."""
+    with pytest.raises(ValueError, match="Categoría"):
+        Gasto(
+            concepto="Gasto prueba",
+            monto=100.0,
+            categoria="INVALIDA",  # type: ignore[arg-type]
+        )
+
+
+def test_detalle_venta_nombre_vacio_lanza_error() -> None:
+    """Valida que DetalleVenta rechace nombre vacio."""
+    from src.domain.transaccion import DetalleVenta
+
+    with pytest.raises(ValueError, match="nombre"):
+        DetalleVenta(
+            producto_id=1,
+            nombre_producto="",
+            cantidad=1,
+            precio_unitario=100.0,
+        )

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Search, ShoppingCart, Minus, Trash2 } from 'lucide-react';
+import Skeleton from '../../components/Skeleton';
 
 const PRODUCT_ICON_RULES = [
   { match: /arroz|grano|lenteja/i, icon: '🍚' },
@@ -92,8 +93,8 @@ const ProductSelectionView = ({
       )}
 
       {loading && (
-        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
-          Cargando productos...
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+          <Skeleton lines={3} />
         </div>
       )}
 

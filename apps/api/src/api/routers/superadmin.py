@@ -15,6 +15,7 @@ from src.api.dependencies import AuthenticatedUser, require_roles
 from src.infrastructure.database.connection import get_db
 from src.infrastructure.database.models import (
     AuditoriaModel,
+    CierreCajaModel,
     DetalleVentaModel,
     ProductoModel,
     ProveedorModel,
@@ -56,11 +57,11 @@ class ProductoSchema(BaseModel):
 class ProductoCreateUpdate(BaseModel):
     nombre: Annotated[str, Field(min_length=1, max_length=120)]
     codigo_barras: str | None = None
-    precio_costo: float = 0.0
-    precio_venta: float = 0.0
+    precio_costo: Annotated[float, Field(ge=0)] = 0.0
+    precio_venta: Annotated[float, Field(ge=0)] = 0.0
     catalogo: str = "tienda"
-    stock_actual: int = 0
-    stock_minimo: int = 0
+    stock_actual: Annotated[int, Field(ge=0)] = 0
+    stock_minimo: Annotated[int, Field(ge=0)] = 0
 
 
 class ProveedorSchema(BaseModel):
@@ -472,3 +473,41 @@ def informes_superadmin(
         productos_mas_vendidos=productos_mas_vendidos[:5],
         productos_menos_vendidos=productos_menos_vendidos[:5],
     )
+
+
+# --- Cierres de caja ---
+class CajaCierreSchema(BaseModel):
+    id: int
+    monto_inicial: float
+    monto_ventas_efectivo: float
+    monto_ventas_transferencia: float
+    monto_gastos: float
+    monto_cierre: float | None
+    fecha_apertura: datetime
+    fecha_cierre: datetime | None
+    abierto_por: str
+    cerrado_por: str | None
+    saldo_esperado: float
+    esta_abierta: bool
+
+
+@router.get("/api/superadmin/caja", response_model=list[CajaCierreSchema])
+def list_caja(db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_roles("superadmin"))):
+    rows = db.execute(select(CierreCajaModel).order_by(CierreCajaModel.fecha_apertura.desc())).scalars().all()
+    return [
+        CajaCierreSchema(
+            id=r.id,
+            monto_inicial=float(r.monto_inicial),
+            monto_ventas_efectivo=float(r.monto_ventas_efectivo),
+            monto_ventas_transferencia=float(r.monto_ventas_transferencia),
+            monto_gastos=float(r.monto_gastos),
+            monto_cierre=float(r.monto_cierre) if r.monto_cierre is not None else None,
+            fecha_apertura=r.fecha_apertura,
+            fecha_cierre=r.fecha_cierre,
+            abierto_por=r.abierto_por,
+            cerrado_por=r.cerrado_por,
+            saldo_esperado=float(r.monto_inicial + r.monto_ventas_efectivo + r.monto_ventas_transferencia - r.monto_gastos),
+            esta_abierta=r.fecha_cierre is None,
+        )
+        for r in rows
+    ]

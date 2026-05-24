@@ -7,10 +7,12 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.api.dependencies import AuthenticatedUser, require_roles
+from src.api.pagination import PageInfo, build_page
 from src.domain.producto import Producto
 from src.infrastructure.database.connection import get_db
 from src.infrastructure.database.models import DetalleVentaModel, ProductoModel
@@ -70,6 +72,13 @@ class ProductoStockPatchRequest(BaseModel):
         return value
 
 
+class ProductoPageResponse(BaseModel):
+    """Respuesta paginada de productos."""
+
+    data: list[ProductoResponse]
+    page: PageInfo
+
+
 class ProductoPrecioPatchRequest(BaseModel):
     """DTO para edicion inline de precio de venta."""
 
@@ -90,18 +99,79 @@ def _to_producto_response(producto: Producto) -> ProductoResponse:
     )
 
 
+def _to_producto_response_from_model(p: ProductoModel) -> ProductoResponse:
+    return ProductoResponse(
+        id=p.id,
+        nombre=p.nombre,
+        codigo_barras=p.codigo_barras,
+        precio_costo=p.precio_costo,
+        precio_venta=p.precio_venta,
+        catalogo=p.catalogo,
+        stock_actual=p.stock_actual,
+        stock_minimo=p.stock_minimo,
+        stock_critico=p.stock_actual <= p.stock_minimo,
+    )
+
+
+def _producto_search_filter(query, q: str | None):
+    if q:
+        pattern = f"%{q.strip()}%"
+        query = query.where(
+            or_(
+                ProductoModel.nombre.ilike(pattern),
+                ProductoModel.codigo_barras.ilike(pattern),
+            ),
+        )
+    return query
+
+
 @router.get("/api/productos", response_model=list[ProductoResponse])
 def list_productos(
     db: Session = Depends(get_db),
     catalogo: str = Query("todos", pattern="^(todos|tienda|cartera)$"),
+    q: str | None = Query(default=None, min_length=1, max_length=100),
+    include_inactivos: bool = Query(default=False),
     _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> list[ProductoResponse]:
-    """Lista todos los productos del inventario."""
-    repository = SqlAlchemyProductoRepository(db)
-    productos = repository.list_all()
+    """Lista todos los productos del inventario. Opcionalmente filtra por texto en nombre o código de barras."""
+    query = select(ProductoModel)
+    if not include_inactivos:
+        query = query.where(ProductoModel.activo == True)
     if catalogo != "todos":
-        productos = [producto for producto in productos if producto.catalogo == catalogo]
-    return [_to_producto_response(producto) for producto in productos]
+        query = query.where(ProductoModel.catalogo == catalogo)
+
+    items = db.execute(query.order_by(ProductoModel.nombre.asc())).scalars().all()
+
+    if q:
+        ql = q.strip().lower()
+        items = [p for p in items if ql in p.nombre.lower() or (p.codigo_barras and ql in p.codigo_barras.lower())]
+    return [_to_producto_response_from_model(p) for p in items]
+
+
+@router.get("/api/productos/paginados", response_model=ProductoPageResponse)
+def list_productos_paginados(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=200),
+    catalogo: str = Query("todos", pattern="^(todos|tienda|cartera)$"),
+    q: str | None = Query(default=None, min_length=1, max_length=100),
+    include_inactivos: bool = Query(default=False),
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+) -> ProductoPageResponse:
+    """Lista paginada de productos. Opcionalmente filtra por texto en nombre o código de barras."""
+    query = select(ProductoModel)
+    if not include_inactivos:
+        query = query.where(ProductoModel.activo == True)
+    if catalogo != "todos":
+        query = query.where(ProductoModel.catalogo == catalogo)
+    query = _producto_search_filter(query, q)
+
+    items, page_info = build_page(db, query, page, limit, ProductoModel.nombre.asc())
+
+    return ProductoPageResponse(
+        data=[_to_producto_response_from_model(p) for p in items],
+        page=page_info,
+    )
 
 
 @router.post("/api/productos", response_model=ProductoResponse, status_code=201)

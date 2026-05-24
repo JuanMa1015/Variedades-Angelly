@@ -30,10 +30,10 @@ def _bootstrap_enabled() -> bool:
 def _default_auth_users() -> tuple[dict[str, str], ...]:
     """Carga usuarios semilla desde variables de entorno."""
     current_file = Path(__file__).resolve()
-    project_root = current_file.parents[3]
     backend_root = current_file.parents[2]
 
-    for candidate in (backend_root / ".env", project_root / ".env"):
+    for parent in (backend_root, *backend_root.parents):
+        candidate = parent / ".env"
         if candidate.exists():
             load_dotenv(dotenv_path=candidate, override=False)
             break

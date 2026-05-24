@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -46,10 +46,14 @@ class ClienteFidelizacionUpdateRequest(BaseModel):
 @router.get("/api/fidelizacion/clientes", response_model=list[ClienteFidelizacionResponse])
 def list_clientes_fidelizacion(
     db: Session = Depends(get_db),
+    include_inactivos: bool = Query(default=False),
     _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> list[ClienteFidelizacionResponse]:
+    query = select(ClienteFidelizacionModel)
+    if not include_inactivos:
+        query = query.where(ClienteFidelizacionModel.activo == True)
     clientes = db.execute(
-        select(ClienteFidelizacionModel).order_by(
+        query.order_by(
             ClienteFidelizacionModel.puntos_acumulados.desc(),
             ClienteFidelizacionModel.nombre.asc(),
         ),

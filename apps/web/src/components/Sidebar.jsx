@@ -24,7 +24,7 @@ const Sidebar = ({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMobile })
   const currentModule = (() => {
     if (location.pathname.startsWith('/admin')) return 'Gerencia';
     if (location.pathname.startsWith('/cartera')) return 'Cartera';
-    if (['/ventas', '/clientes', '/inventario', '/proveedores', '/fidelizacion', '/facturas', '/gastos', '/dashboard'].some((path) => location.pathname.startsWith(path))) {
+    if (['/caja', '/ventas', '/clientes', '/inventario', '/proveedores', '/fidelizacion', '/facturas', '/gastos', '/dashboard'].some((path) => location.pathname.startsWith(path))) {
       return 'Ventas';
     }
     return 'Panel';
@@ -32,6 +32,7 @@ const Sidebar = ({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMobile })
 
   const sections = (() => {
     const vendedorItems = [
+      { label: 'Caja', path: '/caja', icon: Wallet, description: 'Apertura y cierre de caja' },
       { label: 'Ventas', path: '/ventas', icon: ShoppingCart, description: 'Punto de Venta' },
       { label: 'Clientes', path: '/clientes', icon: Users, description: 'Clientes de tienda' },
       { label: 'Inventario', path: '/inventario', icon: Package, description: 'Gestión de Stock' },

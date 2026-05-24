@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
+import useConfirm from '../../components/useConfirm';
 import {
   deleteCarteraCliente,
   fetchCarteraInitialData,
@@ -304,8 +305,7 @@ export const useCarteraData = () => {
   };
 
   const handleDeleteCliente = async (cliente) => {
-    cleanMessages();
-    const confirmed = window.confirm(`¿Eliminar cliente ${cliente.nombre}?`);
+    const confirmed = await confirm({ title: 'Eliminar cliente', message: `¿Eliminar cliente ${cliente.nombre}?` });
     if (!confirmed) return;
 
     try {
@@ -688,6 +688,7 @@ export const useCarteraData = () => {
     formatMoneyWhatsapp,
     toDatetimeLocalValue,
     normalizeWhatsappNumber,
+    ConfirmModal,
   };
 };
 

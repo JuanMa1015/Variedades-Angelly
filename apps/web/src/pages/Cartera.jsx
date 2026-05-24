@@ -1,5 +1,6 @@
 import ErrorMessage from '../components/ErrorMessage';
 import SuccessMessage from '../components/SuccessMessage';
+import Skeleton from '../components/Skeleton';
 import RegistrarAbonoModal from '../components/RegistrarAbonoModal';
 import VerDetalleModal from '../components/VerDetalleModal';
 import CarteraDashboardSection from './cartera/CarteraDashboardSection';
@@ -101,6 +102,7 @@ const Cartera = () => {
     savingVenta,
     navigate,
     formatMoney,
+    ConfirmModal,
   } = data;
 
   return (
@@ -344,7 +346,7 @@ const Cartera = () => {
                   <tbody>
                     {loadingVentasHistorial && (
                       <tr>
-                        <td colSpan={5} className="px-4 py-8 text-center text-gray-500">Cargando historial...</td>
+                        <td colSpan={5} className="px-4 py-8"><Skeleton lines={1} /></td>
                       </tr>
                     )}
 
@@ -374,7 +376,7 @@ const Cartera = () => {
                 <div className="space-y-3 p-4 md:hidden">
                   {loadingVentasHistorial && (
                     <div className="rounded-2xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
-                      Cargando historial...
+                      <Skeleton lines={2} />
                     </div>
                   )}
 
@@ -429,6 +431,7 @@ const Cartera = () => {
           onClose={() => setSelectedClienteDetalle(null)}
         />
       )}
+      {ConfirmModal}
     </div>
   );
 };

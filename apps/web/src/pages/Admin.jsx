@@ -4,6 +4,8 @@ import { useAuth } from '../auth/AuthContext';
 import { apiDelete, apiRequest } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage';
 import SuccessMessage from '../components/SuccessMessage';
+import useConfirm from '../components/useConfirm';
+import Skeleton from '../components/Skeleton';
 
 const MONEY_FORMATTER = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -83,6 +85,8 @@ const Admin = ({ moduleKey = null }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  const { confirm, ConfirmModal } = useConfirm();
 
   const [proveedores, setProveedores] = useState([]);
   const [productos, setProductos] = useState([]);
@@ -335,7 +339,7 @@ const Admin = ({ moduleKey = null }) => {
   };
 
   const handleDeleteClienteCartera = async (item) => {
-    if (!window.confirm(`Eliminar cliente ${item.nombre}?`)) return;
+    const confirmed = await confirm({ title: 'Eliminar cliente', message: `Eliminar cliente ${item.nombre}?` }); if (!confirmed) return;
     try {
       await runDelete({
         endpoint: `/api/cartera/clientes/${item.id}`,
@@ -390,7 +394,7 @@ const Admin = ({ moduleKey = null }) => {
   };
 
   const handleDeleteClienteTienda = async (item) => {
-    if (!window.confirm(`Eliminar cliente ${item.nombre}?`)) return;
+    const confirmed = await confirm({ title: 'Eliminar cliente', message: `Eliminar cliente ${item.nombre}?` }); if (!confirmed) return;
     try {
       await runDelete({
         endpoint: `/api/clientes/tienda-fiado/${item.id}`,
@@ -457,7 +461,7 @@ const Admin = ({ moduleKey = null }) => {
   };
 
   const handleDeleteClienteFidelizacion = async (item) => {
-    if (!window.confirm(`Eliminar cliente ${item.nombre}?`)) return;
+    const confirmed = await confirm({ title: 'Eliminar cliente', message: `Eliminar cliente ${item.nombre}?` }); if (!confirmed) return;
     try {
       await runDelete({
         endpoint: `/api/fidelizacion/clientes/${item.id}`,
@@ -498,8 +502,10 @@ const Admin = ({ moduleKey = null }) => {
   const handleEditVenta = async (item) => {
     const total = window.prompt('Nuevo total', String(item.total ?? ''));
     if (total === null) return;
+    if (Number(total) < 0) { notifyError('El total no puede ser negativo'); return; }
     const saldo = window.prompt('Nuevo saldo pendiente', String(item.saldo_pendiente ?? ''));
     if (saldo === null) return;
+    if (Number(saldo) < 0) { notifyError('El saldo pendiente no puede ser negativo'); return; }
 
     try {
       await request({
@@ -518,7 +524,7 @@ const Admin = ({ moduleKey = null }) => {
   };
 
   const handleDeleteVenta = async (item) => {
-    if (!window.confirm(`Eliminar venta ${item.venta_id}?`)) return;
+    const confirmed = await confirm({ title: 'Eliminar venta', message: `Eliminar venta ${item.venta_id}?` }); if (!confirmed) return;
     try {
       await runDelete({
         endpoint: `/api/ventas/${item.venta_id}`,
@@ -556,6 +562,7 @@ const Admin = ({ moduleKey = null }) => {
     if (descripcion === null) return;
     const monto = window.prompt('Nuevo monto estimado', String(item.monto_estimado ?? ''));
     if (monto === null) return;
+    if (Number(monto) < 0) { notifyError('El monto estimado no puede ser negativo'); return; }
 
     try {
       await request({
@@ -574,7 +581,7 @@ const Admin = ({ moduleKey = null }) => {
   };
 
   const handleDeletePedidoProveedor = async (item) => {
-    if (!window.confirm(`Eliminar pedido ${item.id}?`)) return;
+    const confirmed = await confirm({ title: 'Eliminar pedido', message: `Eliminar pedido ${item.id}?` }); if (!confirmed) return;
     try {
       await runDelete({
         endpoint: `/api/proveedores/pedidos/${item.id}`,
@@ -610,6 +617,7 @@ const Admin = ({ moduleKey = null }) => {
   const handleEditFacturaCompra = async (item) => {
     const total = window.prompt('Nuevo total factura', String(item.total_factura ?? ''));
     if (total === null) return;
+    if (Number(total) < 0) { notifyError('El total de factura no puede ser negativo'); return; }
 
     try {
       await request({
@@ -627,7 +635,7 @@ const Admin = ({ moduleKey = null }) => {
   };
 
   const handleDeleteFacturaCompra = async (item) => {
-    if (!window.confirm(`Eliminar factura ${item.id}?`)) return;
+    const confirmed = await confirm({ title: 'Eliminar factura', message: `Eliminar factura ${item.id}?` }); if (!confirmed) return;
     try {
       await runDelete({
         endpoint: `/api/facturas-compra/${item.id}`,
@@ -694,7 +702,7 @@ const Admin = ({ moduleKey = null }) => {
   };
 
   const handleDeleteGasto = async (item) => {
-    if (!window.confirm(`Eliminar gasto ${item.id}?`)) return;
+    const confirmed = await confirm({ title: 'Eliminar gasto', message: `Eliminar gasto ${item.id}?` }); if (!confirmed) return;
     try {
       await runDelete({
         endpoint: `/api/gastos/${item.id}`,
@@ -731,6 +739,7 @@ const Admin = ({ moduleKey = null }) => {
   const handleEditAbonoCartera = async (item) => {
     const monto = window.prompt('Nuevo monto', String(item.monto ?? ''));
     if (monto === null) return;
+    if (Number(monto) <= 0) { notifyError('El monto del abono debe ser mayor a cero'); return; }
 
     try {
       await request({
@@ -748,7 +757,7 @@ const Admin = ({ moduleKey = null }) => {
   };
 
   const handleDeleteAbonoCartera = async (item) => {
-    if (!window.confirm(`Eliminar abono ${item.id}?`)) return;
+    const confirmed = await confirm({ title: 'Eliminar abono', message: `Eliminar abono ${item.id}?` }); if (!confirmed) return;
     try {
       await runDelete({
         endpoint: `/api/cartera/abonos/${item.id}`,
@@ -800,7 +809,7 @@ const Admin = ({ moduleKey = null }) => {
   };
 
   const handleDeleteAdmin = async (item) => {
-    if (!window.confirm(`Eliminar admin ${item.username}?`)) return;
+    const confirmed = await confirm({ title: 'Eliminar admin', message: `Eliminar admin ${item.username}?` }); if (!confirmed) return;
     try {
       await runDelete({
         endpoint: `/api/superadmin/usuarios/admins/${item.id}`,
@@ -852,7 +861,7 @@ const Admin = ({ moduleKey = null }) => {
   };
 
   const handleDeleteVendedor = async (item) => {
-    if (!window.confirm(`Eliminar vendedor ${item.username}?`)) return;
+    const confirmed = await confirm({ title: 'Eliminar vendedor', message: `Eliminar vendedor ${item.username}?` }); if (!confirmed) return;
     try {
       await runDelete({
         endpoint: `/api/superadmin/usuarios/vendedores/${item.id}`,
@@ -932,7 +941,7 @@ const Admin = ({ moduleKey = null }) => {
   };
 
   const handleDeleteProducto = async (item) => {
-    if (!window.confirm(`Eliminar producto ${item.nombre}?`)) return;
+    const confirmed = await confirm({ title: 'Eliminar producto', message: `Eliminar producto ${item.nombre}?` }); if (!confirmed) return;
     try {
       await apiDelete(`/api/productos/${item.id}`);
       await loadAll();
@@ -987,7 +996,7 @@ const Admin = ({ moduleKey = null }) => {
   };
 
   const handleDeleteProveedor = async (item) => {
-    if (!window.confirm(`Eliminar proveedor ${item.nombre}?`)) return;
+    const confirmed = await confirm({ title: 'Eliminar proveedor', message: `Eliminar proveedor ${item.nombre}?` }); if (!confirmed) return;
     try {
       await apiDelete(`/api/proveedores/${item.id}`);
       await loadAll();
@@ -1045,7 +1054,7 @@ const Admin = ({ moduleKey = null }) => {
   };
 
   const handleDeleteAuditoria = async (item) => {
-    if (!window.confirm(`Eliminar auditoria ${item.id}?`)) return;
+    const confirmed = await confirm({ title: 'Eliminar auditoría', message: `Eliminar auditoría ${item.id}?` }); if (!confirmed) return;
     try {
       await apiDelete(`/api/auditorias/${item.id}`);
       await loadAll();
@@ -1065,8 +1074,8 @@ const Admin = ({ moduleKey = null }) => {
 
   if (loading) {
     return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center text-gray-600">
-        Cargando modulo admin...
+      <div className="rounded-2xl border border-gray-200 bg-white p-8">
+        <Skeleton lines={4} className="mx-auto max-w-md" />
       </div>
     );
   }
@@ -1177,6 +1186,13 @@ const Admin = ({ moduleKey = null }) => {
                     </td>
                   </tr>
                 ))}
+                {vendedores.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-3 py-8 text-center text-sm text-[#6a3f43]/50">
+                      No hay registros
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -1230,6 +1246,13 @@ const Admin = ({ moduleKey = null }) => {
                     </td>
                   </tr>
                 ))}
+                {admins.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-3 py-8 text-center text-sm text-[#6a3f43]/50">
+                      No hay registros
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -1287,6 +1310,13 @@ const Admin = ({ moduleKey = null }) => {
                     </td>
                   </tr>
                 ))}
+                {productos.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-3 py-8 text-center text-sm text-[#6a3f43]/50">
+                      No hay registros
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -1340,6 +1370,13 @@ const Admin = ({ moduleKey = null }) => {
                     </td>
                   </tr>
                 ))}
+                {proveedores.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-3 py-8 text-center text-sm text-[#6a3f43]/50">
+                      No hay registros
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -1399,6 +1436,13 @@ const Admin = ({ moduleKey = null }) => {
                     </td>
                   </tr>
                 ))}
+                {clientesCartera.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-3 py-8 text-center text-sm text-[#6a3f43]/50">
+                      No hay registros
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -1452,6 +1496,13 @@ const Admin = ({ moduleKey = null }) => {
                     </td>
                   </tr>
                 ))}
+                {clientesTienda.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-3 py-8 text-center text-sm text-[#6a3f43]/50">
+                      No hay registros
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -1507,6 +1558,13 @@ const Admin = ({ moduleKey = null }) => {
                     </td>
                   </tr>
                 ))}
+                {clientesFidelizacion.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-3 py-8 text-center text-sm text-[#6a3f43]/50">
+                      No hay registros
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -1568,6 +1626,13 @@ const Admin = ({ moduleKey = null }) => {
                     </td>
                   </tr>
                 ))}
+                {ventas.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="px-3 py-8 text-center text-sm text-[#6a3f43]/50">
+                      No hay registros
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -1629,6 +1694,13 @@ const Admin = ({ moduleKey = null }) => {
                     </td>
                   </tr>
                 ))}
+                {pedidosProveedor.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="px-3 py-8 text-center text-sm text-[#6a3f43]/50">
+                      No hay registros
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -1690,6 +1762,13 @@ const Admin = ({ moduleKey = null }) => {
                     </td>
                   </tr>
                 ))}
+                {facturasCompra.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="px-3 py-8 text-center text-sm text-[#6a3f43]/50">
+                      No hay registros
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -1749,6 +1828,13 @@ const Admin = ({ moduleKey = null }) => {
                     </td>
                   </tr>
                 ))}
+                {gastos.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-3 py-8 text-center text-sm text-[#6a3f43]/50">
+                      No hay registros
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -1810,6 +1896,13 @@ const Admin = ({ moduleKey = null }) => {
                     </td>
                   </tr>
                 ))}
+                {abonosCartera.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="px-3 py-8 text-center text-sm text-[#6a3f43]/50">
+                      No hay registros
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -1869,6 +1962,13 @@ const Admin = ({ moduleKey = null }) => {
                     </td>
                   </tr>
                 ))}
+                {auditorias.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-3 py-8 text-center text-sm text-[#6a3f43]/50">
+                      No hay registros
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -1935,6 +2035,13 @@ const Admin = ({ moduleKey = null }) => {
                         <td className="px-3 py-2 text-right">{formatMoney(item.total_vendido)}</td>
                       </tr>
                     ))}
+                    {(!informes.vendedores_top || informes.vendedores_top.length === 0) && (
+                      <tr>
+                        <td colSpan={3} className="px-3 py-8 text-center text-sm text-[#6a3f43]/50">
+                          No hay datos
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -1959,6 +2066,13 @@ const Admin = ({ moduleKey = null }) => {
                         <td className="px-3 py-2 text-right">{formatMoney(item.total_vendido)}</td>
                       </tr>
                     ))}
+                    {(!informes.productos_menos_vendidos || informes.productos_menos_vendidos.length === 0) && (
+                      <tr>
+                        <td colSpan={3} className="px-3 py-8 text-center text-sm text-[#6a3f43]/50">
+                          No hay datos
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -2304,6 +2418,7 @@ const Admin = ({ moduleKey = null }) => {
           </div>
         </div>
       )}
+      {ConfirmModal}
     </div>
   );
 };

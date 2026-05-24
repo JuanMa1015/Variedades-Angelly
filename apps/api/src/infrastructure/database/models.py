@@ -26,6 +26,7 @@ class UsuarioModel(Base):
     username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     rol: Mapped[str] = mapped_column(String(20), nullable=False)
+    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     def __repr__(self) -> str:
         return f"UsuarioModel(id={self.id!r}, username={self.username!r})"
@@ -46,6 +47,7 @@ class ClienteModel(Base):
     telefono_whatsapp: Mapped[str | None] = mapped_column(String(25), nullable=True)
     limite_credito: Mapped[float] = mapped_column(Float, nullable=False)
     deuda_total: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     def __repr__(self) -> str:
         return f"ClienteModel(id={self.id!r}, nombre={self.nombre!r})"
@@ -60,6 +62,7 @@ class ClienteFidelizacionModel(Base):
     nombre: Mapped[str] = mapped_column(String(120), nullable=False)
     telefono_whatsapp: Mapped[str] = mapped_column(String(25), nullable=False, unique=True)
     puntos_acumulados: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     def __repr__(self) -> str:
         return (
@@ -76,6 +79,7 @@ class ClienteFiadoTiendaModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     nombre: Mapped[str] = mapped_column(String(120), nullable=False)
     telefono_whatsapp: Mapped[str | None] = mapped_column(String(25), nullable=True)
+    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     def __repr__(self) -> str:
         return f"ClienteFiadoTiendaModel(id={self.id!r}, nombre={self.nombre!r})"
@@ -94,6 +98,7 @@ class ProductoModel(Base):
     catalogo: Mapped[str] = mapped_column(String(20), nullable=False, default="tienda")
     stock_actual: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     stock_minimo: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     def __repr__(self) -> str:
         return f"ProductoModel(id={self.id!r}, nombre={self.nombre!r})"
@@ -284,6 +289,33 @@ class AbonoCarteraModel(Base):
 
     def __repr__(self) -> str:
         return f"AbonoCarteraModel(id={self.id!r}, monto={self.monto!r})"
+
+
+class CierreCajaModel(Base):
+    """Representacion persistente de apertura/cierre de caja."""
+
+    __tablename__ = "cierres_caja"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    monto_inicial: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    monto_ventas_efectivo: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    monto_ventas_transferencia: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    monto_gastos: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    monto_cierre: Mapped[float | None] = mapped_column(Float, nullable=True)
+    fecha_apertura: Mapped[datetime] = mapped_column(
+        DateTime(timezone=False),
+        nullable=False,
+        default=_utcnow_naive,
+    )
+    fecha_cierre: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=False),
+        nullable=True,
+    )
+    abierto_por: Mapped[str] = mapped_column(String(50), nullable=False)
+    cerrado_por: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    def __repr__(self) -> str:
+        return f"CierreCajaModel(id={self.id!r}, abierto_por={self.abierto_por!r})"
 
 
 class AuditoriaModel(Base):

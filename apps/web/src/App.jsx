@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout';
 import PrivateRoute from './auth/PrivateRoute';
 import { useAuth } from './auth/AuthContext';
+import Caja from './pages/Caja';
 import Dashboard from './pages/Dashboard';
 import Cartera from './pages/Cartera';
 import Gastos from './pages/Gastos';
@@ -29,7 +30,7 @@ import GastosAdmin from './pages/admin/GastosAdmin';
 import AbonosCartera from './pages/admin/AbonosCartera';
 import { getDefaultRouteForRole } from './auth/roleRoutes';
 import ErrorBoundary from './components/ErrorBoundary'
-import { ToastProvider } from './components/ToastContext'
+import { ToastProvider, useToast } from './components/ToastContext'
 import ToastContainer from './components/ToastContainer'
 import './App.css';
 
@@ -46,6 +47,11 @@ const LandingRedirect = () => {
 
   const target = getDefaultRouteForRole(user?.role);
   return <Navigate to={target} replace />;
+};
+
+const ToastContainerWrapper = () => {
+  const { toasts, removeToast } = useToast();
+  return <ToastContainer toasts={toasts} onRemove={removeToast} />;
 };
 
 function App() {
@@ -87,6 +93,7 @@ function App() {
             </Route>
 
             <Route element={<PrivateRoute allowedRoles={['vendedor', 'superadmin']} />}>
+              <Route path="/caja" element={<Caja />} />
               <Route path="/proveedores" element={<Proveedores />} />
               <Route path="/inventario" element={<Inventario />} />
               <Route path="/fidelizacion" element={<Fidelizacion />} />
@@ -102,7 +109,7 @@ function App() {
         <Route path="*" element={<LandingRedirect />} />
       </Routes>
     </BrowserRouter>
-    <ToastContainer />
+    <ToastContainerWrapper />
       </ToastProvider>
     </ErrorBoundary>
   );

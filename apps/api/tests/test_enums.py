@@ -10,7 +10,9 @@ from src.domain.enums import CategoriaGasto, RolUsuario, TipoMovimiento
 @pytest.mark.parametrize(
     ("rol", "valor_esperado"),
     [
+        (RolUsuario.SUPERADMIN, "SUPERADMIN"),
         (RolUsuario.ADMIN, "ADMIN"),
+        (RolUsuario.VENDEDOR, "VENDEDOR"),
         (RolUsuario.TRABAJADOR, "TRABAJADOR"),
     ],
 )

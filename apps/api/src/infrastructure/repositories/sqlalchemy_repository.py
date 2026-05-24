@@ -111,6 +111,7 @@ class SqlAlchemyClienteRepository(
             documento=entity.documento,
             limite_credito=entity.limite_credito,
             deuda_total=entity.deuda_total,
+            activo=getattr(entity, "activo", True),
         )
 
     def _to_domain(self, model: ClienteModel) -> Cliente:
@@ -160,22 +161,33 @@ class SqlAlchemyUsuarioRepository(
         super().__init__(db=db, model_class=UsuarioModel)
 
     def _to_model(self, entity: Usuario) -> UsuarioModel:
-        rol_normalizado = "admin" if entity.rol is RolUsuario.ADMIN else "vendedor"
+        MAP = {
+            RolUsuario.SUPERADMIN: "superadmin",
+            RolUsuario.ADMIN: "admin",
+            RolUsuario.VENDEDOR: "vendedor",
+            RolUsuario.TRABAJADOR: "vendedor",
+        }
         return UsuarioModel(
             username=entity.username,
             password_hash=getattr(entity, "password_hash", ""),
-            rol=rol_normalizado,
+            rol=MAP.get(entity.rol, "vendedor"),
+            activo=getattr(entity, "activo", True),
         )
 
     def _to_domain(self, model: UsuarioModel) -> Usuario:
-        rol = RolUsuario.ADMIN if model.rol == "admin" else RolUsuario.TRABAJADOR
+        MAP = {
+            "superadmin": RolUsuario.SUPERADMIN,
+            "admin": RolUsuario.ADMIN,
+            "vendedor": RolUsuario.VENDEDOR,
+        }
+        rol = MAP.get(model.rol, RolUsuario.TRABAJADOR)
         usuario = Usuario(
             username=model.username,
             email=f"{model.username}@local.angelly",
             rol=rol,
             nombre_completo=None,
         )
-        usuario.activo = True
+        usuario.activo = model.activo
         usuario.fecha_registro = datetime.now(UTC)
         return usuario
 
@@ -188,6 +200,7 @@ class SqlAlchemyUsuarioRepository(
 
     def _apply_domain_updates(self, model: UsuarioModel, entity: Usuario) -> None:
         model.rol = "admin" if entity.rol is RolUsuario.ADMIN else "vendedor"
+        model.activo = entity.activo
 
     def get_by_username(self, username: str) -> Usuario | None:
         """Busca usuario por username unico y retorna None si no existe."""

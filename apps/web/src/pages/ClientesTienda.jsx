@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage'
 import SuccessMessage from '../components/SuccessMessage'
+import useConfirm from '../components/useConfirm'
 
 const PAGE_SIZE = 10;
 
@@ -31,6 +32,8 @@ const ClientesTienda = () => {
   const [whatsapp, setWhatsapp] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  const { confirm, ConfirmModal } = useConfirm();
 
   const loadClientes = async () => {
     if (!token) return;
@@ -147,7 +150,8 @@ const ClientesTienda = () => {
   };
 
   const handleDelete = async (cliente) => {
-    if (!window.confirm(`¿Eliminar cliente ${cliente.nombre}?`)) return;
+    const confirmed = await confirm({ title: 'Eliminar cliente', message: `¿Eliminar cliente ${cliente.nombre}?` });
+    if (!confirmed) return;
 
     try {
       setError('');
@@ -262,7 +266,7 @@ const ClientesTienda = () => {
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan="3" className="px-3 py-8 text-center text-gray-500">Cargando clientes...</td>
+                  <td colSpan="3" className="px-3 py-8"><Skeleton lines={1} /></td>
                 </tr>
               )}
 
@@ -309,6 +313,7 @@ const ClientesTienda = () => {
           />
         )}
       </section>
+      {ConfirmModal}
     </div>
   );
 };

@@ -11,6 +11,7 @@ from jwt import InvalidTokenError  # type: ignore[import-not-found]
 
 JWT_ALGORITHM = "HS256"
 DEFAULT_JWT_EXPIRE_MINUTES = 60 * 8
+DEFAULT_REFRESH_EXPIRE_DAYS = 30
 
 
 def _jwt_secret_key() -> str:
@@ -35,6 +36,20 @@ def token_expire_minutes() -> int:
         return DEFAULT_JWT_EXPIRE_MINUTES
 
     return max(15, parsed)
+
+
+def refresh_expire_days() -> int:
+    """Obtiene dias de expiracion del refresh token desde entorno."""
+    raw_value = os.getenv("JWT_REFRESH_EXPIRE_DAYS")
+    if not raw_value:
+        return DEFAULT_REFRESH_EXPIRE_DAYS
+
+    try:
+        parsed = int(raw_value)
+    except ValueError:
+        return DEFAULT_REFRESH_EXPIRE_DAYS
+
+    return max(1, parsed)
 
 
 def hash_password(plain_password: str) -> str:
@@ -69,6 +84,25 @@ def create_access_token(username: str, role: str) -> tuple[str, int]:
         "role": role,
         "iat": int(now.timestamp()),
         "exp": int(expires_at.timestamp()),
+        "type": "access",
+    }
+
+    token = jwt.encode(payload, _jwt_secret_key(), algorithm=JWT_ALGORITHM)
+    return token, int(expire_delta.total_seconds())
+
+
+def create_refresh_token(username: str, role: str) -> tuple[str, int]:
+    """Crea un refresh token de larga duracion."""
+    now = datetime.now(timezone.utc)
+    expire_delta = timedelta(days=refresh_expire_days())
+    expires_at = now + expire_delta
+
+    payload = {
+        "sub": username,
+        "role": role,
+        "iat": int(now.timestamp()),
+        "exp": int(expires_at.timestamp()),
+        "type": "refresh",
     }
 
     token = jwt.encode(payload, _jwt_secret_key(), algorithm=JWT_ALGORITHM)

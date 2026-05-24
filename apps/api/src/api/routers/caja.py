@@ -1,0 +1,204 @@
+"""Router del modulo de apertura y cierre de caja."""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from src.api.dependencies import AuthenticatedUser, require_roles
+from src.api.schemas.caja import (
+    AperturaCajaRequest,
+    CajaEstadoResponse,
+    CajaHistorialItemResponse,
+    CierreCajaRequest,
+    CierreCajaResponse,
+)
+from src.infrastructure.database.connection import get_db
+from src.infrastructure.database.models import CierreCajaModel, GastoModel, VentaModel
+
+router = APIRouter(tags=["caja"])
+
+
+def _to_cierre_caja_response(cierre: CierreCajaModel) -> CierreCajaResponse:
+    total_ventas_efectivo = float(cierre.monto_ventas_efectivo)
+    total_ventas_transferencia = float(cierre.monto_ventas_transferencia)
+    total_gastos = float(cierre.monto_gastos)
+    monto_inicial = float(cierre.monto_inicial)
+    esta_abierta = cierre.fecha_cierre is None
+
+    return CierreCajaResponse(
+        id=cierre.id,
+        monto_inicial=monto_inicial,
+        monto_ventas_efectivo=total_ventas_efectivo,
+        monto_ventas_transferencia=total_ventas_transferencia,
+        monto_gastos=total_gastos,
+        monto_cierre=float(cierre.monto_cierre) if cierre.monto_cierre is not None else None,
+        fecha_apertura=cierre.fecha_apertura,
+        fecha_cierre=cierre.fecha_cierre,
+        abierto_por=cierre.abierto_por,
+        cerrado_por=cierre.cerrado_por,
+        saldo_esperado=monto_inicial + total_ventas_efectivo + total_ventas_transferencia - total_gastos,
+        total_ingresos=total_ventas_efectivo + total_ventas_transferencia,
+        esta_abierta=esta_abierta,
+    )
+
+
+def _calcular_metricas_desde(
+    db: Session,
+    desde: datetime,
+) -> tuple[float, float, float]:
+    """Calcula ventas efectivo, transferencia y gastos desde una fecha."""
+    ventas = db.execute(
+        select(
+            func.coalesce(
+                func.sum(VentaModel.total).filter(VentaModel.metodo_pago == "efectivo"),
+                0.0,
+            ),
+            func.coalesce(
+                func.sum(VentaModel.total).filter(VentaModel.metodo_pago == "transferencia"),
+                0.0,
+            ),
+        ).where(VentaModel.fecha >= desde),
+    ).one()
+    total_efectivo = float(ventas[0] or 0.0)
+    total_transferencia = float(ventas[1] or 0.0)
+
+    total_gastos = db.execute(
+        select(func.coalesce(func.sum(GastoModel.monto), 0.0)).where(
+            GastoModel.fecha >= desde,
+        ),
+    ).scalar_one()
+    total_gastos = float(total_gastos or 0.0)
+
+    return total_efectivo, total_transferencia, total_gastos
+
+
+@router.get("/api/caja/estado", response_model=CajaEstadoResponse)
+def caja_estado(
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
+) -> CajaEstadoResponse:
+    """Retorna estado actual de la caja y ultimo cierre."""
+    caja_abierta = db.execute(
+        select(CierreCajaModel)
+        .where(CierreCajaModel.fecha_cierre.is_(None))
+        .order_by(CierreCajaModel.id.desc())
+        .limit(1),
+    ).scalar_one_or_none()
+
+    ultimo_cierre = db.execute(
+        select(CierreCajaModel)
+        .where(CierreCajaModel.fecha_cierre.is_not(None))
+        .order_by(CierreCajaModel.fecha_cierre.desc())
+        .limit(1),
+    ).scalar_one_or_none()
+
+    return CajaEstadoResponse(
+        abierta=caja_abierta is not None,
+        caja_actual=_to_cierre_caja_response(caja_abierta) if caja_abierta is not None else None,
+        ultimo_cierre=_to_cierre_caja_response(ultimo_cierre) if ultimo_cierre is not None else None,
+    )
+
+
+@router.post("/api/caja/apertura", response_model=CierreCajaResponse, status_code=201)
+def caja_apertura(
+    payload: AperturaCajaRequest,
+    db: Session = Depends(get_db),
+    current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
+) -> CierreCajaResponse:
+    """Abre la caja con un monto inicial. Rechaza si ya hay una caja abierta."""
+    caja_existente = db.execute(
+        select(CierreCajaModel)
+        .where(CierreCajaModel.fecha_cierre.is_(None))
+        .limit(1),
+    ).scalar_one_or_none()
+
+    if caja_existente is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="Ya hay una caja abierta. Debes cerrarla antes de abrir una nueva.",
+        )
+
+    cierre = CierreCajaModel(
+        monto_inicial=payload.monto_inicial,
+        monto_ventas_efectivo=0.0,
+        monto_ventas_transferencia=0.0,
+        monto_gastos=0.0,
+        monto_cierre=None,
+        abierto_por=current_user.username,
+        cerrado_por=None,
+    )
+    db.add(cierre)
+    db.commit()
+    db.refresh(cierre)
+
+    return _to_cierre_caja_response(cierre)
+
+
+@router.post("/api/caja/cierre", response_model=CierreCajaResponse)
+def caja_cierre(
+    payload: CierreCajaRequest,
+    db: Session = Depends(get_db),
+    current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
+) -> CierreCajaResponse:
+    """Cierra la caja abierta. Calcula ventas/gastos del turno."""
+    caja = db.execute(
+        select(CierreCajaModel)
+        .where(CierreCajaModel.fecha_cierre.is_(None))
+        .order_by(CierreCajaModel.id.desc())
+        .limit(1),
+    ).scalar_one_or_none()
+
+    if caja is None:
+        raise HTTPException(
+            status_code=409,
+            detail="No hay una caja abierta. Debes abrirla antes de cerrar.",
+        )
+
+    total_efectivo, total_transferencia, total_gastos = _calcular_metricas_desde(
+        db, caja.fecha_apertura,
+    )
+
+    caja.monto_ventas_efectivo = float(caja.monto_ventas_efectivo + total_efectivo)
+    caja.monto_ventas_transferencia = float(caja.monto_ventas_transferencia + total_transferencia)
+    caja.monto_gastos = float(caja.monto_gastos + total_gastos)
+    caja.monto_cierre = payload.monto_cierre
+    caja.fecha_cierre = datetime.now(UTC)
+    caja.cerrado_por = current_user.username
+
+    db.commit()
+    db.refresh(caja)
+
+    return _to_cierre_caja_response(caja)
+
+
+@router.get("/api/caja/historial", response_model=list[CajaHistorialItemResponse])
+def caja_historial(
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("superadmin")),
+) -> list[CajaHistorialItemResponse]:
+    """Historial completo de aperturas y cierres de caja."""
+    cierres = db.execute(
+        select(CierreCajaModel).order_by(CierreCajaModel.fecha_apertura.desc()),
+    ).scalars().all()
+
+    return [
+        CajaHistorialItemResponse(
+            id=c.id,
+            fecha_apertura=c.fecha_apertura,
+            fecha_cierre=c.fecha_cierre,
+            abierto_por=c.abierto_por,
+            cerrado_por=c.cerrado_por,
+            monto_inicial=float(c.monto_inicial),
+            monto_ventas_efectivo=float(c.monto_ventas_efectivo),
+            monto_ventas_transferencia=float(c.monto_ventas_transferencia),
+            monto_gastos=float(c.monto_gastos),
+            monto_cierre=float(c.monto_cierre) if c.monto_cierre is not None else None,
+            saldo_esperado=float(c.monto_inicial + c.monto_ventas_efectivo + c.monto_ventas_transferencia - c.monto_gastos),
+            esta_abierta=c.fecha_cierre is None,
+        )
+        for c in cierres
+    ]
