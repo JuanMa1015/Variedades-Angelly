@@ -392,7 +392,7 @@ const Inventario = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         {loading ? (
           <>
             <SkeletonCard />
@@ -401,22 +401,38 @@ const Inventario = () => {
           </>
         ) : (
           <>
-            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Productos</p>
-              <p className="mt-2 text-3xl font-bold text-gray-900">{resumen.productos}</p>
+              <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">{resumen.productos}</p>
             </div>
-            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Stock total</p>
-              <p className="mt-2 text-3xl font-bold text-gray-900">{`${resumen.totalStock} u`}</p>
+              <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">{`${resumen.totalStock} u`}</p>
             </div>
-            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Bajo stock</p>
-                  <p className="mt-2 text-3xl font-bold text-orange-600">{resumen.bajoStock}</p>
+                  <p className="mt-2 text-2xl font-bold text-orange-600 sm:text-3xl">{resumen.bajoStock}</p>
                 </div>
-                <AlertTriangle className="h-6 w-6 text-orange-500" />
+                <AlertTriangle className="h-5 w-5 text-orange-500 sm:h-6 sm:w-6" />
               </div>
+              {resumen.bajoStock > 0 && (
+                <ul className="mt-3 space-y-1">
+                  {productos
+                    .filter((p) => Number(p.stock_actual || 0) <= Number(p.stock_minimo || 0))
+                    .slice(0, 5)
+                    .map((p) => (
+                      <li key={p.id} className="flex items-center justify-between text-sm">
+                        <span className="truncate text-gray-700">{p.nombre}</span>
+                        <span className="ml-2 shrink-0 font-semibold text-orange-600">{p.stock_actual} u</span>
+                      </li>
+                    ))}
+                  {resumen.bajoStock > 5 && (
+                    <li className="text-xs text-gray-400">...y {resumen.bajoStock - 5} más</li>
+                  )}
+                </ul>
+              )}
             </div>
           </>
         )}

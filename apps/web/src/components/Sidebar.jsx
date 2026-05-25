@@ -48,28 +48,37 @@ const Sidebar = ({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMobile })
       { label: 'Cobrar', path: '/cartera/cobrar', icon: Wallet, description: 'Cobros y abonos' },
     ];
 
-    const superadminItems = [
-      { label: 'Admins', path: '/admin/admins', icon: Shield, description: 'CRUD de usuarios admin' },
-      { label: 'Vendedores', path: '/admin/vendedores', icon: Shield, description: 'CRUD de usuarios vendedores' },
-      { label: 'Productos', path: '/admin/productos', icon: Package, description: 'CRUD de productos' },
-      { label: 'Proveedores', path: '/admin/proveedores', icon: Truck, description: 'CRUD de proveedores' },
-      { label: 'Clientes cartera', path: '/admin/clientes-cartera', icon: Users, description: 'Clientes con cupo' },
-      { label: 'Clientes tienda', path: '/admin/clientes-tienda', icon: Users, description: 'Clientes de tienda' },
-      { label: 'Clientes fidelización', path: '/admin/clientes-fidelizacion', icon: Gift, description: 'Programa de puntos' },
-      { label: 'Ventas', path: '/admin/ventas', icon: ShoppingCart, description: 'Historial de ventas' },
-      { label: 'Pedidos proveedor', path: '/admin/pedidos-proveedor', icon: Receipt, description: 'Pedidos enviados' },
-      { label: 'Facturas compra', path: '/admin/facturas-compra', icon: Receipt, description: 'Facturas de compra' },
-      { label: 'Abonos cartera', path: '/admin/abonos-cartera', icon: Wallet, description: 'Abonos registrados' },
-      { label: 'Gastos', path: '/admin/gastos', icon: Receipt, description: 'Gastos operativos' },
-      { label: 'Auditorias', path: '/admin/auditorias', icon: Shield, description: 'Historial de acciones' },
-      { label: 'Informes', path: '/admin/informes', icon: BarChart3, description: 'Ventas y rankings' },
-    ];
-
     if (user?.role === 'superadmin') {
       return [
-        { title: 'Superadmin', items: superadminItems },
-        { title: 'Admin', items: adminItems },
-        { title: 'Vendedor', items: vendedorItems },
+        {
+          title: 'Vendedor',
+          items: [
+            { label: 'Productos', path: '/admin/productos', icon: Package, description: 'CRUD de productos' },
+            { label: 'Proveedores', path: '/admin/proveedores', icon: Truck, description: 'CRUD de proveedores' },
+            { label: 'Gastos', path: '/admin/gastos', icon: Receipt, description: 'Gastos operativos' },
+            { label: 'Pedidos proveedor', path: '/admin/pedidos-proveedor', icon: Receipt, description: 'Pedidos enviados' },
+          ],
+        },
+        {
+          title: 'Cartera',
+          items: [
+            { label: 'Ventas', path: '/admin/ventas', icon: ShoppingCart, description: 'Historial de ventas' },
+            { label: 'Clientes cartera', path: '/admin/clientes-cartera', icon: Users, description: 'Clientes con cupo' },
+            { label: 'Abonos cartera', path: '/admin/abonos-cartera', icon: Wallet, description: 'Abonos registrados' },
+          ],
+        },
+        {
+          title: 'SuperAdmin',
+          items: [
+            { label: 'Admins', path: '/admin/admins', icon: Shield, description: 'CRUD de usuarios admin' },
+            { label: 'Vendedores', path: '/admin/vendedores', icon: Shield, description: 'CRUD de usuarios vendedores' },
+            { label: 'Clientes tienda', path: '/admin/clientes-tienda', icon: Users, description: 'Clientes de tienda' },
+            { label: 'Clientes fidelización', path: '/admin/clientes-fidelizacion', icon: Gift, description: 'Programa de puntos' },
+            { label: 'Facturas compra', path: '/admin/facturas-compra', icon: Receipt, description: 'Facturas de compra' },
+            { label: 'Auditorías', path: '/admin/auditorias', icon: Shield, description: 'Historial de acciones' },
+            { label: 'Informes', path: '/admin/informes', icon: BarChart3, description: 'Ventas y rankings' },
+          ],
+        },
       ];
     }
 

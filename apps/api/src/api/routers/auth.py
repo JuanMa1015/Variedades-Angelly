@@ -2,16 +2,29 @@
 
 from __future__ import annotations
 
+import os
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.api.dependencies import AuthenticatedUser, require_roles
+from src.api.services.vendedor import (
+    create_vendedor as _create_vendedor,
+    delete_vendedor as _delete_vendedor,
+    list_vendedores as _list_vendedores,
+    update_vendedor as _update_vendedor,
+)
 from src.auth.bootstrap import ensure_default_auth_users
-from src.auth.security import create_access_token, create_refresh_token, decode_access_token, hash_password, verify_password
+from src.auth.security import (
+    create_access_token,
+    create_refresh_token,
+    decode_access_token,
+    refresh_expire_days,
+    verify_password,
+)
 from src.infrastructure.database.connection import get_db
 from src.infrastructure.database.models import UsuarioModel
 from src.api.limiter import limiter, login_rate_limit
@@ -30,17 +43,10 @@ class LoginResponse(BaseModel):
     """Respuesta de autenticacion con token JWT."""
 
     access_token: str
-    refresh_token: str
     token_type: str = "bearer"
     role: str
     username: str
     expires_in: int
-
-
-class RefreshRequest(BaseModel):
-    """Solicitud de refresco de token."""
-
-    refresh_token: str
 
 
 class RefreshResponse(BaseModel):
@@ -79,6 +85,7 @@ class VendedorUsuarioUpdateRequest(BaseModel):
 def auth_login(
     request: Request,
     payload: LoginRequest,
+    response: Response,
     db: Session = Depends(get_db),
 ) -> LoginResponse:
     """Autentica credenciales y retorna JWT firmado con rol."""
@@ -100,11 +107,20 @@ def auth_login(
 
     role = normalized_role
     token, expires_in = create_access_token(username=usuario.username, role=role)
-    refresh_token, _ = create_refresh_token(username=usuario.username, role=role)
+    refresh_token, refresh_expires = create_refresh_token(username=usuario.username, role=role)
+
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        samesite="lax",
+        secure=os.getenv("APP_ENV") != "development",
+        max_age=refresh_expires,
+        path="/api/auth",
+    )
 
     return LoginResponse(
         access_token=token,
-        refresh_token=refresh_token,
         role=role,
         username=usuario.username,
         expires_in=expires_in,
@@ -113,10 +129,17 @@ def auth_login(
 
 @router.post("/api/auth/refresh", response_model=RefreshResponse)
 def auth_refresh(
-    payload: RefreshRequest,
+    request: Request,
 ) -> RefreshResponse:
-    """Valida refresh token y emite un nuevo access token."""
-    decoded = decode_access_token(payload.refresh_token)
+    """Valida refresh token (desde httpOnly cookie) y emite un nuevo access token."""
+    refresh_token = request.cookies.get("refresh_token")
+    if not refresh_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token no encontrado",
+        )
+
+    decoded = decode_access_token(refresh_token)
     if decoded is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -150,20 +173,7 @@ def list_vendedores(
     db: Session = Depends(get_db),
     _: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> list[VendedorUsuarioResponse]:
-    usuarios = db.execute(
-        select(UsuarioModel)
-        .where(UsuarioModel.rol == "vendedor")
-        .order_by(UsuarioModel.username.asc()),
-    ).scalars().all()
-
-    return [
-        VendedorUsuarioResponse(
-            id=user.id,
-            username=user.username,
-            rol=user.rol,
-        )
-        for user in usuarios
-    ]
+    return [VendedorUsuarioResponse(**u) for u in _list_vendedores(db)]
 
 
 @router.post("/api/usuarios/vendedores", response_model=VendedorUsuarioResponse, status_code=201)
@@ -172,7 +182,6 @@ async def create_vendedor(
     db: Session = Depends(get_db),
     _: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> VendedorUsuarioResponse:
-    # Accept either application/json or form-encoded payloads.
     try:
         data = await request.json()
     except Exception:
@@ -184,26 +193,7 @@ async def create_vendedor(
     except ValidationError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.errors())
 
-    username = payload.username.strip()
-    if not username:
-        raise HTTPException(status_code=400, detail="Username requerido")
-
-    existente = db.execute(
-        select(UsuarioModel).where(UsuarioModel.username == username),
-    ).scalar_one_or_none()
-    if existente is not None:
-        raise HTTPException(status_code=409, detail="Ya existe un usuario con ese username")
-
-    usuario = UsuarioModel(
-        username=username,
-        password_hash=hash_password(payload.password),
-        rol="vendedor",
-    )
-    db.add(usuario)
-    db.commit()
-    db.refresh(usuario)
-
-    return VendedorUsuarioResponse(id=usuario.id, username=usuario.username, rol=usuario.rol)
+    return VendedorUsuarioResponse(**_create_vendedor(payload.username, payload.password, db))
 
 
 @router.patch("/api/usuarios/vendedores/{usuario_id}", response_model=VendedorUsuarioResponse)
@@ -213,37 +203,7 @@ def update_vendedor(
     db: Session = Depends(get_db),
     _: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> VendedorUsuarioResponse:
-    usuario = db.execute(
-        select(UsuarioModel).where(
-            UsuarioModel.id == usuario_id,
-            UsuarioModel.rol == "vendedor",
-        ),
-    ).scalar_one_or_none()
-    if usuario is None:
-        raise HTTPException(status_code=404, detail="Vendedor no encontrado")
-
-    if payload.username is not None:
-        next_username = payload.username.strip()
-        if not next_username:
-            raise HTTPException(status_code=400, detail="Username invalido")
-
-        existe_username = db.execute(
-            select(UsuarioModel).where(
-                UsuarioModel.username == next_username,
-                UsuarioModel.id != usuario_id,
-            ),
-        ).scalar_one_or_none()
-        if existe_username is not None:
-            raise HTTPException(status_code=409, detail="Ya existe un usuario con ese username")
-
-        usuario.username = next_username
-
-    if payload.password is not None:
-        usuario.password_hash = hash_password(payload.password)
-
-    db.commit()
-    db.refresh(usuario)
-    return VendedorUsuarioResponse(id=usuario.id, username=usuario.username, rol=usuario.rol)
+    return VendedorUsuarioResponse(**_update_vendedor(usuario_id, payload.username, payload.password, db))
 
 
 @router.delete("/api/usuarios/vendedores/{usuario_id}", status_code=204)
@@ -252,14 +212,4 @@ def delete_vendedor(
     db: Session = Depends(get_db),
     _: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> None:
-    usuario = db.execute(
-        select(UsuarioModel).where(
-            UsuarioModel.id == usuario_id,
-            UsuarioModel.rol == "vendedor",
-        ),
-    ).scalar_one_or_none()
-    if usuario is None:
-        raise HTTPException(status_code=404, detail="Vendedor no encontrado")
-
-    db.delete(usuario)
-    db.commit()
+    _delete_vendedor(usuario_id, db)

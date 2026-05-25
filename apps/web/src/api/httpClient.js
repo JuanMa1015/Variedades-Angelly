@@ -1,5 +1,4 @@
 const TOKEN_STORAGE_KEY = 'angelly.auth.token';
-const REFRESH_TOKEN_KEY = 'angelly.auth.refresh_token';
 const USER_STORAGE_KEY = 'angelly.auth.user';
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
 
@@ -31,20 +30,17 @@ const notifyUnauthorized = () => {
 };
 
 const tryRefreshToken = async () => {
-  const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-  if (!refreshToken) return null;
-
   try {
     const response = await fetch(buildUrl('/api/auth/refresh'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: refreshToken }),
+      credentials: 'include',
     });
 
     if (!response.ok) return null;
 
     const data = await response.json();
-    localStorage.setItem(TOKEN_STORAGE_KEY, data.access_token);
+    sessionStorage.setItem(TOKEN_STORAGE_KEY, data.access_token);
     return data.access_token;
   } catch {
     return null;
@@ -57,7 +53,7 @@ const performRequest = async (endpoint, options) => {
   const nextHeaders = { ...headers };
 
   if (includeAuth) {
-    const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+    const token = sessionStorage.getItem(TOKEN_STORAGE_KEY);
     if (token && !nextHeaders.Authorization) {
       nextHeaders.Authorization = `Bearer ${token}`;
     }
@@ -73,6 +69,7 @@ const performRequest = async (endpoint, options) => {
     headers: nextHeaders,
     body: hasJsonBody ? JSON.stringify(body) : undefined,
     signal,
+    credentials: 'include',
   });
 
   const payload = await response.json().catch(() => null);
@@ -98,9 +95,8 @@ export const apiRequest = async (endpoint, options = {}) => {
     }
 
     if (!newToken || result.response.status === 401) {
-      localStorage.removeItem(TOKEN_STORAGE_KEY);
-      localStorage.removeItem(REFRESH_TOKEN_KEY);
-      localStorage.removeItem(USER_STORAGE_KEY);
+      sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+      sessionStorage.removeItem(USER_STORAGE_KEY);
       notifyUnauthorized();
     }
   }

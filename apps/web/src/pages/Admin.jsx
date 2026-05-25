@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Database, PencilLine, Plus, RefreshCw, Shield, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Database, PencilLine, Plus, RefreshCw, Shield, Trash2, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { apiDelete, apiRequest } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage';
@@ -28,21 +28,36 @@ const formatDateTime = (value) => {
   });
 };
 
-const TAB_ITEMS = [
-  { id: 'admins', label: 'Admins' },
-  { id: 'vendedores', label: 'Vendedores' },
-  { id: 'productos', label: 'Productos' },
-  { id: 'proveedores', label: 'Proveedores' },
-  { id: 'clientes_cartera', label: 'Clientes cartera' },
-  { id: 'clientes_tienda', label: 'Clientes tienda' },
-  { id: 'clientes_fidelizacion', label: 'Clientes fidelizacion' },
-  { id: 'ventas', label: 'Ventas' },
-  { id: 'pedidos_proveedor', label: 'Pedidos proveedor' },
-  { id: 'facturas_compra', label: 'Facturas compra' },
-  { id: 'gastos', label: 'Gastos' },
-  { id: 'abonos_cartera', label: 'Abonos cartera' },
-  { id: 'auditorias', label: 'Auditorias' },
-  { id: 'informes', label: 'Informes' },
+const ROLE_GROUPS = [
+  {
+    role: 'Vendedor',
+    modules: [
+      { id: 'productos', label: 'Productos' },
+      { id: 'proveedores', label: 'Proveedores' },
+      { id: 'gastos', label: 'Gastos' },
+      { id: 'pedidos_proveedor', label: 'Pedidos proveedor' },
+    ],
+  },
+  {
+    role: 'Cartera',
+    modules: [
+      { id: 'ventas', label: 'Ventas' },
+      { id: 'clientes_cartera', label: 'Clientes cartera' },
+      { id: 'abonos_cartera', label: 'Abonos cartera' },
+    ],
+  },
+  {
+    role: 'SuperAdmin',
+    modules: [
+      { id: 'admins', label: 'Admins' },
+      { id: 'vendedores', label: 'Vendedores' },
+      { id: 'clientes_tienda', label: 'Clientes tienda' },
+      { id: 'clientes_fidelizacion', label: 'Clientes fidelización' },
+      { id: 'facturas_compra', label: 'Facturas compra' },
+      { id: 'auditorias', label: 'Auditorías' },
+      { id: 'informes', label: 'Informes' },
+    ],
+  },
 ];
 
 const MODULE_LABELS = {
@@ -52,13 +67,13 @@ const MODULE_LABELS = {
   proveedores: 'Proveedores',
   clientes_cartera: 'Clientes cartera',
   clientes_tienda: 'Clientes tienda',
-  clientes_fidelizacion: 'Clientes fidelizacion',
+  clientes_fidelizacion: 'Clientes fidelización',
   ventas: 'Ventas',
   pedidos_proveedor: 'Pedidos proveedor',
   facturas_compra: 'Facturas compra',
   gastos: 'Gastos',
   abonos_cartera: 'Abonos cartera',
-  auditorias: 'Auditorias',
+  auditorias: 'Auditorías',
   informes: 'Informes',
 };
 
@@ -81,7 +96,8 @@ const CREATE_DIALOGS = {
 const Admin = ({ moduleKey = null }) => {
   const { token, isSuperAdmin } = useAuth();
 
-  const [activeTab, setActiveTab] = useState(moduleKey ?? 'vendedores');
+  const [activeTab, setActiveTab] = useState(moduleKey ?? 'productos');
+  const [expandedRole, setExpandedRole] = useState('Vendedor');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -1082,9 +1098,9 @@ const Admin = ({ moduleKey = null }) => {
               <Shield className="h-3.5 w-3.5" />
               Panel administrativo
             </div>
-            <h1 className="mt-3 text-3xl font-black tracking-tight text-[#6a3f43] sm:text-4xl">Modulo Admin</h1>
+            <h1 className="mt-3 text-3xl font-black tracking-tight text-[#6a3f43] sm:text-4xl">Panel de Administración</h1>
             <p className="mt-2 max-w-2xl text-sm text-[#6a3f43]/80 sm:text-base">
-              Vista de control para gerencia: tablas, métricas y acciones directas con altas en modal.
+              Gestiona usuarios, productos, ventas y más desde un solo lugar.
             </p>
           </div>
 
@@ -1110,23 +1126,48 @@ const Admin = ({ moduleKey = null }) => {
       )}
 
       {!moduleKey && (
-        <div className="rounded-[28px] border border-[#eebbbb]/70 bg-white/90 p-3 shadow-[0_16px_40px_rgba(106,63,67,0.06)] sm:p-4">
-          <div className="flex flex-wrap gap-2">
-            {TAB_ITEMS.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`rounded-full px-3 py-2 text-xs font-semibold transition sm:px-4 sm:text-sm ${
-                  activeTab === tab.id
-                    ? 'bg-[#6a3f43] text-[#fdf1f1]'
-                    : 'bg-[#fdf1f1] text-[#6a3f43] hover:bg-[#fbe3e3]'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+        <div className="space-y-3">
+          {ROLE_GROUPS.map((group) => {
+            const isExpanded = expandedRole === group.role;
+            return (
+              <div key={group.role} className="rounded-[28px] border border-[#eebbbb]/70 bg-white/90 shadow-[0_16px_40px_rgba(106,63,67,0.06)]">
+                <button
+                  type="button"
+                  onClick={() => setExpandedRole(isExpanded ? '' : group.role)}
+                  className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition hover:bg-[#fdf1f1]"
+                >
+                  <span className="text-sm font-bold uppercase tracking-[0.08em] text-[#6a3f43]">
+                    {group.role}
+                  </span>
+                  {isExpanded ? (
+                    <ChevronDown className="h-4 w-4 text-[#6a3f43]" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-[#6a3f43]" />
+                  )}
+                </button>
+                {isExpanded && (
+                  <div className="border-t border-[#eebbbb]/50 px-5 py-3">
+                    <div className="flex flex-wrap gap-2">
+                      {group.modules.map((mod) => (
+                        <button
+                          key={mod.id}
+                          type="button"
+                          onClick={() => setActiveTab(mod.id)}
+                          className={`rounded-full px-3 py-2 text-xs font-semibold transition sm:px-4 sm:text-sm ${
+                            activeTab === mod.id
+                              ? 'bg-[#6a3f43] text-[#fdf1f1]'
+                              : 'bg-[#fdf1f1] text-[#6a3f43] hover:bg-[#fbe3e3]'
+                          }`}
+                        >
+                          {mod.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -2090,8 +2131,8 @@ const Admin = ({ moduleKey = null }) => {
               </button>
             </div>
             <form onSubmit={handleCreateVendedor} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <input value={vendedorForm.username} onChange={(e) => setVendedorForm((c) => ({ ...c, username: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Username" required />
-              <input type="password" value={vendedorForm.password} onChange={(e) => setVendedorForm((c) => ({ ...c, password: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Contraseña" required />
+               <input value={vendedorForm.username} onChange={(e) => setVendedorForm((c) => ({ ...c, username: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Usuario" required />
+               <input type="password" value={vendedorForm.password} onChange={(e) => setVendedorForm((c) => ({ ...c, password: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Contraseña" required />
               <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
                 <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
                 <button type="submit" className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear vendedor</button>
@@ -2114,8 +2155,8 @@ const Admin = ({ moduleKey = null }) => {
               </button>
             </div>
             <form onSubmit={handleCreateAdmin} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <input value={adminForm.username} onChange={(e) => setAdminForm((c) => ({ ...c, username: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Username" required />
-              <input type="password" value={adminForm.password} onChange={(e) => setAdminForm((c) => ({ ...c, password: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Contraseña" required />
+               <input value={adminForm.username} onChange={(e) => setAdminForm((c) => ({ ...c, username: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Usuario" required />
+               <input type="password" value={adminForm.password} onChange={(e) => setAdminForm((c) => ({ ...c, password: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Contraseña" required />
               <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
                 <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
                 <button type="submit" className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear admin</button>
@@ -2195,10 +2236,10 @@ const Admin = ({ moduleKey = null }) => {
               </button>
             </div>
             <form onSubmit={handleCreateAuditoria} className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <input value={auditoriaForm.modulo} onChange={(e) => setAuditoriaForm((c) => ({ ...c, modulo: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Modulo" required />
-              <input value={auditoriaForm.entidad} onChange={(e) => setAuditoriaForm((c) => ({ ...c, entidad: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Entidad" required />
-              <input value={auditoriaForm.entidad_id} onChange={(e) => setAuditoriaForm((c) => ({ ...c, entidad_id: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Entidad ID" />
-              <input value={auditoriaForm.accion} onChange={(e) => setAuditoriaForm((c) => ({ ...c, accion: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Accion" required />
+               <input value={auditoriaForm.modulo} onChange={(e) => setAuditoriaForm((c) => ({ ...c, modulo: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Módulo" required />
+               <input value={auditoriaForm.entidad} onChange={(e) => setAuditoriaForm((c) => ({ ...c, entidad: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Entidad" required />
+               <input value={auditoriaForm.entidad_id} onChange={(e) => setAuditoriaForm((c) => ({ ...c, entidad_id: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="ID entidad" />
+               <input value={auditoriaForm.accion} onChange={(e) => setAuditoriaForm((c) => ({ ...c, accion: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Acción" required />
               <textarea value={auditoriaForm.detalle} onChange={(e) => setAuditoriaForm((c) => ({ ...c, detalle: e.target.value }))} className="min-h-28 rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none md:col-span-2" placeholder="Detalle" />
               <div className="md:col-span-2 flex justify-end gap-2 pt-2">
                 <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
@@ -2296,8 +2337,8 @@ const Admin = ({ moduleKey = null }) => {
               </button>
             </div>
             <form onSubmit={handleCreateVenta} className="grid grid-cols-1 gap-3">
-              <input value={ventaForm.cliente_id} onChange={(e) => setVentaForm((c) => ({ ...c, cliente_id: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Cliente ID (opcional)" />
-              <textarea value={ventaForm.items_json} onChange={(e) => setVentaForm((c) => ({ ...c, items_json: e.target.value }))} className="min-h-28 rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder='Items JSON' />
+               <input value={ventaForm.cliente_id} onChange={(e) => setVentaForm((c) => ({ ...c, cliente_id: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="ID del cliente (opcional)" />
+               <textarea value={ventaForm.items_json} onChange={(e) => setVentaForm((c) => ({ ...c, items_json: e.target.value }))} className="min-h-28 rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder='[{"producto_id":1,"cantidad":2}]' />
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
                 <button type="submit" className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear venta</button>
@@ -2320,7 +2361,7 @@ const Admin = ({ moduleKey = null }) => {
               </button>
             </div>
             <form onSubmit={handleCreatePedidoProveedor} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <input value={pedidoProveedorForm.proveedor_id} onChange={(e) => setPedidoProveedorForm((c) => ({ ...c, proveedor_id: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Proveedor ID" required />
+              <input value={pedidoProveedorForm.proveedor_id} onChange={(e) => setPedidoProveedorForm((c) => ({ ...c, proveedor_id: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="ID del proveedor" required />
               <input value={pedidoProveedorForm.descripcion} onChange={(e) => setPedidoProveedorForm((c) => ({ ...c, descripcion: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Descripción" required />
               <input type="number" min="0" value={pedidoProveedorForm.monto_estimado} onChange={(e) => setPedidoProveedorForm((c) => ({ ...c, monto_estimado: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Monto estimado" />
               <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
@@ -2345,8 +2386,8 @@ const Admin = ({ moduleKey = null }) => {
               </button>
             </div>
             <form onSubmit={handleCreateFacturaCompra} className="grid grid-cols-1 gap-3">
-              <input value={facturaCompraForm.proveedor_id} onChange={(e) => setFacturaCompraForm((c) => ({ ...c, proveedor_id: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Proveedor ID" required />
-              <textarea value={facturaCompraForm.items_json} onChange={(e) => setFacturaCompraForm((c) => ({ ...c, items_json: e.target.value }))} className="min-h-28 rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder='Items JSON' />
+               <input value={facturaCompraForm.proveedor_id} onChange={(e) => setFacturaCompraForm((c) => ({ ...c, proveedor_id: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="ID del proveedor" required />
+               <textarea value={facturaCompraForm.items_json} onChange={(e) => setFacturaCompraForm((c) => ({ ...c, items_json: e.target.value }))} className="min-h-28 rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder='[{"producto_id":1,"cantidad":2}]' />
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
                 <button type="submit" className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear factura</button>
@@ -2394,7 +2435,7 @@ const Admin = ({ moduleKey = null }) => {
               </button>
             </div>
             <form onSubmit={handleCreateAbonoCartera} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <input type="number" min="1" value={abonoCarteraForm.cliente_id} onChange={(e) => setAbonoCarteraForm((c) => ({ ...c, cliente_id: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Cliente ID" required />
+              <input type="number" min="1" value={abonoCarteraForm.cliente_id} onChange={(e) => setAbonoCarteraForm((c) => ({ ...c, cliente_id: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="ID del cliente" required />
               <input type="number" min="0" step="0.01" value={abonoCarteraForm.monto} onChange={(e) => setAbonoCarteraForm((c) => ({ ...c, monto: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Monto" required />
               <select value={abonoCarteraForm.metodo_pago} onChange={(e) => setAbonoCarteraForm((c) => ({ ...c, metodo_pago: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none">
                 <option value="efectivo">Efectivo</option>

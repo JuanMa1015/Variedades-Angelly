@@ -160,9 +160,25 @@ def delete_cliente_fidelizacion(
     if cliente is None:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
 
-    db.delete(cliente)
+    cliente.activo = False
     db.commit()
     return Response(status_code=204)
+
+
+@router.put("/api/fidelizacion/clientes/{cliente_id}/reactivar", status_code=200)
+def reactivar_cliente_fidelizacion(
+    cliente_id: int,
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+) -> dict:
+    cliente = db.execute(
+        select(ClienteFidelizacionModel).where(ClienteFidelizacionModel.id == cliente_id),
+    ).scalar_one_or_none()
+    if cliente is None:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+    cliente.activo = True
+    db.commit()
+    return {"message": "Cliente reactivado"}
 
 
 @router.post("/api/fidelizacion/clientes/{cliente_id}/canjear-bono", response_model=ClienteFidelizacionResponse)

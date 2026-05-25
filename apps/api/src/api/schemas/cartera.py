@@ -64,7 +64,7 @@ class MovimientoClienteResponse(BaseModel):
     referencia: str | None = None
     monto: float
     fecha: datetime
-    saldo: float
+    saldo: float | None = None
 
 
 class MovimientoClientePageResponse(BaseModel):

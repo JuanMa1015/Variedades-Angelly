@@ -71,6 +71,10 @@ def export_ventas(
     _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> StreamingResponse:
     query = select(VentaModel).order_by(VentaModel.fecha.desc())
+    if fecha_desde:
+        query = query.where(VentaModel.fecha >= fecha_desde)
+    if fecha_hasta:
+        query = query.where(VentaModel.fecha <= fecha_hasta)
     ventas = db.execute(query).scalars().all()
 
     cliente_ids = {v.cliente_id for v in ventas if v.cliente_id is not None}
@@ -108,6 +112,10 @@ def export_gastos(
     _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> StreamingResponse:
     query = select(GastoModel).order_by(GastoModel.fecha.desc())
+    if fecha_desde:
+        query = query.where(GastoModel.fecha >= fecha_desde)
+    if fecha_hasta:
+        query = query.where(GastoModel.fecha <= fecha_hasta)
     gastos = db.execute(query).scalars().all()
 
     rows = [

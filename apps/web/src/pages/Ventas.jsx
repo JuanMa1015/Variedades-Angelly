@@ -161,6 +161,16 @@ const Ventas = () => {
       return;
     }
 
+    for (const [productoId, cantidad] of groupedItems) {
+      const producto = productos.find((p) => Number(p.id) === Number(productoId));
+      if (!producto) continue;
+      const stock = Number(producto.stock_actual || 0);
+      if (cantidad > stock) {
+        setError(`Stock insuficiente para "${producto.nombre}": solicitaste ${cantidad}, hay ${stock} disponibles.`);
+        return;
+      }
+    }
+
     if (esFiado && !clienteTiendaId) {
       setError('Selecciona un cliente de fiado tienda para registrar el fiado');
       return;
@@ -266,6 +276,11 @@ const Ventas = () => {
 
   const handleQuickAddProducto = (productoId) => {
     setItems((current) => {
+      const qtyInCart = current.find((item) => Number(item.producto_id) === Number(productoId))?.cantidad || 0;
+      const producto = productos.find((p) => Number(p.id) === Number(productoId));
+      const stock = Number(producto?.stock_actual || 0);
+      if (qtyInCart >= stock) return current;
+
       const index = current.findIndex((item) => Number(item.producto_id) === Number(productoId));
       if (index >= 0) {
         return current.map((item, rowIndex) => (rowIndex === index

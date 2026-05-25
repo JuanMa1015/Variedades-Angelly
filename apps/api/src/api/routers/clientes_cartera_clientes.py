@@ -188,9 +188,25 @@ def delete_cliente_cartera(
             detail="No se puede eliminar un cliente con historial de ventas o abonos",
         )
 
-    db.delete(cliente)
+    cliente.activo = False
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.put("/api/clientes/{cliente_id}/reactivar", status_code=200)
+def reactivar_cliente(
+    cliente_id: int,
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+) -> dict:
+    cliente = db.execute(
+        select(ClienteModel).where(ClienteModel.id == cliente_id),
+    ).scalar_one_or_none()
+    if cliente is None:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+    cliente.activo = True
+    db.commit()
+    return {"message": "Cliente reactivado"}
 
 
 @router.get("/api/clientes/{nombre}", response_model=ClienteResponse)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import time
 
 from fastapi import FastAPI, status
@@ -116,8 +117,9 @@ def _cors_response(status_code: int, content: dict, request) -> JSONResponse:
     """Retorna JSONResponse con CORS headers para errores fuera del middleware."""
     resp = JSONResponse(status_code=status_code, content=content)
     origin = request.headers.get("origin", "")
-    allowed = _load_cors_origins() + (["*"] if _load_cors_origin_regex() else [])
-    if origin in allowed or "*" in allowed:
+    allowed = _load_cors_origins()
+    regex = _load_cors_origin_regex()
+    if origin in allowed or (regex and re.search(regex, origin)):
         resp.headers["Access-Control-Allow-Origin"] = origin
     resp.headers["Access-Control-Allow-Credentials"] = "true"
     resp.headers["Access-Control-Allow-Methods"] = "*"

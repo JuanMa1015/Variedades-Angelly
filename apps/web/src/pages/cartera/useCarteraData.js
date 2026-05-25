@@ -72,15 +72,22 @@ const normalizeWhatsappNumber = (rawValue) => {
   const digits = String(rawValue || '').replace(/\D/g, '');
   if (!digits) return '';
 
+  if (digits.length === 12 && digits.startsWith('57')) {
+    return digits;
+  }
+
   if (digits.length === 10) {
     return `57${digits}`;
   }
 
-  return digits;
+  return '';
 };
 
 const formatMoney = (value) => MONEY_FORMATTER.format(Number(value || 0));
-const formatMoneyWhatsapp = (value) => `$${Number(value || 0).toLocaleString('es-CO', { maximumFractionDigits: 0 })}`;
+const formatMoneyWhatsapp = (value) => {
+  const num = Number(value || 0);
+  return `$${Math.round(num).toLocaleString('es-CO', { useGrouping: false, maximumFractionDigits: 0 })}`;
+};
 
 export const useCarteraData = () => {
   const { isAuthenticated, bootstrapped } = useAuth();
@@ -285,6 +292,12 @@ export const useCarteraData = () => {
       return;
     }
 
+    const phone = clienteForm.telefono_whatsapp.trim();
+    if (phone && !normalizeWhatsappNumber(phone)) {
+      setError('El número de WhatsApp debe tener 10 dígitos (ej: 3001234567)');
+      return;
+    }
+
     try {
       setSavingCliente(true);
       await saveCarteraCliente({
@@ -378,30 +391,40 @@ export const useCarteraData = () => {
     const deuda = Number(cliente?.deuda_total || 0);
     const nombre = String(cliente?.nombre || '').trim();
 
-    let productosPendientes = '';
+    let productosRegistrados = '';
+    let totalOriginal = 0;
     try {
       const movimientos = await fetchCarteraMovimientos({ clienteId: cliente.id, page: 1, limit: 20 });
       const ventas = (movimientos?.data || []).filter((m) => m.tipo === 'Venta');
       if (ventas.length > 0) {
-        productosPendientes = ventas
+        totalOriginal = ventas.reduce((sum, v) => sum + Number(v.monto || 0), 0);
+        productosRegistrados = ventas
           .filter((v) => v.articulo)
           .slice(0, 5)
-          .map((v) => `- ${v.articulo} (${v.cantidad ? `x${v.cantidad}` : ''} $${v.monto ? Number(v.monto).toLocaleString('es-CO') : '?'})`)
+          .map((v) => `- ${v.articulo} ($${Math.round(Number(v.monto)).toLocaleString('es-CO', { useGrouping: false, maximumFractionDigits: 0 })})`)
           .join('\n');
       }
     } catch {
       // si falla la consulta, solo omitimos el detalle
     }
 
+    const totalAbonado = Math.max(0, totalOriginal - deuda);
+
     const lineas = [];
     lineas.push(`Hola ${nombre}, un saludo de Tienda Angelly.`);
     lineas.push('');
-    lineas.push(`Tu saldo pendiente es de ${formatMoneyWhatsapp(deuda)}.`);
 
-    if (productosPendientes) {
+    if (productosRegistrados) {
+      lineas.push('Productos registrados:');
+      lineas.push(productosRegistrados);
       lineas.push('');
-      lineas.push('Productos pendientes:');
-      lineas.push(productosPendientes);
+      lineas.push(`Total original: ${formatMoneyWhatsapp(totalOriginal)}`);
+      if (totalAbonado > 0) {
+        lineas.push(`Abonado: ${formatMoneyWhatsapp(totalAbonado)}`);
+      }
+      lineas.push(`Pendiente: ${formatMoneyWhatsapp(deuda)}`);
+    } else {
+      lineas.push(`Tu saldo pendiente es de ${formatMoneyWhatsapp(deuda)}.`);
     }
 
     lineas.push('');

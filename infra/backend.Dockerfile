@@ -21,6 +21,9 @@ COPY scripts/release_api.sh ./scripts/release_api.sh
 
 RUN chmod +x ./scripts/release_api.sh
 
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+  CMD curl -f http://localhost:8000/health || exit 1
+
 EXPOSE 8000
 
 ENTRYPOINT ["sh", "./scripts/release_api.sh"]

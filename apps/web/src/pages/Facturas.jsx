@@ -243,7 +243,7 @@ const Facturas = () => {
                     value={item.precio_unitario}
                     onChange={(event) => handleItemChange(index, 'precio_unitario', event.target.value)}
                     className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
-                    placeholder="P. unit"
+                    placeholder="Precio unit."
                   />
 
                   <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800">

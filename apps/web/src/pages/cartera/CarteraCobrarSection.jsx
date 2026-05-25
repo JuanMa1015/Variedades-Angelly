@@ -26,7 +26,7 @@ const CarteraCobrarSection = ({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-xl font-bold text-gray-900">Cobrar cartera</h2>
-            <p className="text-sm text-gray-600">Primero ves la tarjeta, luego despliegas detalles para hacer CRUD y cobrar.</p>
+            <p className="text-sm text-gray-600">Administra los cobros de cartera.</p>
           </div>
           <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">{clientes.length} clientes visibles</span>
         </div>

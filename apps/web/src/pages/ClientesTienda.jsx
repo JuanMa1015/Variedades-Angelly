@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Save, Search, Trash2, UserRound } from 'lucide-react';
+import { Plus, Save, Search, Trash2, UserRound, X } from 'lucide-react';
 import PaginationControls from '../components/PaginationControls';
 import { useAuth } from '../auth/AuthContext';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage'
 import SuccessMessage from '../components/SuccessMessage'
 import useConfirm from '../components/useConfirm'
+import Skeleton from '../components/Skeleton'
 
 const PAGE_SIZE = 10;
 
@@ -32,6 +33,7 @@ const ClientesTienda = () => {
   const [whatsapp, setWhatsapp] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const { confirm, ConfirmModal } = useConfirm();
 
@@ -93,6 +95,7 @@ const ClientesTienda = () => {
     setApellido('');
     setWhatsapp('');
     setEditingId(null);
+    setIsModalOpen(false);
   };
 
   const handleSubmit = async (event) => {
@@ -135,7 +138,14 @@ const ClientesTienda = () => {
     }
   };
 
-  const handleEdit = (cliente) => {
+  const openCreateModal = () => {
+    resetForm();
+    setError('');
+    setSuccess('');
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (cliente) => {
     const fullName = String(cliente.nombre || '').trim();
     const parts = fullName.split(/\s+/);
     const firstName = parts.shift() || '';
@@ -147,6 +157,7 @@ const ClientesTienda = () => {
     setEditingId(cliente.id);
     setError('');
     setSuccess('');
+    setIsModalOpen(true);
   };
 
   const handleDelete = async (cliente) => {
@@ -172,7 +183,7 @@ const ClientesTienda = () => {
         <UserRound className="h-8 w-8 text-rosewood" />
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Clientes de Tienda</h1>
-          <p className="text-gray-600">CRUD básico para ventas y fiados de tienda</p>
+          <p className="text-gray-600">Gestión de ventas y fiados</p>
         </div>
       </div>
 
@@ -180,58 +191,79 @@ const ClientesTienda = () => {
       <SuccessMessage message={success} onDismiss={() => setSuccess('')} />
 
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
-        <h2 className="mb-4 text-xl font-bold text-gray-900">
-          {editingId ? 'Editar cliente' : 'Registrar cliente'}
-        </h2>
-
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <input
-              type="text"
-              value={nombre}
-              onChange={(event) => setNombre(event.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
-              placeholder="Nombre"
-            />
-            <input
-              type="text"
-              value={apellido}
-              onChange={(event) => setApellido(event.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
-              placeholder="Apellido"
-            />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Registrar cliente</h2>
+            <p className="text-sm text-gray-600">Agrega un nuevo cliente de tienda / fiado.</p>
           </div>
+          <button
+            type="button"
+            onClick={openCreateModal}
+            className="inline-flex items-center gap-2 rounded-lg bg-rosewood px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
+          >
+            <Plus className="h-4 w-4" />
+            Nuevo cliente
+          </button>
+        </div>
+      </section>
 
-          <input
-            type="text"
-            value={whatsapp}
-            onChange={(event) => setWhatsapp(event.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
-            placeholder="WhatsApp (+57 por defecto)"
-          />
-
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="submit"
-              disabled={saving}
-              className="inline-flex items-center gap-2 rounded-lg bg-rosewood px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300"
-            >
-              <Save className="h-4 w-4" />
-              {saving ? 'Guardando...' : editingId ? 'Actualizar' : 'Guardar'}
-            </button>
-
-            {editingId && (
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6" onClick={() => { if (!editingId) setIsModalOpen(false); }}>
+          <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl sm:p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h3 className="text-xl font-bold text-gray-900">{editingId ? 'Editar cliente' : 'Nuevo cliente'}</h3>
               <button
                 type="button"
                 onClick={resetForm}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100"
+                className="rounded-full border border-gray-200 p-2 text-gray-500 transition hover:bg-gray-50 hover:text-gray-700"
+                aria-label="Cerrar modal"
               >
-                Cancelar
+                <X className="h-5 w-5" />
               </button>
+            </div>
+
+            {error && (
+              <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
             )}
+
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <input
+                  type="text"
+                  value={nombre}
+                  onChange={(event) => setNombre(event.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+                  placeholder="Nombre"
+                />
+                <input
+                  type="text"
+                  value={apellido}
+                  onChange={(event) => setApellido(event.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+                  placeholder="Apellido"
+                />
+              </div>
+
+              <input
+                type="text"
+                value={whatsapp}
+                onChange={(event) => setWhatsapp(event.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+                placeholder="WhatsApp (+57 por defecto)"
+              />
+
+              <button
+                type="submit"
+                disabled={saving}
+                className="w-full rounded-lg bg-rosewood px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300"
+              >
+                <Save className="mr-2 inline h-4 w-4" />
+                {saving ? 'Guardando...' : editingId ? 'Actualizar' : 'Guardar'}
+              </button>
+            </form>
           </div>
-        </form>
-      </section>
+        </div>
+      )}
 
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -284,7 +316,7 @@ const ClientesTienda = () => {
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => handleEdit(cliente)}
+                        onClick={() => openEditModal(cliente)}
                         className="rounded-lg border border-blue-300 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"
                       >
                         Editar
