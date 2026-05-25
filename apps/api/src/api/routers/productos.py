@@ -12,7 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.api.dependencies import AuthenticatedUser, require_roles
-from src.api.pagination import PageInfo, build_page
+from src.api.pagination import PageInfo, build_page, search_filter
 from src.domain.producto import Producto
 from src.infrastructure.database.connection import get_db
 from src.infrastructure.database.models import DetalleVentaModel, ProductoModel
@@ -114,14 +114,9 @@ def _to_producto_response_from_model(p: ProductoModel) -> ProductoResponse:
 
 
 def _producto_search_filter(query, q: str | None):
-    if q:
-        pattern = f"%{q.strip()}%"
-        query = query.where(
-            or_(
-                ProductoModel.nombre.ilike(pattern),
-                ProductoModel.codigo_barras.ilike(pattern),
-            ),
-        )
+    filters = search_filter(q.strip() if q else None, ProductoModel.nombre, ProductoModel.codigo_barras)
+    if filters:
+        query = query.where(or_(*filters))
     return query
 
 

@@ -33,9 +33,23 @@ jobs:
     defaults:
       run:
         working-directory: apps/api
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
     env:
       APP_ENV: test
-      DATABASE_URL: sqlite+pysqlite:///./ci.db
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/test_db
       JWT_SECRET_KEY: test-jwt-secret-key-with-32-bytes-minimum
       AUTH_BOOTSTRAP_ENABLED: true
       AUTH_ADMIN_USERNAME: angelly_admin

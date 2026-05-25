@@ -6,7 +6,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -257,8 +257,16 @@ def delete_admin(
 
 # --- Productos ---
 @router.get("/api/superadmin/productos", response_model=list[ProductoSchema])
-def list_productos(db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_roles("superadmin"))):
-    rows = db.execute(select(ProductoModel).order_by(ProductoModel.nombre.asc())).scalars().all()
+def list_productos(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=200, ge=1, le=500),
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("superadmin")),
+):
+    offset = (page - 1) * limit
+    rows = db.execute(
+        select(ProductoModel).order_by(ProductoModel.nombre.asc()).offset(offset).limit(limit),
+    ).scalars().all()
     return [ProductoSchema(
         id=r.id,
         nombre=r.nombre,
@@ -338,8 +346,16 @@ def delete_producto(
 
 # --- Proveedores ---
 @router.get("/api/superadmin/proveedores", response_model=list[ProveedorSchema])
-def list_proveedores(db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_roles("superadmin"))):
-    rows = db.execute(select(ProveedorModel).order_by(ProveedorModel.nombre.asc())).scalars().all()
+def list_proveedores(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=200, ge=1, le=500),
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("superadmin")),
+):
+    offset = (page - 1) * limit
+    rows = db.execute(
+        select(ProveedorModel).order_by(ProveedorModel.nombre.asc()).offset(offset).limit(limit),
+    ).scalars().all()
     return [ProveedorSchema(id=r.id, nombre=r.nombre, contacto=r.contacto, telefono=r.telefono, activo=r.activo) for r in rows]
 
 
@@ -389,8 +405,16 @@ def delete_proveedor(
 
 # --- Auditorias ---
 @router.get("/api/superadmin/auditorias", response_model=list[AuditoriaSchema])
-def list_auditorias(db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_roles("superadmin"))):
-    rows = db.execute(select(AuditoriaModel).order_by(AuditoriaModel.fecha.desc())).scalars().all()
+def list_auditorias(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=200, ge=1, le=500),
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("superadmin")),
+):
+    offset = (page - 1) * limit
+    rows = db.execute(
+        select(AuditoriaModel).order_by(AuditoriaModel.fecha.desc()).offset(offset).limit(limit),
+    ).scalars().all()
     return [AuditoriaSchema(id=r.id, modulo=r.modulo, entidad=r.entidad, entidad_id=r.entidad_id, accion=r.accion, detalle=r.detalle, usuario=r.usuario, fecha=r.fecha) for r in rows]
 
 
@@ -550,8 +574,16 @@ class CajaCierreSchema(BaseModel):
 
 
 @router.get("/api/superadmin/caja", response_model=list[CajaCierreSchema])
-def list_caja(db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_roles("superadmin"))):
-    rows = db.execute(select(CierreCajaModel).order_by(CierreCajaModel.fecha_apertura.desc())).scalars().all()
+def list_caja(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=200, ge=1, le=500),
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("superadmin")),
+):
+    offset = (page - 1) * limit
+    rows = db.execute(
+        select(CierreCajaModel).order_by(CierreCajaModel.fecha_apertura.desc()).offset(offset).limit(limit),
+    ).scalars().all()
     return [
         CajaCierreSchema(
             id=r.id,

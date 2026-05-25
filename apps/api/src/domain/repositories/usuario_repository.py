@@ -14,7 +14,3 @@ class UsuarioRepository(BaseRepository[Usuario, int]):
     @abstractmethod
     def get_by_username(self, username: str) -> Usuario | None:
         """Retorna un usuario por username unico, si existe."""
-
-    @abstractmethod
-    def get_by_email(self, email: str) -> Usuario | None:
-        """Retorna un usuario por correo, si existe."""

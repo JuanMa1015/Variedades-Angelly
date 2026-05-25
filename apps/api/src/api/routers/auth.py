@@ -6,7 +6,7 @@ import os
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -128,6 +128,7 @@ def auth_login(
 
 
 @router.post("/api/auth/refresh", response_model=RefreshResponse)
+@limiter.limit("20/minute")
 def auth_refresh(
     request: Request,
 ) -> RefreshResponse:
@@ -177,22 +178,11 @@ def list_vendedores(
 
 
 @router.post("/api/usuarios/vendedores", response_model=VendedorUsuarioResponse, status_code=201)
-async def create_vendedor(
-    request: Request,
+def create_vendedor(
+    payload: VendedorUsuarioCreateRequest,
     db: Session = Depends(get_db),
     _: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> VendedorUsuarioResponse:
-    try:
-        data = await request.json()
-    except Exception:
-        form = await request.form()
-        data = dict(form)
-
-    try:
-        payload = VendedorUsuarioCreateRequest(**data)
-    except ValidationError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.errors())
-
     return VendedorUsuarioResponse(**_create_vendedor(payload.username, payload.password, db))
 
 

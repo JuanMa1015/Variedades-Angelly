@@ -40,15 +40,18 @@ class ClienteFiadoTiendaUpdateRequest(BaseModel):
 
 @router.get("/api/clientes/tienda-fiado", response_model=list[ClienteFiadoTiendaResponse])
 def list_clientes_fiado_tienda(
-    db: Session = Depends(get_db),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=200, ge=1, le=500),
     include_inactivos: bool = Query(default=False),
+    db: Session = Depends(get_db),
     _: AuthenticatedUser = Depends(require_roles("superadmin", "admin", "vendedor")),
 ) -> list[ClienteFiadoTiendaResponse]:
     query = select(ClienteFiadoTiendaModel)
     if not include_inactivos:
         query = query.where(ClienteFiadoTiendaModel.activo == True)
+    offset = (page - 1) * limit
     clientes = db.execute(
-        query.order_by(ClienteFiadoTiendaModel.nombre.asc()),
+        query.order_by(ClienteFiadoTiendaModel.nombre.asc()).offset(offset).limit(limit),
     ).scalars().all()
 
     return [

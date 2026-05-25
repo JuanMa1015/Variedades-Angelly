@@ -3,21 +3,17 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from datetime import UTC, datetime
 from typing import Any, Generic, TypeVar, cast
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.domain.cliente import Cliente
-from src.domain.enums import RolUsuario
 from src.domain.producto import Producto
 from src.domain.repositories.base_repository import BaseRepository
 from src.domain.repositories.cliente_repository import ClienteRepository
 from src.domain.repositories.producto_repository import ProductoRepository
-from src.domain.repositories.usuario_repository import UsuarioRepository
-from src.domain.usuario import Usuario
-from src.infrastructure.database.models import ClienteModel, ProductoModel, UsuarioModel
+from src.infrastructure.database.models import ClienteModel, ProductoModel
 
 TDomain = TypeVar("TDomain")
 TModel = TypeVar("TModel")
@@ -138,64 +134,6 @@ class SqlAlchemyClienteRepository(
             return None
         return self._to_domain(model)
 
-
-class SqlAlchemyUsuarioRepository(
-    SqlAlchemyRepository[Usuario, UsuarioModel],
-    UsuarioRepository,
-):
-    """Repositorio SQLAlchemy para persistir usuarios de dominio."""
-
-    def __init__(self, db: Session) -> None:
-        super().__init__(db=db, model_class=UsuarioModel)
-
-    def _to_model(self, entity: Usuario) -> UsuarioModel:
-        MAP = {
-            RolUsuario.SUPERADMIN: "superadmin",
-            RolUsuario.ADMIN: "admin",
-            RolUsuario.VENDEDOR: "vendedor",
-            RolUsuario.TRABAJADOR: "vendedor",
-        }
-        return UsuarioModel(
-            username=entity.username,
-            password_hash=getattr(entity, "password_hash", ""),
-            rol=MAP.get(entity.rol, "vendedor"),
-            activo=getattr(entity, "activo", True),
-        )
-
-    def _to_domain(self, model: UsuarioModel) -> Usuario:
-        MAP = {
-            "superadmin": RolUsuario.SUPERADMIN,
-            "admin": RolUsuario.ADMIN,
-            "vendedor": RolUsuario.VENDEDOR,
-        }
-        rol = MAP.get(model.rol, RolUsuario.TRABAJADOR)
-        usuario = Usuario(
-            username=model.username,
-            email=f"{model.username}@local.angelly",
-            rol=rol,
-            nombre_completo=None,
-        )
-        usuario.activo = model.activo
-        usuario.fecha_registro = datetime.now(UTC)
-        return usuario
-
-    def _find_model_for_update(self, entity: Usuario) -> UsuarioModel | None:
-        return self.db.execute(select(UsuarioModel).where(UsuarioModel.username == entity.username)).scalar_one_or_none()
-
-    def _apply_domain_updates(self, model: UsuarioModel, entity: Usuario) -> None:
-        model.rol = "admin" if entity.rol is RolUsuario.ADMIN else "vendedor"
-        model.activo = entity.activo
-
-    def get_by_username(self, username: str) -> Usuario | None:
-        """Busca usuario por username unico y retorna None si no existe."""
-        model = self.db.execute(select(UsuarioModel).where(UsuarioModel.username == username)).scalar_one_or_none()
-        if model is None:
-            return None
-        return self._to_domain(model)
-
-    def get_by_email(self, email: str) -> Usuario | None:
-        """Compatibilidad legacy: el esquema auth actual no persiste email."""
-        return None
 
 
 class SqlAlchemyProductoRepository(

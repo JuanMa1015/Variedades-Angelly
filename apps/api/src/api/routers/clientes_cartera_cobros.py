@@ -9,6 +9,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from src.api.dependencies import AuthenticatedUser, require_roles
+from src.api.pagination import search_filter
 from src.infrastructure.database.connection import get_db
 from src.infrastructure.database.models import AbonoCarteraModel, ClienteModel, DetalleVentaModel, ProductoModel, VentaModel
 from src.api.routers.cartera_shared import build_cliente_page_response, normalize_naive_datetime, to_abono_response
@@ -75,15 +76,9 @@ def list_clientes_cartera_admin(
     query = select(ClienteModel).where(ClienteModel.activo == True)
     normalized_search = search.strip() if search else None
 
-    if normalized_search:
-        like_term = f"%{normalized_search}%"
-        query = query.where(
-            or_(
-                ClienteModel.nombre.ilike(like_term),
-                ClienteModel.documento.ilike(like_term),
-                ClienteModel.telefono_whatsapp.ilike(like_term),
-            ),
-        )
+    filters = search_filter(normalized_search, ClienteModel.nombre, ClienteModel.documento, ClienteModel.telefono_whatsapp)
+    if filters:
+        query = query.where(or_(*filters))
 
     return build_cliente_page_response(query=query, page=page, limit=limit, db=db)
 
@@ -99,15 +94,9 @@ def list_clientes_cartera(
     query = select(ClienteModel).where(ClienteModel.activo == True, ClienteModel.deuda_total > 0)
     normalized_search = search.strip() if search else None
 
-    if normalized_search:
-        like_term = f"%{normalized_search}%"
-        query = query.where(
-            or_(
-                ClienteModel.nombre.ilike(like_term),
-                ClienteModel.documento.ilike(like_term),
-                ClienteModel.telefono_whatsapp.ilike(like_term),
-            ),
-        )
+    filters = search_filter(normalized_search, ClienteModel.nombre, ClienteModel.documento, ClienteModel.telefono_whatsapp)
+    if filters:
+        query = query.where(or_(*filters))
 
     return build_cliente_page_response(query=query, page=page, limit=limit, db=db)
 

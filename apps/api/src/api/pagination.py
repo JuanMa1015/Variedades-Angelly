@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import Session
 
 
@@ -10,6 +12,18 @@ class PageInfo(BaseModel):
     total_pages: int
     current_page: int
     limit: int
+
+
+def search_filter(term: str | None, *columns: Any) -> list[ColumnElement[bool]]:
+    """Build a list of ILIKE filters for the given term across multiple columns.
+
+    Returns an empty list when term is None or empty so callers can use
+    ``*search_filter(q, Col.name, Col.code)`` directly in ``.where()``.
+    """
+    if not term:
+        return []
+    pattern = f"%{term}%"
+    return [col.ilike(pattern) for col in columns]
 
 
 def build_page(
