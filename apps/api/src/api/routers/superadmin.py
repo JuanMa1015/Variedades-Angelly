@@ -12,6 +12,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from src.api.dependencies import AuthenticatedUser, require_roles
+from src.api.services.vendedor import (
+    create_vendedor as _create_vendedor,
+    delete_vendedor as _delete_vendedor,
+    list_vendedores as _list_vendedores,
+    update_vendedor as _update_vendedor,
+)
 from src.infrastructure.database.connection import get_db
 from src.infrastructure.database.models import (
     AuditoriaModel,
@@ -123,17 +129,13 @@ class InformesSuperadminResponse(BaseModel):
     productos_menos_vendidos: list[RankingProductoSchema]
 
 
-# --- Usuarios (vendedores) reuse existing logic ---
+# --- Usuarios (vendedores) reuse shared logic ---
 @router.get("/api/superadmin/usuarios/vendedores", response_model=list[UsuarioSchema])
 def list_vendedores(
     db: Session = Depends(get_db),
     _: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> list[UsuarioSchema]:
-    usuarios = db.execute(
-        select(UsuarioModel).where(UsuarioModel.rol == "vendedor").order_by(UsuarioModel.username.asc())
-    ).scalars().all()
-
-    return [UsuarioSchema(id=u.id, username=u.username, rol=u.rol) for u in usuarios]
+    return [UsuarioSchema(**u) for u in _list_vendedores(db)]
 
 
 @router.post("/api/superadmin/usuarios/vendedores", response_model=UsuarioSchema, status_code=201)
@@ -142,16 +144,7 @@ def create_vendedor(
     db: Session = Depends(get_db),
     _: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> UsuarioSchema:
-    username = payload.username.strip()
-    existente = db.execute(select(UsuarioModel).where(UsuarioModel.username == username)).scalar_one_or_none()
-    if existente is not None:
-        raise HTTPException(status_code=409, detail="Ya existe un usuario con ese username")
-
-    usuario = UsuarioModel(username=username, password_hash=hash_password(payload.password), rol="vendedor")
-    db.add(usuario)
-    db.commit()
-    db.refresh(usuario)
-    return UsuarioSchema(id=usuario.id, username=usuario.username, rol=usuario.rol)
+    return UsuarioSchema(**_create_vendedor(payload.username, payload.password, db))
 
 
 @router.patch("/api/superadmin/usuarios/vendedores/{usuario_id}", response_model=UsuarioSchema)
@@ -161,37 +154,7 @@ def update_vendedor(
     db: Session = Depends(get_db),
     _: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> UsuarioSchema:
-    usuario = db.execute(
-        select(UsuarioModel).where(
-            UsuarioModel.id == usuario_id,
-            UsuarioModel.rol == "vendedor",
-        ),
-    ).scalar_one_or_none()
-    if usuario is None:
-        raise HTTPException(status_code=404, detail="Vendedor no encontrado")
-
-    if payload.username is not None:
-        next_username = payload.username.strip()
-        if not next_username:
-            raise HTTPException(status_code=400, detail="Username invalido")
-
-        existe_username = db.execute(
-            select(UsuarioModel).where(
-                UsuarioModel.username == next_username,
-                UsuarioModel.id != usuario_id,
-            ),
-        ).scalar_one_or_none()
-        if existe_username is not None:
-            raise HTTPException(status_code=409, detail="Ya existe un usuario con ese username")
-
-        usuario.username = next_username
-
-    if payload.password is not None:
-        usuario.password_hash = hash_password(payload.password)
-
-    db.commit()
-    db.refresh(usuario)
-    return UsuarioSchema(id=usuario.id, username=usuario.username, rol=usuario.rol)
+    return UsuarioSchema(**_update_vendedor(usuario_id, payload.username, payload.password, db))
 
 
 @router.delete("/api/superadmin/usuarios/vendedores/{usuario_id}", status_code=204)
@@ -200,17 +163,7 @@ def delete_vendedor(
     db: Session = Depends(get_db),
     _: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> None:
-    usuario = db.execute(
-        select(UsuarioModel).where(
-            UsuarioModel.id == usuario_id,
-            UsuarioModel.rol == "vendedor",
-        ),
-    ).scalar_one_or_none()
-    if usuario is None:
-        raise HTTPException(status_code=404, detail="Vendedor no encontrado")
-
-    db.delete(usuario)
-    db.commit()
+    _delete_vendedor(usuario_id, db)
 
 
 @router.get("/api/superadmin/usuarios/admins", response_model=list[UsuarioSchema])

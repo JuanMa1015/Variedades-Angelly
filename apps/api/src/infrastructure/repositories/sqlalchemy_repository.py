@@ -6,6 +6,7 @@ from abc import abstractmethod
 from datetime import UTC, datetime
 from typing import Any, Generic, TypeVar, cast
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.domain.cliente import Cliente
@@ -57,18 +58,14 @@ class SqlAlchemyRepository(BaseRepository[TDomain, int], Generic[TDomain, TModel
     def get_by_id(self, entity_id: int) -> TDomain | None:
         """Recupera una entidad por ID; retorna None si no existe."""
         model_class = cast(type[Any], self._model_class)
-        model = (
-            self.db.query(self._model_class)
-            .filter(model_class.id == entity_id)
-            .first()
-        )
+        model = self.db.execute(select(self._model_class).where(model_class.id == entity_id)).scalar_one_or_none()
         if model is None:
             return None
         return self._to_domain(model)
 
     def list_all(self) -> list[TDomain]:
         """Lista todas las entidades de la tabla asociada."""
-        models = self.db.query(self._model_class).all()
+        models = self.db.execute(select(self._model_class)).scalars().all()
         return [self._to_domain(model) for model in models]
 
     def update(self, entity: TDomain) -> TDomain:
@@ -85,11 +82,7 @@ class SqlAlchemyRepository(BaseRepository[TDomain, int], Generic[TDomain, TModel
     def delete(self, entity_id: int) -> None:
         """Elimina por ID; no falla si la entidad no existe."""
         model_class = cast(type[Any], self._model_class)
-        model = (
-            self.db.query(self._model_class)
-            .filter(model_class.id == entity_id)
-            .first()
-        )
+        model = self.db.execute(select(self._model_class).where(model_class.id == entity_id)).scalar_one_or_none()
         if model is None:
             return
         self.db.delete(model)
@@ -125,17 +118,9 @@ class SqlAlchemyClienteRepository(
 
     def _find_model_for_update(self, entity: Cliente) -> ClienteModel | None:
         if entity.documento:
-            return (
-                self.db.query(ClienteModel)
-                .filter(ClienteModel.documento == entity.documento)
-                .first()
-            )
+            return self.db.execute(select(ClienteModel).where(ClienteModel.documento == entity.documento)).scalar_one_or_none()
 
-        return (
-            self.db.query(ClienteModel)
-            .filter(ClienteModel.nombre == entity.nombre)
-            .first()
-        )
+        return self.db.execute(select(ClienteModel).where(ClienteModel.nombre == entity.nombre)).scalar_one_or_none()
 
     def _apply_domain_updates(self, model: ClienteModel, entity: Cliente) -> None:
         model.nombre = entity.nombre
@@ -145,7 +130,7 @@ class SqlAlchemyClienteRepository(
 
     def get_by_nombre(self, nombre: str) -> Cliente | None:
         """Busca cliente por nombre exacto y retorna None si no existe."""
-        model = self.db.query(ClienteModel).filter(ClienteModel.nombre == nombre).first()
+        model = self.db.execute(select(ClienteModel).where(ClienteModel.nombre == nombre)).scalar_one_or_none()
         if model is None:
             return None
         return self._to_domain(model)
@@ -192,11 +177,7 @@ class SqlAlchemyUsuarioRepository(
         return usuario
 
     def _find_model_for_update(self, entity: Usuario) -> UsuarioModel | None:
-        return (
-            self.db.query(UsuarioModel)
-            .filter(UsuarioModel.username == entity.username)
-            .first()
-        )
+        return self.db.execute(select(UsuarioModel).where(UsuarioModel.username == entity.username)).scalar_one_or_none()
 
     def _apply_domain_updates(self, model: UsuarioModel, entity: Usuario) -> None:
         model.rol = "admin" if entity.rol is RolUsuario.ADMIN else "vendedor"
@@ -204,11 +185,7 @@ class SqlAlchemyUsuarioRepository(
 
     def get_by_username(self, username: str) -> Usuario | None:
         """Busca usuario por username unico y retorna None si no existe."""
-        model = (
-            self.db.query(UsuarioModel)
-            .filter(UsuarioModel.username == username)
-            .first()
-        )
+        model = self.db.execute(select(UsuarioModel).where(UsuarioModel.username == username)).scalar_one_or_none()
         if model is None:
             return None
         return self._to_domain(model)
@@ -252,17 +229,9 @@ class SqlAlchemyProductoRepository(
 
     def _find_model_for_update(self, entity: Producto) -> ProductoModel | None:
         if entity.id is not None:
-            return (
-                self.db.query(ProductoModel)
-                .filter(ProductoModel.id == entity.id)
-                .first()
-            )
+            return self.db.execute(select(ProductoModel).where(ProductoModel.id == entity.id)).scalar_one_or_none()
 
-        return (
-            self.db.query(ProductoModel)
-            .filter(ProductoModel.nombre == entity.nombre)
-            .first()
-        )
+        return self.db.execute(select(ProductoModel).where(ProductoModel.nombre == entity.nombre)).scalar_one_or_none()
 
     def _apply_domain_updates(self, model: ProductoModel, entity: Producto) -> None:
         model.nombre = entity.nombre
@@ -275,14 +244,14 @@ class SqlAlchemyProductoRepository(
 
     def get_by_nombre(self, nombre: str) -> Producto | None:
         """Busca un producto por nombre exacto."""
-        model = self.db.query(ProductoModel).filter(ProductoModel.nombre == nombre).first()
+        model = self.db.execute(select(ProductoModel).where(ProductoModel.nombre == nombre)).scalar_one_or_none()
         if model is None:
             return None
         return self._to_domain(model)
 
     def update_stock(self, producto_id: int, delta: int) -> Producto | None:
         """Ajusta el inventario por delta positivo o negativo."""
-        model = self.db.query(ProductoModel).filter(ProductoModel.id == producto_id).first()
+        model = self.db.execute(select(ProductoModel).where(ProductoModel.id == producto_id)).scalar_one_or_none()
         if model is None:
             return None
 
@@ -304,7 +273,7 @@ class SqlAlchemyProductoRepository(
         if precio_venta < 0:
             raise ValueError("El precio de venta no puede ser negativo")
 
-        model = self.db.query(ProductoModel).filter(ProductoModel.id == producto_id).first()
+        model = self.db.execute(select(ProductoModel).where(ProductoModel.id == producto_id)).scalar_one_or_none()
         if model is None:
             return None
 

@@ -72,7 +72,7 @@ def list_clientes_cartera_admin(
     db: Session = Depends(get_db),
     _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> ClienteCarteraPageResponse:
-    query = select(ClienteModel)
+    query = select(ClienteModel).where(ClienteModel.activo == True)
     normalized_search = search.strip() if search else None
 
     if normalized_search:
@@ -96,7 +96,7 @@ def list_clientes_cartera(
     db: Session = Depends(get_db),
     _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> ClienteCarteraPageResponse:
-    query = select(ClienteModel).where(ClienteModel.deuda_total > 0)
+    query = select(ClienteModel).where(ClienteModel.activo == True, ClienteModel.deuda_total > 0)
     normalized_search = search.strip() if search else None
 
     if normalized_search:

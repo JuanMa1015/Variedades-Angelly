@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, Literal
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from src.api.schemas.cartera import MetodoPago, VentaItemCreateRequest, VentaDetalleResponse, VentaResponse
 from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.pagination import PageInfo, build_page
 from src.application.services.ventas_service import (
@@ -29,14 +30,6 @@ router = APIRouter(tags=["ventas-fidelizacion"])
 
 FIADO_ORIGEN_CARTERA = "cartera"
 FIADO_ORIGEN_TIENDA = "tienda"
-MetodoPago = Literal["efectivo", "transferencia"]
-
-
-class VentaItemCreateRequest(BaseModel):
-    """DTO de cada item a vender."""
-
-    producto_id: Annotated[int, Field(gt=0)]
-    cantidad: Annotated[int, Field(gt=0)]
 
 
 class VentaCreateRequest(BaseModel):
@@ -60,33 +53,6 @@ class VentaUpdateRequest(BaseModel):
     fiado_origen: str | None = None
     total: Annotated[float | None, Field(ge=0)] = None
     saldo_pendiente: Annotated[float | None, Field(ge=0)] = None
-
-
-class VentaDetalleResponse(BaseModel):
-    """DTO de salida para lineas de una venta."""
-
-    producto_id: int
-    nombre_producto: str
-    cantidad: int
-    precio_unitario: float
-    subtotal: float
-
-
-class VentaResponse(BaseModel):
-    """DTO de salida para venta creada."""
-
-    venta_id: int
-    cliente_id: int | None
-    cliente_tienda_id: int | None
-    cliente_nombre: str | None
-    es_fiado: bool
-    fiado_origen: str | None
-    metodo_pago: MetodoPago | None = None
-    total: float
-    saldo_pendiente: float
-    fecha: datetime
-    detalles: list[VentaDetalleResponse]
-    resumen_recibo: str
 
 
 class VentaPageResponse(BaseModel):

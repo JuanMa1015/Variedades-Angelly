@@ -224,7 +224,7 @@ def test_vendedor_no_puede_editar_producto_admin_patch(
     assert patch_response.status_code == 403
 
 
-def test_no_se_puede_eliminar_producto_con_historial_ventas(
+def test_soft_delete_producto_con_historial_ventas(
     inventario_client: tuple[TestClient, sessionmaker[Session]],
 ) -> None:
     client, testing_session_local = inventario_client
@@ -273,5 +273,4 @@ def test_no_se_puede_eliminar_producto_con_historial_ventas(
         headers={"Authorization": f"Bearer {admin_token}"},
     )
 
-    assert delete_response.status_code == 409
-    assert "historial de ventas" in delete_response.json()["detail"]
+    assert delete_response.status_code == 204

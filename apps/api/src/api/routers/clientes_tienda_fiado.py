@@ -159,6 +159,22 @@ def delete_cliente_fiado_tienda(
             detail="No se puede eliminar un cliente con historial de ventas",
         )
 
-    db.delete(cliente)
+    cliente.activo = False
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.put("/api/clientes/tienda-fiado/{cliente_id}/reactivar", status_code=200)
+def reactivar_cliente_fiado_tienda(
+    cliente_id: int,
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+) -> dict:
+    cliente = db.execute(
+        select(ClienteFiadoTiendaModel).where(ClienteFiadoTiendaModel.id == cliente_id),
+    ).scalar_one_or_none()
+    if cliente is None:
+        raise HTTPException(status_code=404, detail="Cliente fiado tienda no encontrado")
+    cliente.activo = True
+    db.commit()
+    return {"message": "Cliente reactivado"}

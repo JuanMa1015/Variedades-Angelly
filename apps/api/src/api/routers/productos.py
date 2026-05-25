@@ -184,7 +184,7 @@ def create_producto(
         raise HTTPException(status_code=409, detail="Ya existe un producto con ese nombre")
 
     if payload.codigo_barras:
-        existe_codigo = db.query(ProductoModel).filter(ProductoModel.codigo_barras == payload.codigo_barras.strip()).first()
+        existe_codigo = db.execute(select(ProductoModel).where(ProductoModel.codigo_barras == payload.codigo_barras.strip())).scalar_one_or_none()
         if existe_codigo is not None:
             raise HTTPException(status_code=409, detail="Ya existe un producto con ese codigo de barras")
 
@@ -218,7 +218,7 @@ def update_producto(
     _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> ProductoResponse:
     """Edita datos de producto en inventario."""
-    producto = db.query(ProductoModel).filter(ProductoModel.id == producto_id).first()
+    producto = db.execute(select(ProductoModel).where(ProductoModel.id == producto_id)).scalar_one_or_none()
     if producto is None:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
 
@@ -227,11 +227,9 @@ def update_producto(
         if not nombre:
             raise HTTPException(status_code=400, detail="El nombre no puede estar vacio")
 
-        existente = (
-            db.query(ProductoModel)
-            .filter(ProductoModel.nombre == nombre, ProductoModel.id != producto_id)
-            .first()
-        )
+        existente = db.execute(
+            select(ProductoModel).where(ProductoModel.nombre == nombre, ProductoModel.id != producto_id)
+        ).scalar_one_or_none()
         if existente is not None:
             raise HTTPException(status_code=409, detail="Ya existe un producto con ese nombre")
         producto.nombre = nombre
@@ -239,11 +237,9 @@ def update_producto(
     if payload.codigo_barras is not None:
         codigo = payload.codigo_barras.strip() or None
         if codigo is not None:
-            existente_codigo = (
-                db.query(ProductoModel)
-                .filter(ProductoModel.codigo_barras == codigo, ProductoModel.id != producto_id)
-                .first()
-            )
+            existente_codigo = db.execute(
+                select(ProductoModel).where(ProductoModel.codigo_barras == codigo, ProductoModel.id != producto_id)
+            ).scalar_one_or_none()
             if existente_codigo is not None:
                 raise HTTPException(status_code=409, detail="Ya existe un producto con ese codigo de barras")
         producto.codigo_barras = codigo
@@ -290,25 +286,28 @@ def delete_producto(
     db: Session = Depends(get_db),
     _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> Response:
-    """Elimina un producto sin historial de ventas asociado."""
-    producto = db.query(ProductoModel).filter(ProductoModel.id == producto_id).first()
+    """Desactiva un producto (soft-delete)."""
+    producto = db.execute(select(ProductoModel).where(ProductoModel.id == producto_id)).scalar_one_or_none()
     if producto is None:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
 
-    detalles_asociados = (
-        db.query(DetalleVentaModel)
-        .filter(DetalleVentaModel.producto_id == producto_id)
-        .count()
-    )
-    if detalles_asociados > 0:
-        raise HTTPException(
-            status_code=409,
-            detail="No se puede eliminar un producto con historial de ventas",
-        )
-
-    db.delete(producto)
+    producto.activo = False
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.put("/api/productos/{producto_id}/reactivar", status_code=200)
+def reactivar_producto(
+    producto_id: int,
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+) -> dict:
+    producto = db.execute(select(ProductoModel).where(ProductoModel.id == producto_id)).scalar_one_or_none()
+    if producto is None:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    producto.activo = True
+    db.commit()
+    return {"message": "Producto reactivado"}
 
 
 @router.patch("/api/productos/{producto_id}/stock", response_model=ProductoResponse)
