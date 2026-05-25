@@ -183,7 +183,7 @@ const ClientesTienda = () => {
         <UserRound className="h-8 w-8 text-rosewood" />
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Clientes de Tienda</h1>
-          <p className="text-gray-600">CRUD básico para ventas y fiados de tienda</p>
+          <p className="text-gray-600">Gestión de ventas y fiados</p>
         </div>
       </div>
 

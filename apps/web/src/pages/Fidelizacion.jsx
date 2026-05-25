@@ -80,7 +80,7 @@ const Fidelizacion = () => {
         <Gift className="w-8 h-8 text-rosewood" />
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Fidelización</h1>
-          <p className="text-gray-600">Base independiente para clientes de bonos</p>
+          <p className="text-gray-600">Programa de bonos y recompensas</p>
         </div>
       </div>
 
