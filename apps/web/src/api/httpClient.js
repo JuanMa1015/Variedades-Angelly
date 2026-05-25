@@ -47,6 +47,15 @@ const tryRefreshToken = async () => {
   }
 };
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const shouldRetry = (response, error) => {
+  if (error) return true;
+  if (!response) return true;
+  const status = response.status;
+  return status === 502 || status === 503 || status === 504;
+};
+
 const performRequest = async (endpoint, options) => {
   const { method = 'GET', body, headers = {}, signal, includeAuth = true } = options;
 
@@ -64,16 +73,42 @@ const performRequest = async (endpoint, options) => {
     nextHeaders['Content-Type'] = 'application/json';
   }
 
-  const response = await fetch(buildUrl(endpoint), {
-    method,
-    headers: nextHeaders,
-    body: hasJsonBody ? JSON.stringify(body) : undefined,
-    signal,
-    credentials: 'include',
-  });
+  const MAX_RETRIES = 2;
+  let lastError = null;
+  let lastResponse = null;
 
-  const payload = await response.json().catch(() => null);
-  return { response, payload };
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    if (attempt > 0) {
+      if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+      await sleep(2000 * attempt);
+    }
+
+    try {
+      const response = await fetch(buildUrl(endpoint), {
+        method,
+        headers: nextHeaders,
+        body: hasJsonBody ? JSON.stringify(body) : undefined,
+        signal,
+        credentials: 'include',
+      });
+
+      if (attempt < MAX_RETRIES && shouldRetry(response, null)) {
+        lastResponse = response;
+        continue;
+      }
+
+      const payload = await response.json().catch(() => null);
+      return { response, payload };
+    } catch (err) {
+      if (attempt < MAX_RETRIES && shouldRetry(null, err)) {
+        lastError = err;
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  throw lastError || new ApiError('No se pudo conectar con el servidor', lastResponse?.status || 0, null);
 };
 
 export const apiRequest = async (endpoint, options = {}) => {

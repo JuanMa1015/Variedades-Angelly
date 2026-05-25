@@ -445,7 +445,7 @@ def create_pedido_proveedor(
         estado=PEDIDO_ESTADO_ENVIADO,
         creado_por=current_user.username,
         aprobado_por=None,
-        fecha_resolucion=datetime.now(UTC),
+        fecha_resolucion=None,
     )
     db.add(pedido)
     db.commit()
