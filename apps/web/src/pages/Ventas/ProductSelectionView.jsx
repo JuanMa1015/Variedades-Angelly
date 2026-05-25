@@ -72,6 +72,10 @@ const ProductSelectionView = ({
               if (!code) return;
               const product = productos.find((p) => p.codigo_barras === code);
               if (product) {
+                const stock = Number(product.stock_actual || 0);
+                if (stock === 0) return;
+                const qtyInCart = cart.find((item) => Number(item.producto_id) === Number(product.id))?.cantidad || 0;
+                if (qtyInCart >= stock) return;
                 onAddItem(product);
                 e.target.value = '';
               }
@@ -128,8 +132,9 @@ const ProductSelectionView = ({
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {visibleProducts.map((producto) => {
             const stock = Number(producto.stock_actual || 0);
-            const lowStock = stock < 5;
+            const lowStock = stock > 0 && stock < 5;
             const outOfStock = stock === 0;
+            const atMax = !outOfStock && qtyInCart >= stock;
             const qtyInCart = cart.find(
               (item) => Number(item.producto_id) === Number(producto.id),
             )?.cantidad || 0;
@@ -139,9 +144,9 @@ const ProductSelectionView = ({
                 key={producto.id}
                 role="button"
                 tabIndex={outOfStock ? -1 : 0}
-                onClick={() => { if (!outOfStock) onAddItem(producto.id); }}
+                onClick={() => { if (!outOfStock && !atMax) onAddItem(producto.id); }}
                 onKeyDown={(event) => {
-                  if (outOfStock) return;
+                  if (outOfStock || atMax) return;
                   if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
                     onAddItem(producto.id);
@@ -149,7 +154,9 @@ const ProductSelectionView = ({
                 }}
                 className={`relative rounded-2xl border pt-10 p-3 text-left shadow-sm transition sm:pt-4 sm:p-4 ${
                   qtyInCart > 0
-                    ? 'border-rosewood bg-blush-50'
+                    ? atMax
+                      ? 'cursor-not-allowed border-rosewood bg-blush-50 opacity-60'
+                      : 'border-rosewood bg-blush-50'
                     : outOfStock
                       ? 'cursor-not-allowed border-gray-200 bg-gray-100 opacity-50'
                       : lowStock
@@ -205,8 +212,8 @@ const ProductSelectionView = ({
 
                     <div className="w-6 flex-shrink-0" />
                 </div>
-                <p className={`mt-1 text-xs font-medium ${outOfStock ? 'text-red-600' : lowStock ? 'text-amber-800' : 'text-gray-500'}`}>
-                  {outOfStock ? 'Sin stock' : `Stock: ${stock}${lowStock ? ' · Bajo' : ''}`}
+                <p className={`mt-1 text-xs font-medium ${outOfStock ? 'text-red-600' : atMax ? 'text-rosewood' : lowStock ? 'text-amber-800' : 'text-gray-500'}`}>
+                  {outOfStock ? 'Sin stock' : atMax ? 'Máximo alcanzado' : `Stock: ${stock}${lowStock ? ' · Bajo' : ''}`}
                 </p>
                 {/* fallback controls (previously duplicated) removed to simplify mobile layout */}
               </div>
