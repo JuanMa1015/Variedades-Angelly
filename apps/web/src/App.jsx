@@ -1,38 +1,40 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout';
 import PrivateRoute from './auth/PrivateRoute';
 import { useAuth } from './auth/AuthContext';
-import Caja from './pages/Caja';
-import Dashboard from './pages/Dashboard';
-import Cartera from './pages/Cartera';
-import Gastos from './pages/Gastos';
-import Inventario from './pages/Inventario';
-import Ventas from './pages/Ventas';
-import Proveedores from './pages/Proveedores';
-import Facturas from './pages/Facturas';
-import Fidelizacion from './pages/Fidelizacion';
-import ClientesTienda from './pages/ClientesTienda';
 import Login from './pages/Login';
-import Admin from './pages/Admin';
-import VendedoresAdmin from './pages/admin/Vendedores';
-import AdminsAdmin from './pages/admin/Admins';
-import ProductosAdmin from './pages/admin/Productos';
-import ProveedoresAdmin from './pages/admin/Proveedores';
-import AuditoriasAdmin from './pages/admin/Auditorias';
-import InformesAdmin from './pages/admin/Informes';
-import ClientesCartera from './pages/admin/ClientesCartera';
-import ClientesTiendaAdmin from './pages/admin/ClientesTienda';
-import ClientesFidelizacionAdmin from './pages/admin/ClientesFidelizacion';
-import VentasAdmin from './pages/admin/VentasAdmin';
-import PedidosProveedor from './pages/admin/PedidosProveedor';
-import FacturasCompra from './pages/admin/FacturasCompra';
-import GastosAdmin from './pages/admin/GastosAdmin';
-import AbonosCartera from './pages/admin/AbonosCartera';
 import { getDefaultRouteForRole } from './auth/roleRoutes';
 import ErrorBoundary from './components/ErrorBoundary'
 import { ToastProvider, useToast } from './components/ToastContext'
 import ToastContainer from './components/ToastContainer'
 import './App.css';
+
+const Caja = lazy(() => import('./pages/Caja'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Cartera = lazy(() => import('./pages/Cartera'));
+const Gastos = lazy(() => import('./pages/Gastos'));
+const Inventario = lazy(() => import('./pages/Inventario'));
+const Ventas = lazy(() => import('./pages/Ventas'));
+const Proveedores = lazy(() => import('./pages/Proveedores'));
+const Facturas = lazy(() => import('./pages/Facturas'));
+const Fidelizacion = lazy(() => import('./pages/Fidelizacion'));
+const ClientesTienda = lazy(() => import('./pages/ClientesTienda'));
+const Admin = lazy(() => import('./pages/Admin'));
+const VendedoresAdmin = lazy(() => import('./pages/admin/Vendedores'));
+const AdminsAdmin = lazy(() => import('./pages/admin/Admins'));
+const ProductosAdmin = lazy(() => import('./pages/admin/Productos'));
+const ProveedoresAdmin = lazy(() => import('./pages/admin/Proveedores'));
+const AuditoriasAdmin = lazy(() => import('./pages/admin/Auditorias'));
+const InformesAdmin = lazy(() => import('./pages/admin/Informes'));
+const ClientesCartera = lazy(() => import('./pages/admin/ClientesCartera'));
+const ClientesTiendaAdmin = lazy(() => import('./pages/admin/ClientesTienda'));
+const ClientesFidelizacionAdmin = lazy(() => import('./pages/admin/ClientesFidelizacion'));
+const VentasAdmin = lazy(() => import('./pages/admin/VentasAdmin'));
+const PedidosProveedor = lazy(() => import('./pages/admin/PedidosProveedor'));
+const FacturasCompra = lazy(() => import('./pages/admin/FacturasCompra'));
+const GastosAdmin = lazy(() => import('./pages/admin/GastosAdmin'));
+const AbonosCartera = lazy(() => import('./pages/admin/AbonosCartera'));
 
 const LandingRedirect = () => {
   const { isAuthenticated, user, bootstrapped } = useAuth();
@@ -59,6 +61,14 @@ function App() {
     <ErrorBoundary>
       <ToastProvider>
         <BrowserRouter>
+          <Suspense fallback={
+            <div className="flex h-screen items-center justify-center bg-[#fdf1f1]">
+              <div className="text-center">
+                <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-[#eebbbb] border-t-[#6a3f43]" />
+                <p className="mt-4 text-sm text-[#6a3f43]/70">Cargando...</p>
+              </div>
+            </div>
+          }>
           <Routes>
             <Route path="/" element={<LandingRedirect />} />
             <Route path="/login" element={<Login />} />
@@ -108,6 +118,7 @@ function App() {
 
         <Route path="*" element={<LandingRedirect />} />
       </Routes>
+      </Suspense>
     </BrowserRouter>
     <ToastContainerWrapper />
       </ToastProvider>

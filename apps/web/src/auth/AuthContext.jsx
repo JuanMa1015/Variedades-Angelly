@@ -52,26 +52,26 @@ export const AuthProvider = ({ children }) => {
   const refreshTimerRef = useRef(null);
 
   const clearAuth = useCallback(() => {
-    localStorage.removeItem(TOKEN_STORAGE_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-    localStorage.removeItem(USER_STORAGE_KEY);
+    sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+    sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+    sessionStorage.removeItem(USER_STORAGE_KEY);
     setToken(null);
     setRefreshToken(null);
     setUser(null);
   }, []);
 
   const persistAuth = useCallback((nextToken, nextRefreshToken, nextUser) => {
-    localStorage.setItem(TOKEN_STORAGE_KEY, nextToken);
-    if (nextRefreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, nextRefreshToken);
-    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(nextUser));
+    sessionStorage.setItem(TOKEN_STORAGE_KEY, nextToken);
+    if (nextRefreshToken) sessionStorage.setItem(REFRESH_TOKEN_KEY, nextRefreshToken);
+    sessionStorage.setItem(USER_STORAGE_KEY, JSON.stringify(nextUser));
     setToken(nextToken);
     setRefreshToken(nextRefreshToken);
     setUser(nextUser);
   }, []);
 
   useEffect(() => {
-    const storedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
-    const storedUserRaw = localStorage.getItem(USER_STORAGE_KEY);
+    const storedToken = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+    const storedUserRaw = sessionStorage.getItem(USER_STORAGE_KEY);
 
     if (!storedToken || !storedUserRaw || isTokenExpired(storedToken)) {
       clearAuth();
@@ -142,7 +142,7 @@ export const AuthProvider = ({ children }) => {
     if (timeUntilExpiry <= 0) {
       // Already expired, try immediate refresh
       const doRefresh = async () => {
-        const storedRefresh = localStorage.getItem(REFRESH_TOKEN_KEY);
+        const storedRefresh = sessionStorage.getItem(REFRESH_TOKEN_KEY);
         if (!storedRefresh) return;
         try {
           const payload2 = await apiPost('/api/auth/refresh', { refresh_token: storedRefresh }, { includeAuth: true });
@@ -158,7 +158,7 @@ export const AuthProvider = ({ children }) => {
     }
 
     refreshTimerRef.current = setTimeout(async () => {
-      const storedRefresh = localStorage.getItem(REFRESH_TOKEN_KEY);
+      const storedRefresh = sessionStorage.getItem(REFRESH_TOKEN_KEY);
       if (!storedRefresh) return;
       try {
         const payload2 = await apiPost('/api/auth/refresh', { refresh_token: storedRefresh }, { includeAuth: true });

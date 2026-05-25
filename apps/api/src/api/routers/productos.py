@@ -139,12 +139,9 @@ def list_productos(
         query = query.where(ProductoModel.activo == True)
     if catalogo != "todos":
         query = query.where(ProductoModel.catalogo == catalogo)
+    query = _producto_search_filter(query, q)
 
     items = db.execute(query.order_by(ProductoModel.nombre.asc())).scalars().all()
-
-    if q:
-        ql = q.strip().lower()
-        items = [p for p in items if ql in p.nombre.lower() or (p.codigo_barras and ql in p.codigo_barras.lower())]
     return [_to_producto_response_from_model(p) for p in items]
 
 
