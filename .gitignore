@@ -21,7 +21,6 @@ Thumbs.db
 
 # Environment variables (secrets, credentials)
 .env
-.env.example
 backend/.env
 frontend/.env
 apps/api/.env

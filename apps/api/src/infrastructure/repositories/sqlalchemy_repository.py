@@ -80,12 +80,15 @@ class SqlAlchemyRepository(BaseRepository[TDomain, int], Generic[TDomain, TModel
         return self._to_domain(model)
 
     def delete(self, entity_id: int) -> None:
-        """Elimina por ID; no falla si la entidad no existe."""
+        """Desactiva (soft-delete) por ID; no falla si la entidad no existe."""
         model_class = cast(type[Any], self._model_class)
         model = self.db.execute(select(self._model_class).where(model_class.id == entity_id)).scalar_one_or_none()
         if model is None:
             return
-        self.db.delete(model)
+        if hasattr(model, 'activo'):
+            model.activo = False
+        else:
+            self.db.delete(model)
         self.db.commit()
 
 
