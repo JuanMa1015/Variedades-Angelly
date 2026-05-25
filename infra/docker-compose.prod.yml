@@ -1,0 +1,57 @@
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: infra/backend.Dockerfile
+    image: ghcr.io/variedades-angelly/backend:latest
+    container_name: variedades_angelly_backend
+    restart: always
+    env_file:
+      - ../.env.production
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: infra/frontend.Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+        VITE_COBRO_BANCO: ${VITE_COBRO_BANCO}
+        VITE_COBRO_TIPO_CUENTA: ${VITE_COBRO_TIPO_CUENTA}
+        VITE_COBRO_NUMERO_CUENTA: ${VITE_COBRO_NUMERO_CUENTA}
+        VITE_COBRO_TITULAR_CUENTA: ${VITE_COBRO_TITULAR_CUENTA}
+        VITE_COBRO_NEQUI_NUMERO: ${VITE_COBRO_NEQUI_NUMERO}
+        VITE_COBRO_NEQUI_TITULAR: ${VITE_COBRO_NEQUI_TITULAR}
+    image: ghcr.io/variedades-angelly/frontend:latest
+    container_name: variedades_angelly_frontend
+    restart: always
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - internal
+    ports:
+      - "127.0.0.1:8080:80"
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
+
+networks:
+  internal:
+    driver: bridge
