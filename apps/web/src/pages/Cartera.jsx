@@ -1,3 +1,4 @@
+import { Package, Plus, UserPlus } from 'lucide-react';
 import ErrorMessage from '../components/ErrorMessage';
 import SuccessMessage from '../components/SuccessMessage';
 import Skeleton from '../components/Skeleton';
@@ -76,6 +77,7 @@ const Cartera = () => {
     handleOpenVentasHistorial,
     handleVerDetalle,
     handleSubmitVentaCartera,
+    handleAddProductoVenta,
     handleChangeVentaItem,
     handleRemoveVentaItem,
     cleanMessages,
@@ -94,7 +96,6 @@ const Cartera = () => {
     referenciaVenta,
     setReferenciaVenta,
     ventaItems,
-    setVentaItems,
     productosById,
     totalVentaEstimado,
     totalAPagar,
@@ -129,7 +130,6 @@ const Cartera = () => {
           referenciaVenta={referenciaVenta}
           setReferenciaVenta={setReferenciaVenta}
           ventaItems={ventaItems}
-          setVentaItems={setVentaItems}
           productosById={productosById}
           todosLosProductos={productosCartera}
           totalVentaEstimado={totalVentaEstimado}
@@ -139,6 +139,7 @@ const Cartera = () => {
           handleOpenVentasHistorial={handleOpenVentasHistorial}
           startNewCliente={startNewCliente}
           startNewProducto={startNewProducto}
+          handleAddProductoVenta={handleAddProductoVenta}
           handleChangeVentaItem={handleChangeVentaItem}
           handleRemoveVentaItem={handleRemoveVentaItem}
           handleSubmitVentaCartera={handleSubmitVentaCartera}
@@ -245,7 +246,7 @@ const Cartera = () => {
               />
 
               <div className="flex flex-wrap gap-2 pt-2">
-                <button type="submit" disabled={savingCliente} className="inline-flex items-center gap-2 rounded-lg bg-rosewood px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300">{savingCliente ? 'Guardando...' : editingClienteId ? 'Actualizar' : 'Guardar cliente'}</button>
+                <button type="submit" disabled={savingCliente} className="inline-flex items-center gap-2 rounded-lg bg-rosewood px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300">{savingCliente ? 'Guardando...' : <><UserPlus className="h-4 w-4" /> {editingClienteId ? 'Actualizar' : 'Guardar cliente'}</>}</button>
                 <button type="button" onClick={cancelEditingCliente} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-100">Cancelar</button>
               </div>
             </form>
@@ -312,7 +313,7 @@ const Cartera = () => {
               </div>
 
               <div className="flex flex-wrap gap-2 pt-2">
-                <button type="submit" disabled={savingProducto} className="inline-flex items-center gap-2 rounded-lg bg-rosewood px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300">{savingProducto ? 'Guardando...' : 'Guardar producto'}</button>
+                <button type="submit" disabled={savingProducto} className="inline-flex items-center gap-2 rounded-lg bg-rosewood px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300">{savingProducto ? 'Guardando...' : <><Package className="h-4 w-4" /> Guardar producto</>}</button>
                 <button type="button" onClick={() => setIsProductoModalOpen(false)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-100">Cancelar</button>
               </div>
             </form>
