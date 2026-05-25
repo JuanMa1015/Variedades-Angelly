@@ -132,12 +132,12 @@ const ProductSelectionView = ({
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {visibleProducts.map((producto) => {
             const stock = Number(producto.stock_actual || 0);
-            const lowStock = stock > 0 && stock < 5;
-            const outOfStock = stock === 0;
-            const atMax = !outOfStock && qtyInCart >= stock;
             const qtyInCart = cart.find(
               (item) => Number(item.producto_id) === Number(producto.id),
             )?.cantidad || 0;
+            const lowStock = stock > 0 && stock < 5;
+            const outOfStock = stock === 0;
+            const atMax = !outOfStock && qtyInCart >= stock;
 
             return (
               <div
