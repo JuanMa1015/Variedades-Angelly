@@ -72,15 +72,22 @@ const normalizeWhatsappNumber = (rawValue) => {
   const digits = String(rawValue || '').replace(/\D/g, '');
   if (!digits) return '';
 
+  if (digits.length === 12 && digits.startsWith('57')) {
+    return digits;
+  }
+
   if (digits.length === 10) {
     return `57${digits}`;
   }
 
-  return digits;
+  return '';
 };
 
 const formatMoney = (value) => MONEY_FORMATTER.format(Number(value || 0));
-const formatMoneyWhatsapp = (value) => `$${Number(value || 0).toLocaleString('es-CO', { maximumFractionDigits: 0 })}`;
+const formatMoneyWhatsapp = (value) => {
+  const num = Number(value || 0);
+  return `$${Math.round(num).toLocaleString('es-CO', { useGrouping: false, maximumFractionDigits: 0 })}`;
+};
 
 export const useCarteraData = () => {
   const { isAuthenticated, bootstrapped } = useAuth();
@@ -285,6 +292,12 @@ export const useCarteraData = () => {
       return;
     }
 
+    const phone = clienteForm.telefono_whatsapp.trim();
+    if (phone && !normalizeWhatsappNumber(phone)) {
+      setError('El número de WhatsApp debe tener 10 dígitos (ej: 3001234567)');
+      return;
+    }
+
     try {
       setSavingCliente(true);
       await saveCarteraCliente({
@@ -386,7 +399,7 @@ export const useCarteraData = () => {
         productosPendientes = ventas
           .filter((v) => v.articulo)
           .slice(0, 5)
-          .map((v) => `- ${v.articulo} (${v.cantidad ? `x${v.cantidad}` : ''} $${v.monto ? Number(v.monto).toLocaleString('es-CO') : '?'})`)
+          .map((v) => `- ${v.articulo} (${v.cantidad ? `x${v.cantidad}` : ''} $${v.monto ? Number(v.monto).toLocaleString('es-CO', { useGrouping: false }) : '?'})`)
           .join('\n');
       }
     } catch {

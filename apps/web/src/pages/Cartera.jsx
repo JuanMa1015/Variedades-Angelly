@@ -231,7 +231,7 @@ const Cartera = () => {
                   value={clienteForm.telefono_whatsapp}
                   onChange={(event) => setClienteForm((current) => ({ ...current, telefono_whatsapp: event.target.value }))}
                   className="w-full rounded-lg border border-gray-300 px-3 py-3 text-sm focus:border-rosewood focus:outline-none"
-                  placeholder="WhatsApp"
+                  placeholder="WhatsApp (10 dígitos, ej: 3001234567)"
                 />
               </div>
 
