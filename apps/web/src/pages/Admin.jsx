@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Database, PencilLine, Plus, RefreshCw, Shield, Trash2, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { apiDelete, apiRequest } from '../api/httpClient';
@@ -6,6 +6,7 @@ import ErrorMessage from '../components/ErrorMessage';
 import SuccessMessage from '../components/SuccessMessage';
 import useConfirm from '../components/useConfirm';
 import Skeleton from '../components/Skeleton';
+import EditFormModal from '../components/EditFormModal';
 
 const MONEY_FORMATTER = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -87,6 +88,12 @@ const Admin = ({ moduleKey = null }) => {
   const [success, setSuccess] = useState('');
 
   const { confirm, ConfirmModal } = useConfirm();
+
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editModalTitle, setEditModalTitle] = useState('');
+  const [editModalFields, setEditModalFields] = useState([]);
+  const [editModalValues, setEditModalValues] = useState({});
+  const editOnSaveRef = useRef(null);
 
   const [proveedores, setProveedores] = useState([]);
   const [productos, setProductos] = useState([]);
@@ -274,6 +281,14 @@ const Admin = ({ moduleKey = null }) => {
     notifySuccess(successMessage);
   };
 
+  const openEditModal = (title, fields, initialValues, onSave) => {
+    setEditModalTitle(title);
+    setEditModalFields(fields);
+    setEditModalValues(initialValues);
+    editOnSaveRef.current = onSave;
+    setEditModalOpen(true);
+  };
+
   const parseItemsJson = (value) => {
     const raw = String(value || '').trim() || '[]';
     const parsed = JSON.parse(raw);
@@ -310,32 +325,31 @@ const Admin = ({ moduleKey = null }) => {
     }
   };
 
-  const handleEditClienteCartera = async (item) => {
-    const nombre = window.prompt('Nuevo nombre', item.nombre);
-    if (nombre === null) return;
-    const documento = window.prompt('Nuevo documento (opcional)', item.documento || '');
-    if (documento === null) return;
-    const telefono = window.prompt('Nuevo telefono (opcional)', item.telefono_whatsapp || '');
-    if (telefono === null) return;
-    const limite = window.prompt('Nuevo limite credito', String(item.limite_credito ?? ''));
-    if (limite === null) return;
-
-    try {
-      await request({
-        endpoint: `/api/cartera/clientes/${item.id}`,
-        method: 'PATCH',
-        body: {
-          nombre: nombre.trim(),
-          documento: documento.trim() || null,
-          telefono_whatsapp: telefono.trim() || null,
-          limite_credito: Number(limite || 0),
-        },
-      });
-      await loadAll();
-      notifySuccess('Cliente actualizado');
-    } catch (err) {
-      notifyError(err.message || 'No se pudo actualizar cliente');
-    }
+  const handleEditClienteCartera = (item) => {
+    openEditModal(
+      'Editar cliente cartera',
+      [
+        { name: 'nombre', label: 'Nombre', type: 'text', required: true },
+        { name: 'documento', label: 'Documento (opcional)', type: 'text', required: false },
+        { name: 'telefono_whatsapp', label: 'Teléfono (opcional)', type: 'text', required: false },
+        { name: 'limite_credito', label: 'Límite crédito', type: 'number', required: true },
+      ],
+      { nombre: item.nombre, documento: item.documento || '', telefono_whatsapp: item.telefono_whatsapp || '', limite_credito: String(item.limite_credito ?? '') },
+      async (values) => {
+        await request({
+          endpoint: `/api/cartera/clientes/${item.id}`,
+          method: 'PATCH',
+          body: {
+            nombre: values.nombre.trim(),
+            documento: values.documento.trim() || null,
+            telefono_whatsapp: values.telefono_whatsapp.trim() || null,
+            limite_credito: Number(values.limite_credito || 0),
+          },
+        });
+        await loadAll();
+        notifySuccess('Cliente actualizado');
+      },
+    );
   };
 
   const handleDeleteClienteCartera = async (item) => {
@@ -371,26 +385,27 @@ const Admin = ({ moduleKey = null }) => {
     }
   };
 
-  const handleEditClienteTienda = async (item) => {
-    const nombre = window.prompt('Nuevo nombre', item.nombre);
-    if (nombre === null) return;
-    const telefono = window.prompt('Nuevo telefono (opcional)', item.telefono_whatsapp || '');
-    if (telefono === null) return;
-
-    try {
-      await request({
-        endpoint: `/api/clientes/tienda-fiado/${item.id}`,
-        method: 'PATCH',
-        body: {
-          nombre: nombre.trim(),
-          telefono_whatsapp: telefono.trim() || null,
-        },
-      });
-      await loadAll();
-      notifySuccess('Cliente tienda actualizado');
-    } catch (err) {
-      notifyError(err.message || 'No se pudo actualizar cliente tienda');
-    }
+  const handleEditClienteTienda = (item) => {
+    openEditModal(
+      'Editar cliente tienda',
+      [
+        { name: 'nombre', label: 'Nombre', type: 'text', required: true },
+        { name: 'telefono_whatsapp', label: 'Teléfono (opcional)', type: 'text', required: false },
+      ],
+      { nombre: item.nombre, telefono_whatsapp: item.telefono_whatsapp || '' },
+      async (values) => {
+        await request({
+          endpoint: `/api/clientes/tienda-fiado/${item.id}`,
+          method: 'PATCH',
+          body: {
+            nombre: values.nombre.trim(),
+            telefono_whatsapp: values.telefono_whatsapp.trim() || null,
+          },
+        });
+        await loadAll();
+        notifySuccess('Cliente tienda actualizado');
+      },
+    );
   };
 
   const handleDeleteClienteTienda = async (item) => {
@@ -431,33 +446,33 @@ const Admin = ({ moduleKey = null }) => {
     }
   };
 
-  const handleEditClienteFidelizacion = async (item) => {
-    const nombre = window.prompt('Nuevo nombre', item.nombre);
-    if (nombre === null) return;
-    const telefono = window.prompt('Nuevo telefono', item.telefono_whatsapp || '');
-    if (telefono === null) return;
-    const puntos = window.prompt('Nuevos puntos', String(item.puntos_acumulados ?? ''));
-    if (puntos === null) return;
-    if (Number(puntos) < 0) {
-      notifyError('Los puntos acumulados no pueden ser negativos');
-      return;
-    }
-
-    try {
-      await request({
-        endpoint: `/api/fidelizacion/clientes/${item.id}`,
-        method: 'PATCH',
-        body: {
-          nombre: nombre.trim(),
-          telefono_whatsapp: telefono.trim(),
-          puntos_acumulados: Number(puntos || 0),
-        },
-      });
-      await loadAll();
-      notifySuccess('Cliente fidelizacion actualizado');
-    } catch (err) {
-      notifyError(err.message || 'No se pudo actualizar cliente fidelizacion');
-    }
+  const handleEditClienteFidelizacion = (item) => {
+    openEditModal(
+      'Editar cliente fidelización',
+      [
+        { name: 'nombre', label: 'Nombre', type: 'text', required: true },
+        { name: 'telefono_whatsapp', label: 'Teléfono', type: 'text', required: true },
+        { name: 'puntos_acumulados', label: 'Puntos acumulados', type: 'number', required: true },
+      ],
+      { nombre: item.nombre, telefono_whatsapp: item.telefono_whatsapp || '', puntos_acumulados: String(item.puntos_acumulados ?? '') },
+      async (values) => {
+        if (Number(values.puntos_acumulados) < 0) {
+          notifyError('Los puntos acumulados no pueden ser negativos');
+          return;
+        }
+        await request({
+          endpoint: `/api/fidelizacion/clientes/${item.id}`,
+          method: 'PATCH',
+          body: {
+            nombre: values.nombre.trim(),
+            telefono_whatsapp: values.telefono_whatsapp.trim(),
+            puntos_acumulados: Number(values.puntos_acumulados || 0),
+          },
+        });
+        await loadAll();
+        notifySuccess('Cliente fidelizacion actualizado');
+      },
+    );
   };
 
   const handleDeleteClienteFidelizacion = async (item) => {
@@ -499,28 +514,26 @@ const Admin = ({ moduleKey = null }) => {
     }
   };
 
-  const handleEditVenta = async (item) => {
-    const total = window.prompt('Nuevo total', String(item.total ?? ''));
-    if (total === null) return;
-    if (Number(total) < 0) { notifyError('El total no puede ser negativo'); return; }
-    const saldo = window.prompt('Nuevo saldo pendiente', String(item.saldo_pendiente ?? ''));
-    if (saldo === null) return;
-    if (Number(saldo) < 0) { notifyError('El saldo pendiente no puede ser negativo'); return; }
-
-    try {
-      await request({
-        endpoint: `/api/ventas/${item.venta_id}`,
-        method: 'PATCH',
-        body: {
-          total: Number(total),
-          saldo_pendiente: Number(saldo),
-        },
-      });
-      await loadAll();
-      notifySuccess('Venta actualizada');
-    } catch (err) {
-      notifyError(err.message || 'No se pudo actualizar venta');
-    }
+  const handleEditVenta = (item) => {
+    openEditModal(
+      'Editar venta',
+      [
+        { name: 'total', label: 'Total', type: 'number', required: true },
+        { name: 'saldo_pendiente', label: 'Saldo pendiente', type: 'number', required: true },
+      ],
+      { total: String(item.total ?? ''), saldo_pendiente: String(item.saldo_pendiente ?? '') },
+      async (values) => {
+        if (Number(values.total) < 0) { notifyError('El total no puede ser negativo'); return; }
+        if (Number(values.saldo_pendiente) < 0) { notifyError('El saldo pendiente no puede ser negativo'); return; }
+        await request({
+          endpoint: `/api/ventas/${item.venta_id}`,
+          method: 'PATCH',
+          body: { total: Number(values.total), saldo_pendiente: Number(values.saldo_pendiente) },
+        });
+        await loadAll();
+        notifySuccess('Venta actualizada');
+      },
+    );
   };
 
   const handleDeleteVenta = async (item) => {
@@ -557,27 +570,25 @@ const Admin = ({ moduleKey = null }) => {
     }
   };
 
-  const handleEditPedidoProveedor = async (item) => {
-    const descripcion = window.prompt('Nueva descripcion', item.descripcion);
-    if (descripcion === null) return;
-    const monto = window.prompt('Nuevo monto estimado', String(item.monto_estimado ?? ''));
-    if (monto === null) return;
-    if (Number(monto) < 0) { notifyError('El monto estimado no puede ser negativo'); return; }
-
-    try {
-      await request({
-        endpoint: `/api/proveedores/pedidos/${item.id}`,
-        method: 'PATCH',
-        body: {
-          descripcion: descripcion.trim(),
-          monto_estimado: Number(monto || 0),
-        },
-      });
-      await loadAll();
-      notifySuccess('Pedido actualizado');
-    } catch (err) {
-      notifyError(err.message || 'No se pudo actualizar pedido');
-    }
+  const handleEditPedidoProveedor = (item) => {
+    openEditModal(
+      'Editar pedido proveedor',
+      [
+        { name: 'descripcion', label: 'Descripción', type: 'textarea', required: true },
+        { name: 'monto_estimado', label: 'Monto estimado', type: 'number', required: true },
+      ],
+      { descripcion: item.descripcion, monto_estimado: String(item.monto_estimado ?? '') },
+      async (values) => {
+        if (Number(values.monto_estimado) < 0) { notifyError('El monto estimado no puede ser negativo'); return; }
+        await request({
+          endpoint: `/api/proveedores/pedidos/${item.id}`,
+          method: 'PATCH',
+          body: { descripcion: values.descripcion.trim(), monto_estimado: Number(values.monto_estimado || 0) },
+        });
+        await loadAll();
+        notifySuccess('Pedido actualizado');
+      },
+    );
   };
 
   const handleDeletePedidoProveedor = async (item) => {
@@ -614,24 +625,22 @@ const Admin = ({ moduleKey = null }) => {
     }
   };
 
-  const handleEditFacturaCompra = async (item) => {
-    const total = window.prompt('Nuevo total factura', String(item.total_factura ?? ''));
-    if (total === null) return;
-    if (Number(total) < 0) { notifyError('El total de factura no puede ser negativo'); return; }
-
-    try {
-      await request({
-        endpoint: `/api/facturas-compra/${item.id}`,
-        method: 'PATCH',
-        body: {
-          total_factura: Number(total),
-        },
-      });
-      await loadAll();
-      notifySuccess('Factura actualizada');
-    } catch (err) {
-      notifyError(err.message || 'No se pudo actualizar factura');
-    }
+  const handleEditFacturaCompra = (item) => {
+    openEditModal(
+      'Editar factura compra',
+      [{ name: 'total_factura', label: 'Total factura', type: 'number', required: true }],
+      { total_factura: String(item.total_factura ?? '') },
+      async (values) => {
+        if (Number(values.total_factura) < 0) { notifyError('El total de factura no puede ser negativo'); return; }
+        await request({
+          endpoint: `/api/facturas-compra/${item.id}`,
+          method: 'PATCH',
+          body: { total_factura: Number(values.total_factura) },
+        });
+        await loadAll();
+        notifySuccess('Factura actualizada');
+      },
+    );
   };
 
   const handleDeleteFacturaCompra = async (item) => {
@@ -672,33 +681,26 @@ const Admin = ({ moduleKey = null }) => {
     }
   };
 
-  const handleEditGasto = async (item) => {
-    const categoria = window.prompt('Nueva categoria', item.categoria);
-    if (categoria === null) return;
-    const descripcion = window.prompt('Nueva descripcion', item.descripcion);
-    if (descripcion === null) return;
-    const monto = window.prompt('Nuevo monto', String(item.monto ?? ''));
-    if (monto === null) return;
-    if (Number(monto) < 0) {
-      notifyError('El monto no puede ser negativo');
-      return;
-    }
-
-    try {
-      await request({
-        endpoint: `/api/gastos/${item.id}`,
-        method: 'PATCH',
-        body: {
-          categoria: categoria.trim(),
-          descripcion: descripcion.trim(),
-          monto: Number(monto || 0),
-        },
-      });
-      await loadAll();
-      notifySuccess('Gasto actualizado');
-    } catch (err) {
-      notifyError(err.message || 'No se pudo actualizar gasto');
-    }
+  const handleEditGasto = (item) => {
+    openEditModal(
+      'Editar gasto',
+      [
+        { name: 'categoria', label: 'Categoría', type: 'text', required: true },
+        { name: 'descripcion', label: 'Descripción', type: 'textarea', required: true },
+        { name: 'monto', label: 'Monto', type: 'number', required: true },
+      ],
+      { categoria: item.categoria, descripcion: item.descripcion, monto: String(item.monto ?? '') },
+      async (values) => {
+        if (Number(values.monto) < 0) { notifyError('El monto no puede ser negativo'); return; }
+        await request({
+          endpoint: `/api/gastos/${item.id}`,
+          method: 'PATCH',
+          body: { categoria: values.categoria.trim(), descripcion: values.descripcion.trim(), monto: Number(values.monto || 0) },
+        });
+        await loadAll();
+        notifySuccess('Gasto actualizado');
+      },
+    );
   };
 
   const handleDeleteGasto = async (item) => {
@@ -736,24 +738,22 @@ const Admin = ({ moduleKey = null }) => {
     }
   };
 
-  const handleEditAbonoCartera = async (item) => {
-    const monto = window.prompt('Nuevo monto', String(item.monto ?? ''));
-    if (monto === null) return;
-    if (Number(monto) <= 0) { notifyError('El monto del abono debe ser mayor a cero'); return; }
-
-    try {
-      await request({
-        endpoint: `/api/cartera/abonos/${item.id}`,
-        method: 'PATCH',
-        body: {
-          monto: Number(monto),
-        },
-      });
-      await loadAll();
-      notifySuccess('Abono actualizado');
-    } catch (err) {
-      notifyError(err.message || 'No se pudo actualizar abono');
-    }
+  const handleEditAbonoCartera = (item) => {
+    openEditModal(
+      'Editar abono cartera',
+      [{ name: 'monto', label: 'Monto', type: 'number', required: true }],
+      { monto: String(item.monto ?? '') },
+      async (values) => {
+        if (Number(values.monto) <= 0) { notifyError('El monto del abono debe ser mayor a cero'); return; }
+        await request({
+          endpoint: `/api/cartera/abonos/${item.id}`,
+          method: 'PATCH',
+          body: { monto: Number(values.monto) },
+        });
+        await loadAll();
+        notifySuccess('Abono actualizado');
+      },
+    );
   };
 
   const handleDeleteAbonoCartera = async (item) => {
@@ -786,26 +786,26 @@ const Admin = ({ moduleKey = null }) => {
     }
   };
 
-  const handleEditAdmin = async (item) => {
-    const username = window.prompt('Nuevo username', item.username);
-    if (username === null) return;
-    const password = window.prompt('Nueva contraseña (en blanco para mantener)');
-    if (password === null) return;
-
-    const payload = { username: username.trim() };
-    if (password.trim()) payload.password = password;
-
-    try {
-      await request({
-        endpoint: `/api/superadmin/usuarios/admins/${item.id}`,
-        method: 'PATCH',
-        body: payload,
-      });
-      await loadAll();
-      notifySuccess('Admin actualizado');
-    } catch (err) {
-      notifyError(err.message || 'No se pudo actualizar admin');
-    }
+  const handleEditAdmin = (item) => {
+    openEditModal(
+      'Editar admin',
+      [
+        { name: 'username', label: 'Username', type: 'text', required: true },
+        { name: 'password', label: 'Nueva contraseña (en blanco para mantener)', type: 'password', required: false },
+      ],
+      { username: item.username, password: '' },
+      async (values) => {
+        const payload = { username: values.username.trim() };
+        if (values.password.trim()) payload.password = values.password;
+        await request({
+          endpoint: `/api/superadmin/usuarios/admins/${item.id}`,
+          method: 'PATCH',
+          body: payload,
+        });
+        await loadAll();
+        notifySuccess('Admin actualizado');
+      },
+    );
   };
 
   const handleDeleteAdmin = async (item) => {
@@ -838,26 +838,26 @@ const Admin = ({ moduleKey = null }) => {
     }
   };
 
-  const handleEditVendedor = async (item) => {
-    const username = window.prompt('Nuevo username', item.username);
-    if (username === null) return;
-    const password = window.prompt('Nueva contraseña (en blanco para mantener)');
-    if (password === null) return;
-
-    const payload = { username: username.trim() };
-    if (password.trim()) payload.password = password;
-
-    try {
-      await request({
-        endpoint: `/api/superadmin/usuarios/vendedores/${item.id}`,
-        method: 'PATCH',
-        body: payload,
-      });
-      await loadAll();
-      notifySuccess('Vendedor actualizado');
-    } catch (err) {
-      notifyError(err.message || 'No se pudo actualizar vendedor');
-    }
+  const handleEditVendedor = (item) => {
+    openEditModal(
+      'Editar vendedor',
+      [
+        { name: 'username', label: 'Username', type: 'text', required: true },
+        { name: 'password', label: 'Nueva contraseña (en blanco para mantener)', type: 'password', required: false },
+      ],
+      { username: item.username, password: '' },
+      async (values) => {
+        const payload = { username: values.username.trim() };
+        if (values.password.trim()) payload.password = values.password;
+        await request({
+          endpoint: `/api/superadmin/usuarios/vendedores/${item.id}`,
+          method: 'PATCH',
+          body: payload,
+        });
+        await loadAll();
+        notifySuccess('Vendedor actualizado');
+      },
+    );
   };
 
   const handleDeleteVendedor = async (item) => {
@@ -914,30 +914,25 @@ const Admin = ({ moduleKey = null }) => {
     }
   };
 
-  const handleEditProducto = async (item) => {
-    const nombre = window.prompt('Nuevo nombre', item.nombre);
-    if (nombre === null) return;
-    const precioVenta = window.prompt('Nuevo precio de venta', String(item.precio_venta ?? ''));
-    if (precioVenta === null) return;
-    if (Number(precioVenta) < 0) {
-      notifyError('El precio de venta no puede ser negativo');
-      return;
-    }
-
-    try {
-      await request({
-        endpoint: `/api/productos/${item.id}`,
-        method: 'PATCH',
-        body: {
-          nombre: nombre.trim(),
-          precio_venta: Number(precioVenta),
-        },
-      });
-      await loadAll();
-      notifySuccess('Producto actualizado');
-    } catch (err) {
-      notifyError(err.message || 'No se pudo actualizar producto');
-    }
+  const handleEditProducto = (item) => {
+    openEditModal(
+      'Editar producto',
+      [
+        { name: 'nombre', label: 'Nombre', type: 'text', required: true },
+        { name: 'precio_venta', label: 'Precio de venta', type: 'number', required: true },
+      ],
+      { nombre: item.nombre, precio_venta: String(item.precio_venta ?? '') },
+      async (values) => {
+        if (Number(values.precio_venta) < 0) { notifyError('El precio de venta no puede ser negativo'); return; }
+        await request({
+          endpoint: `/api/productos/${item.id}`,
+          method: 'PATCH',
+          body: { nombre: values.nombre.trim(), precio_venta: Number(values.precio_venta) },
+        });
+        await loadAll();
+        notifySuccess('Producto actualizado');
+      },
+    );
   };
 
   const handleDeleteProducto = async (item) => {
@@ -973,26 +968,24 @@ const Admin = ({ moduleKey = null }) => {
     }
   };
 
-  const handleEditProveedor = async (item) => {
-    const nombre = window.prompt('Nuevo nombre', item.nombre);
-    if (nombre === null) return;
-    const telefono = window.prompt('Nuevo telefono', item.telefono || '');
-    if (telefono === null) return;
-
-    try {
-      await request({
-        endpoint: `/api/proveedores/${item.id}`,
-        method: 'PATCH',
-        body: {
-          nombre: nombre.trim(),
-          telefono: telefono.trim() || null,
-        },
-      });
-      await loadAll();
-      notifySuccess('Proveedor actualizado');
-    } catch (err) {
-      notifyError(err.message || 'No se pudo actualizar proveedor');
-    }
+  const handleEditProveedor = (item) => {
+    openEditModal(
+      'Editar proveedor',
+      [
+        { name: 'nombre', label: 'Nombre', type: 'text', required: true },
+        { name: 'telefono', label: 'Teléfono', type: 'text', required: true },
+      ],
+      { nombre: item.nombre, telefono: item.telefono || '' },
+      async (values) => {
+        await request({
+          endpoint: `/api/proveedores/${item.id}`,
+          method: 'PATCH',
+          body: { nombre: values.nombre.trim(), telefono: values.telefono.trim() || null },
+        });
+        await loadAll();
+        notifySuccess('Proveedor actualizado');
+      },
+    );
   };
 
   const handleDeleteProveedor = async (item) => {
@@ -1031,26 +1024,24 @@ const Admin = ({ moduleKey = null }) => {
     }
   };
 
-  const handleEditAuditoria = async (item) => {
-    const modulo = window.prompt('Nuevo modulo', item.modulo);
-    if (modulo === null) return;
-    const accion = window.prompt('Nueva accion', item.accion);
-    if (accion === null) return;
-
-    try {
-      await request({
-        endpoint: `/api/auditorias/${item.id}`,
-        method: 'PATCH',
-        body: {
-          modulo: modulo.trim(),
-          accion: accion.trim(),
-        },
-      });
-      await loadAll();
-      notifySuccess('Auditoria actualizada');
-    } catch (err) {
-      notifyError(err.message || 'No se pudo actualizar auditoria');
-    }
+  const handleEditAuditoria = (item) => {
+    openEditModal(
+      'Editar auditoría',
+      [
+        { name: 'modulo', label: 'Módulo', type: 'text', required: true },
+        { name: 'accion', label: 'Acción', type: 'text', required: true },
+      ],
+      { modulo: item.modulo, accion: item.accion },
+      async (values) => {
+        await request({
+          endpoint: `/api/auditorias/${item.id}`,
+          method: 'PATCH',
+          body: { modulo: values.modulo.trim(), accion: values.accion.trim() },
+        });
+        await loadAll();
+        notifySuccess('Auditoria actualizada');
+      },
+    );
   };
 
   const handleDeleteAuditoria = async (item) => {
@@ -1876,7 +1867,7 @@ const Admin = ({ moduleKey = null }) => {
                 {abonosCartera.map((item) => (
                   <tr key={item.id} className="border-b border-[#fbe3e3] text-[#6a3f43]">
                     <td className="px-3 py-3 font-semibold">{item.id}</td>
-                    <td className="px-3 py-3">{item.cliente_id}</td>
+                    <td className="px-3 py-3">{clientesCartera.find((c) => c.id === item.cliente_id)?.nombre || item.cliente_id}</td>
                     <td className="px-3 py-3 text-right">{formatMoney(item.monto)}</td>
                     <td className="px-3 py-3">{item.metodo_pago || '-'}</td>
                     <td className="px-3 py-3 text-right">{formatMoney(item.saldo_cliente)}</td>
@@ -2419,6 +2410,16 @@ const Admin = ({ moduleKey = null }) => {
         </div>
       )}
       {ConfirmModal}
+      <EditFormModal
+        isOpen={editModalOpen}
+        title={editModalTitle}
+        fields={editModalFields}
+        initialValues={editModalValues}
+        onSave={async (values) => {
+          await editOnSaveRef.current?.(values);
+        }}
+        onClose={() => setEditModalOpen(false)}
+      />
     </div>
   );
 };
