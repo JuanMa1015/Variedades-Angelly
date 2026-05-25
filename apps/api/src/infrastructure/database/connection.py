@@ -51,8 +51,15 @@ def _load_database_url() -> str:
 
 DATABASE_URL: str = _load_database_url()
 
+DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "5"))
+DB_MAX_OVERFLOW: int = int(os.getenv("DB_MAX_OVERFLOW", "10"))
+DB_POOL_RECYCLE: int = int(os.getenv("DB_POOL_RECYCLE", "3600"))
+
 engine: Engine = create_engine(
     DATABASE_URL,
+    pool_size=DB_POOL_SIZE,
+    max_overflow=DB_MAX_OVERFLOW,
+    pool_recycle=DB_POOL_RECYCLE,
     pool_pre_ping=True,
 )
 

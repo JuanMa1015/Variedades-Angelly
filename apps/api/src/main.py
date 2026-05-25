@@ -30,13 +30,15 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "img-src 'self' data:; "
             "style-src 'self' 'unsafe-inline'; "
             "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
-            "connect-src 'self' *; "
+            "connect-src 'self'; "
             "font-src 'self' data:; "
             "form-action 'self'"
         )
         return response
 from sqlalchemy.exc import IntegrityError
 from pydantic import ValidationError
+
+from sqlalchemy import text
 
 from src.api.routers.auditorias import router as auditorias_router
 from src.api.routers.caja import router as caja_router
@@ -233,7 +235,16 @@ def _extract_integrity_detail(error_text: str) -> str:
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok"}
+    try:
+        db = next(get_db())
+        db.execute(text("SELECT 1"))
+        db.close()
+        return {"status": "ok", "database": "connected"}
+    except Exception as e:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "database": str(e)[:200]},
+        )
 
 
 # ─── Routers ───

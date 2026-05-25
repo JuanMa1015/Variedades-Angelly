@@ -133,16 +133,21 @@ def list_cliente_movimientos(
     if cliente is None:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
 
+    MAX_PAGE = limit * 10
+    search_limit = max(MAX_PAGE, 500)
+
     ventas = db.execute(
         select(VentaModel)
         .where(VentaModel.cliente_id == cliente_id)
-        .order_by(VentaModel.fecha.desc()),
+        .order_by(VentaModel.fecha.desc())
+        .limit(search_limit),
     ).scalars().all()
 
     abonos = db.execute(
         select(AbonoCarteraModel)
         .where(AbonoCarteraModel.cliente_id == cliente_id)
-        .order_by(AbonoCarteraModel.fecha.desc()),
+        .order_by(AbonoCarteraModel.fecha.desc())
+        .limit(search_limit),
     ).scalars().all()
 
     detalles_por_venta_id: dict[int, list[DetalleVentaModel]] = {}
@@ -164,7 +169,6 @@ def list_cliente_movimientos(
         detalles_venta = detalles_por_venta_id.get(venta.id, [])
         if not detalles_venta:
             continue
-
         for detalle in detalles_venta:
             movimientos.append(
                 MovimientoClienteResponse(

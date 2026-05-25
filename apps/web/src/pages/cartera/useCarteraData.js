@@ -429,8 +429,12 @@ export const useCarteraData = () => {
 
     lineas.push('');
     lineas.push('Formas de pago:');
-    lineas.push(`- Transferencia: ${import.meta.env.VITE_COBRO_BANCO || 'Bancolombia'} ${import.meta.env.VITE_COBRO_TIPO_CUENTA || 'Ahorros'} ${import.meta.env.VITE_COBRO_NUMERO_CUENTA || '58440719897'}`);
-    lineas.push(`- Nequi: ${import.meta.env.VITE_COBRO_NEQUI_NUMERO || '3226515399'}`);
+    if (import.meta.env.VITE_COBRO_NUMERO_CUENTA) {
+      lineas.push(`- Transferencia: ${import.meta.env.VITE_COBRO_BANCO} ${import.meta.env.VITE_COBRO_TIPO_CUENTA} ${import.meta.env.VITE_COBRO_NUMERO_CUENTA}`);
+    }
+    if (import.meta.env.VITE_COBRO_NEQUI_NUMERO) {
+      lineas.push(`- Nequi: ${import.meta.env.VITE_COBRO_NEQUI_NUMERO}`);
+    }
     lineas.push('');
     lineas.push('Comparte el comprobante para aplicar el abono. Gracias!');
 
