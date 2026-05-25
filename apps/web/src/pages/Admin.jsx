@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Database, PencilLine, Plus, RefreshCw, Shield, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Database, PencilLine, Plus, RefreshCw, Shield, Trash2, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { apiDelete, apiRequest } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage';
@@ -28,21 +28,36 @@ const formatDateTime = (value) => {
   });
 };
 
-const TAB_ITEMS = [
-  { id: 'admins', label: 'Admins' },
-  { id: 'vendedores', label: 'Vendedores' },
-  { id: 'productos', label: 'Productos' },
-  { id: 'proveedores', label: 'Proveedores' },
-  { id: 'clientes_cartera', label: 'Clientes cartera' },
-  { id: 'clientes_tienda', label: 'Clientes tienda' },
-  { id: 'clientes_fidelizacion', label: 'Clientes fidelizacion' },
-  { id: 'ventas', label: 'Ventas' },
-  { id: 'pedidos_proveedor', label: 'Pedidos proveedor' },
-  { id: 'facturas_compra', label: 'Facturas compra' },
-  { id: 'gastos', label: 'Gastos' },
-  { id: 'abonos_cartera', label: 'Abonos cartera' },
-  { id: 'auditorias', label: 'Auditorias' },
-  { id: 'informes', label: 'Informes' },
+const ROLE_GROUPS = [
+  {
+    role: 'Vendedor',
+    modules: [
+      { id: 'productos', label: 'Productos' },
+      { id: 'proveedores', label: 'Proveedores' },
+      { id: 'gastos', label: 'Gastos' },
+      { id: 'pedidos_proveedor', label: 'Pedidos proveedor' },
+    ],
+  },
+  {
+    role: 'Cartera',
+    modules: [
+      { id: 'ventas', label: 'Ventas' },
+      { id: 'clientes_cartera', label: 'Clientes cartera' },
+      { id: 'abonos_cartera', label: 'Abonos cartera' },
+    ],
+  },
+  {
+    role: 'SuperAdmin',
+    modules: [
+      { id: 'admins', label: 'Admins' },
+      { id: 'vendedores', label: 'Vendedores' },
+      { id: 'clientes_tienda', label: 'Clientes tienda' },
+      { id: 'clientes_fidelizacion', label: 'Clientes fidelización' },
+      { id: 'facturas_compra', label: 'Facturas compra' },
+      { id: 'auditorias', label: 'Auditorías' },
+      { id: 'informes', label: 'Informes' },
+    ],
+  },
 ];
 
 const MODULE_LABELS = {
@@ -52,13 +67,13 @@ const MODULE_LABELS = {
   proveedores: 'Proveedores',
   clientes_cartera: 'Clientes cartera',
   clientes_tienda: 'Clientes tienda',
-  clientes_fidelizacion: 'Clientes fidelizacion',
+  clientes_fidelizacion: 'Clientes fidelización',
   ventas: 'Ventas',
   pedidos_proveedor: 'Pedidos proveedor',
   facturas_compra: 'Facturas compra',
   gastos: 'Gastos',
   abonos_cartera: 'Abonos cartera',
-  auditorias: 'Auditorias',
+  auditorias: 'Auditorías',
   informes: 'Informes',
 };
 
@@ -81,7 +96,8 @@ const CREATE_DIALOGS = {
 const Admin = ({ moduleKey = null }) => {
   const { token, isSuperAdmin } = useAuth();
 
-  const [activeTab, setActiveTab] = useState(moduleKey ?? 'vendedores');
+  const [activeTab, setActiveTab] = useState(moduleKey ?? 'productos');
+  const [expandedRole, setExpandedRole] = useState('Vendedor');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -1110,23 +1126,48 @@ const Admin = ({ moduleKey = null }) => {
       )}
 
       {!moduleKey && (
-        <div className="rounded-[28px] border border-[#eebbbb]/70 bg-white/90 p-3 shadow-[0_16px_40px_rgba(106,63,67,0.06)] sm:p-4">
-          <div className="flex flex-wrap gap-2">
-            {TAB_ITEMS.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`rounded-full px-3 py-2 text-xs font-semibold transition sm:px-4 sm:text-sm ${
-                  activeTab === tab.id
-                    ? 'bg-[#6a3f43] text-[#fdf1f1]'
-                    : 'bg-[#fdf1f1] text-[#6a3f43] hover:bg-[#fbe3e3]'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+        <div className="space-y-3">
+          {ROLE_GROUPS.map((group) => {
+            const isExpanded = expandedRole === group.role;
+            return (
+              <div key={group.role} className="rounded-[28px] border border-[#eebbbb]/70 bg-white/90 shadow-[0_16px_40px_rgba(106,63,67,0.06)]">
+                <button
+                  type="button"
+                  onClick={() => setExpandedRole(isExpanded ? '' : group.role)}
+                  className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition hover:bg-[#fdf1f1]"
+                >
+                  <span className="text-sm font-bold uppercase tracking-[0.08em] text-[#6a3f43]">
+                    {group.role}
+                  </span>
+                  {isExpanded ? (
+                    <ChevronDown className="h-4 w-4 text-[#6a3f43]" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-[#6a3f43]" />
+                  )}
+                </button>
+                {isExpanded && (
+                  <div className="border-t border-[#eebbbb]/50 px-5 py-3">
+                    <div className="flex flex-wrap gap-2">
+                      {group.modules.map((mod) => (
+                        <button
+                          key={mod.id}
+                          type="button"
+                          onClick={() => setActiveTab(mod.id)}
+                          className={`rounded-full px-3 py-2 text-xs font-semibold transition sm:px-4 sm:text-sm ${
+                            activeTab === mod.id
+                              ? 'bg-[#6a3f43] text-[#fdf1f1]'
+                              : 'bg-[#fdf1f1] text-[#6a3f43] hover:bg-[#fbe3e3]'
+                          }`}
+                        >
+                          {mod.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 

@@ -401,7 +401,7 @@ export const useCarteraData = () => {
         productosRegistrados = ventas
           .filter((v) => v.articulo)
           .slice(0, 5)
-          .map((v) => `- ${v.articulo} ($${Number(v.monto).toLocaleString('es-CO', { useGrouping: false })})`)
+          .map((v) => `- ${v.articulo} ($${Math.round(Number(v.monto)).toLocaleString('es-CO', { useGrouping: false, maximumFractionDigits: 0 })})`)
           .join('\n');
       }
     } catch {
