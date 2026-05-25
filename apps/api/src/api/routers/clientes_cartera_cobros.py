@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from src.api.dependencies import AuthenticatedUser, require_roles
 from src.infrastructure.database.connection import get_db
-from src.infrastructure.database.models import AbonoCarteraModel, ClienteModel, DetalleVentaModel, VentaModel
+from src.infrastructure.database.models import AbonoCarteraModel, ClienteModel, DetalleVentaModel, ProductoModel, VentaModel
 from src.api.routers.cartera_shared import build_cliente_page_response, normalize_naive_datetime, to_abono_response
 from src.api.schemas.cartera import (
     AbonoCarteraCreateAdminRequest,
@@ -149,7 +149,12 @@ def list_cliente_movimientos(
     venta_ids = [venta.id for venta in ventas]
     if venta_ids:
         detalles = db.execute(
-            select(DetalleVentaModel).where(DetalleVentaModel.venta_id.in_(venta_ids)),
+            select(DetalleVentaModel)
+            .join(ProductoModel, DetalleVentaModel.producto_id == ProductoModel.id)
+            .where(
+                DetalleVentaModel.venta_id.in_(venta_ids),
+                ProductoModel.catalogo == 'cartera',
+            ),
         ).scalars().all()
         for detalle in detalles:
             detalles_por_venta_id.setdefault(detalle.venta_id, []).append(detalle)
@@ -157,26 +162,22 @@ def list_cliente_movimientos(
     movimientos: list[MovimientoClienteResponse] = []
     for venta in ventas:
         detalles_venta = detalles_por_venta_id.get(venta.id, [])
-        cantidad_total = sum(detalle.cantidad for detalle in detalles_venta) or None
-        articulo = None
-        if detalles_venta:
-            if len(detalles_venta) == 1:
-                articulo = detalles_venta[0].nombre_producto
-            else:
-                articulo = f"{detalles_venta[0].nombre_producto} +{len(detalles_venta) - 1} más"
+        if not detalles_venta:
+            continue
 
-        movimientos.append(
-            MovimientoClienteResponse(
-                id=venta.id,
-                tipo="Venta",
-                descripcion="Venta fiada" if venta.es_fiado else "Venta cancelada",
-                articulo=articulo,
-                cantidad=cantidad_total,
-                monto=venta.total,
-                fecha=venta.fecha,
-                saldo=venta.saldo_pendiente,
-            ),
-        )
+        for detalle in detalles_venta:
+            movimientos.append(
+                MovimientoClienteResponse(
+                    id=detalle.id,
+                    tipo="Venta",
+                    descripcion="Venta fiada" if venta.es_fiado else "Venta cancelada",
+                    articulo=detalle.nombre_producto,
+                    cantidad=detalle.cantidad,
+                    monto=detalle.subtotal,
+                    fecha=venta.fecha,
+                    saldo=None,
+                ),
+            )
 
     for abono in abonos:
         movimientos.append(

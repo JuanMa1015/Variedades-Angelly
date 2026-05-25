@@ -115,6 +115,7 @@ def test_historial_cartera_devuelve_metodo_pago_y_detalle_de_articulos(
             precio_venta=3500,
             stock_actual=20,
             stock_minimo=2,
+            catalogo='cartera',
         )
         session.add_all([cliente, producto])
         session.commit()
