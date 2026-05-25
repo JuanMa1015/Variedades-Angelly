@@ -28,10 +28,10 @@ def _resolve_dotenv_path() -> Path | None:
 
 def _normalize_database_url(raw_url: str) -> str:
     """Asegura driver psycopg cuando la URL viene como postgresql://."""
-    if raw_url.startswith("postgresql+psycopg://"):
+    if raw_url.startswith("postgresql+psycopg2://"):
         return raw_url
     if raw_url.startswith("postgresql://"):
-        return raw_url.replace("postgresql://", "postgresql+psycopg://", 1)
+        return raw_url.replace("postgresql://", "postgresql+psycopg2://", 1)
     return raw_url
 
 
