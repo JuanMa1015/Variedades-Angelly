@@ -391,30 +391,40 @@ export const useCarteraData = () => {
     const deuda = Number(cliente?.deuda_total || 0);
     const nombre = String(cliente?.nombre || '').trim();
 
-    let productosPendientes = '';
+    let productosRegistrados = '';
+    let totalOriginal = 0;
     try {
       const movimientos = await fetchCarteraMovimientos({ clienteId: cliente.id, page: 1, limit: 20 });
       const ventas = (movimientos?.data || []).filter((m) => m.tipo === 'Venta');
       if (ventas.length > 0) {
-        productosPendientes = ventas
+        totalOriginal = ventas.reduce((sum, v) => sum + Number(v.monto || 0), 0);
+        productosRegistrados = ventas
           .filter((v) => v.articulo)
           .slice(0, 5)
-          .map((v) => `- ${v.articulo} (${v.cantidad ? `x${v.cantidad}` : ''} $${v.monto ? Number(v.monto).toLocaleString('es-CO', { useGrouping: false }) : '?'})`)
+          .map((v) => `- ${v.articulo} ($${Number(v.monto).toLocaleString('es-CO', { useGrouping: false })})`)
           .join('\n');
       }
     } catch {
       // si falla la consulta, solo omitimos el detalle
     }
 
+    const totalAbonado = Math.max(0, totalOriginal - deuda);
+
     const lineas = [];
     lineas.push(`Hola ${nombre}, un saludo de Tienda Angelly.`);
     lineas.push('');
-    lineas.push(`Tu saldo pendiente es de ${formatMoneyWhatsapp(deuda)}.`);
 
-    if (productosPendientes) {
+    if (productosRegistrados) {
+      lineas.push('Productos registrados:');
+      lineas.push(productosRegistrados);
       lineas.push('');
-      lineas.push('Productos pendientes:');
-      lineas.push(productosPendientes);
+      lineas.push(`Total original: ${formatMoneyWhatsapp(totalOriginal)}`);
+      if (totalAbonado > 0) {
+        lineas.push(`Abonado: ${formatMoneyWhatsapp(totalAbonado)}`);
+      }
+      lineas.push(`Pendiente: ${formatMoneyWhatsapp(deuda)}`);
+    } else {
+      lineas.push(`Tu saldo pendiente es de ${formatMoneyWhatsapp(deuda)}.`);
     }
 
     lineas.push('');
