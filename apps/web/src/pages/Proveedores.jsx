@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Truck } from 'lucide-react';
+import { CheckCircle2, Plus, Truck, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { apiGet, apiPost } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage'
@@ -86,6 +86,8 @@ const Proveedores = () => {
     contacto: '',
     telefono: '',
   });
+
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const [pedidoForm, setPedidoForm] = useState({
     proveedor_id: '',
@@ -281,6 +283,7 @@ const Proveedores = () => {
         proveedor_id: current.proveedor_id || String(payload.id),
       }));
       setSuccess('Proveedor creado correctamente');
+      setIsCreateModalOpen(false);
     } catch (err) {
       setError(err.message || 'No se pudo crear el proveedor');
     } finally {
@@ -366,69 +369,102 @@ const Proveedores = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Activos</p>
-          <p className="mt-2 text-3xl font-bold text-gray-900">{resumen.proveedoresActivos}</p>
+          <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">{resumen.proveedoresActivos}</p>
         </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Pedidos emitidos</p>
-          <p className="mt-2 text-3xl font-bold text-gray-900">{resumen.pedidosEmitidos}</p>
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Pedidos</p>
+          <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">{resumen.pedidosEmitidos}</p>
         </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Monto solicitado</p>
-          <p className="mt-2 text-3xl font-bold text-gray-900">{formatMoney(resumen.montoSolicitado)}</p>
+          <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">{formatMoney(resumen.montoSolicitado)}</p>
         </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Listos por WhatsApp</p>
-          <p className="mt-2 text-3xl font-bold text-emerald-700">{resumen.pedidosConWhatsapp}</p>
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">WhatsApp</p>
+          <p className="mt-2 text-2xl font-bold text-emerald-700 sm:text-3xl">{resumen.pedidosConWhatsapp}</p>
         </div>
       </div>
 
       <ErrorMessage message={error} onDismiss={() => setError('')} />
       <SuccessMessage message={success} onDismiss={() => setSuccess('')} />
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
-          <h2 className="mb-4 text-xl font-bold text-gray-900">Registrar proveedor</h2>
+      <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Registrar proveedor</h2>
+            <p className="text-sm text-gray-600">Agrega un nuevo proveedor al sistema.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => { clearMessages(); setIsCreateModalOpen(true); }}
+            className="inline-flex items-center gap-2 rounded-lg bg-rosewood px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
+          >
+            <Plus className="h-4 w-4" />
+            Nuevo proveedor
+          </button>
+        </div>
+      </section>
 
-          <form className="space-y-3" onSubmit={handleCreateProveedor}>
-            <input
-              type="text"
-              value={proveedorForm.nombre}
-              onChange={(event) => handleProveedorChange('nombre', event.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
-              placeholder="Nombre del proveedor"
-              maxLength={120}
-            />
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6" onClick={() => setIsCreateModalOpen(false)}>
+          <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl sm:p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h3 className="text-xl font-bold text-gray-900">Nuevo proveedor</h3>
+              <button
+                type="button"
+                onClick={() => setIsCreateModalOpen(false)}
+                className="rounded-full border border-gray-200 p-2 text-gray-500 transition hover:bg-gray-50 hover:text-gray-700"
+                aria-label="Cerrar modal"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
 
-            <input
-              type="text"
-              value={proveedorForm.contacto}
-              onChange={(event) => handleProveedorChange('contacto', event.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
-              placeholder="Contacto principal"
-              maxLength={120}
-            />
+            <form className="space-y-3" onSubmit={handleCreateProveedor}>
+              {error && (
+                <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
+              )}
+              <input
+                type="text"
+                value={proveedorForm.nombre}
+                onChange={(event) => handleProveedorChange('nombre', event.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+                placeholder="Nombre del proveedor"
+                maxLength={120}
+              />
 
-            <input
-              type="text"
-              value={proveedorForm.telefono}
-              onChange={(event) => handleProveedorChange('telefono', event.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
-              placeholder="Teléfono"
-              maxLength={25}
-            />
+              <input
+                type="text"
+                value={proveedorForm.contacto}
+                onChange={(event) => handleProveedorChange('contacto', event.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+                placeholder="Contacto principal"
+                maxLength={120}
+              />
 
-            <button
-              type="submit"
-              disabled={savingProveedor}
-              className="w-full rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300"
-            >
-              {savingProveedor ? 'Guardando proveedor...' : 'Guardar proveedor'}
-            </button>
-          </form>
-        </section>
+              <input
+                type="text"
+                value={proveedorForm.telefono}
+                onChange={(event) => handleProveedorChange('telefono', event.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+                placeholder="Teléfono"
+                maxLength={25}
+              />
+
+              <button
+                type="submit"
+                disabled={savingProveedor}
+                className="w-full rounded-lg bg-rosewood px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300"
+              >
+                {savingProveedor ? 'Guardando proveedor...' : 'Guardar proveedor'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
         <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
           <h2 className="mb-4 text-xl font-bold text-gray-900">Crear pedido a proveedor</h2>
@@ -449,7 +485,7 @@ const Proveedores = () => {
 
             <div className="space-y-2 rounded-xl border border-gray-200 p-3">
               {pedidoForm.items.map((item, index) => (
-                <div key={`pedido-item-${index}`} className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_110px_40px]">
+                  <div key={`pedido-item-${index}`} className="grid grid-cols-[1fr_90px_36px] gap-2">
                   <select
                     value={item.producto_id}
                     onChange={(event) => handlePedidoItemChange(index, 'producto_id', event.target.value)}
@@ -475,7 +511,7 @@ const Proveedores = () => {
                   <button
                     type="button"
                     onClick={() => handleRemovePedidoItem(index)}
-                    className="rounded-lg border border-gray-300 px-2 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    className="flex items-center justify-center rounded-lg border border-gray-300 px-2 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
                   >
                     -
                   </button>
@@ -500,7 +536,6 @@ const Proveedores = () => {
             </button>
           </form>
         </section>
-      </div>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
         <h2 className="mb-4 text-xl font-bold text-gray-900">Pedidos registrados</h2>

@@ -157,24 +157,24 @@ const Caja = () => {
       <SuccessMessage message={success} onDismiss={() => setSuccess('')} />
 
       {/* Estado actual */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div className={`rounded-2xl border p-5 shadow-sm ${abierta ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-white'}`}>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+        <div className={`rounded-2xl border p-4 shadow-sm sm:p-5 ${abierta ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-white'}`}>
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Estado</p>
-          <p className={`mt-2 flex items-center gap-2 text-3xl font-bold ${abierta ? 'text-green-700' : 'text-gray-900'}`}>
-            {abierta ? <><Unlock className="h-6 w-6" /> Abierta</> : <><Lock className="h-6 w-6" /> Cerrada</>}
+          <p className={`mt-2 flex items-center gap-2 text-2xl font-bold sm:text-3xl ${abierta ? 'text-green-700' : 'text-gray-900'}`}>
+            {abierta ? <><Unlock className="h-5 w-5 sm:h-6 sm:w-6" /> Abierta</> : <><Lock className="h-5 w-5 sm:h-6 sm:w-6" /> Cerrada</>}
           </p>
         </div>
 
         {abierta && cajaActual && (
           <>
-            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Saldo esperado</p>
-              <p className="mt-2 text-3xl font-bold text-gray-900">{formatMoney(saldoEsperado)}</p>
+              <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">{formatMoney(saldoEsperado)}</p>
             </div>
 
-            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Abierta por</p>
-              <p className="mt-2 text-3xl font-bold text-gray-900">{cajaActual.abierto_por}</p>
+              <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">{cajaActual.abierto_por}</p>
               <p className="text-xs text-gray-500">{formatDateTime(cajaActual.fecha_apertura)}</p>
             </div>
           </>
@@ -182,16 +182,16 @@ const Caja = () => {
 
         {!abierta && (
           <>
-            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Último cierre</p>
-              <p className="mt-2 text-3xl font-bold text-gray-900">
+              <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">
                 {estado?.ultimo_cierre ? formatMoney(estado.ultimo_cierre.monto_cierre) : '-'}
               </p>
             </div>
 
-            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Cerrado por</p>
-              <p className="mt-2 text-3xl font-bold text-gray-900">
+              <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">
                 {estado?.ultimo_cierre?.cerrado_por ?? '-'}
               </p>
             </div>
@@ -201,7 +201,7 @@ const Caja = () => {
 
       {/* Detalle de caja abierta */}
       {abierta && cajaActual && (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Monto inicial</p>
             <p className="mt-2 text-2xl font-bold text-gray-900">{formatMoney(saldoInicial)}</p>
