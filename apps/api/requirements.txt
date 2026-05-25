@@ -1,23 +1,11 @@
-# ──────────────────────────────────────────────
-# Dependencias de producción
-# ──────────────────────────────────────────────
-fastapi==0.135.2
-uvicorn==0.42.0
-sqlalchemy==2.0.48
-pydantic==2.12.5
-psycopg[binary]==3.3.3
-python-dotenv==1.2.2
-bcrypt==5.0.0
-PyJWT==2.12.1
-alembic==1.14.1
-slowapi==0.1.9
-
-# ──────────────────────────────────────────────
-# Dependencias de desarrollo / testing
-# ──────────────────────────────────────────────
-pytest==8.3.5
-pytest-cov==6.0.0
-httpx==0.26.0
-behave==1.2.6
-black==24.1.1
-autopep8==2.3.2
+fastapi>=0.110.0
+sqlalchemy>=2.0.0
+pydantic>=2.0.0
+slowapi>=0.1.9
+bcrypt>=4.0.0
+PyJWT>=2.0.0
+python-dotenv>=1.0.0
+uvicorn>=0.27.0
+psycopg2-binary>=2.9.0
+python-multipart>=0.0.6
+alembic>=1.13.0
