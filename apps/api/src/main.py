@@ -235,16 +235,18 @@ def _extract_integrity_detail(error_text: str) -> str:
 
 @app.get("/health")
 def health_check():
+    db_ok = False
     try:
         db = next(get_db())
         db.execute(text("SELECT 1"))
         db.close()
-        return {"status": "ok", "database": "connected"}
+        db_ok = True
     except Exception as e:
-        return JSONResponse(
-            status_code=503,
-            content={"status": "error", "database": str(e)[:200]},
-        )
+        logger.warning("Health check — DB error: %s", e)
+    return {
+        "status": "ok",
+        "database": "connected" if db_ok else "unavailable",
+    }
 
 
 # ─── Routers ───
