@@ -333,19 +333,19 @@ const CarteraVentaSection = ({
             )}
           </div>
 
-          <div className="mt-4 space-y-1.5 rounded-xl bg-rosewood p-4 text-white">
+          <div className="mt-4 space-y-1.5 rounded-xl bg-blush-200 p-4 text-gray-900">
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold">Total</span>
               <span className="text-lg font-bold">{formatMoney(totalVentaEstimado)}</span>
             </div>
             {ventaModo === 'fiado' && (
-              <div className="flex items-center justify-between text-sm text-gray-300">
+              <div className="flex items-center justify-between text-sm text-gray-600">
                 <span>Saldo fiado</span>
                 <span className="font-semibold">{formatMoney(totalAPagar)}</span>
               </div>
             )}
             {ventaModo === 'contado' && (
-              <div className="flex items-center justify-between text-sm text-gray-300">
+              <div className="flex items-center justify-between text-sm text-gray-600">
                 <span>Cambio</span>
                 <span className="font-semibold">{formatMoney(cambioContado)}</span>
               </div>
