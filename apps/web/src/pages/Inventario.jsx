@@ -417,6 +417,22 @@ const Inventario = () => {
                 </div>
                 <AlertTriangle className="h-6 w-6 text-orange-500" />
               </div>
+              {resumen.bajoStock > 0 && (
+                <ul className="mt-3 space-y-1">
+                  {productos
+                    .filter((p) => Number(p.stock_actual || 0) <= Number(p.stock_minimo || 0))
+                    .slice(0, 5)
+                    .map((p) => (
+                      <li key={p.id} className="flex items-center justify-between text-sm">
+                        <span className="truncate text-gray-700">{p.nombre}</span>
+                        <span className="ml-2 shrink-0 font-semibold text-orange-600">{p.stock_actual} u</span>
+                      </li>
+                    ))}
+                  {resumen.bajoStock > 5 && (
+                    <li className="text-xs text-gray-400">...y {resumen.bajoStock - 5} más</li>
+                  )}
+                </ul>
+              )}
             </div>
           </>
         )}

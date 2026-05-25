@@ -129,6 +129,7 @@ const ProductSelectionView = ({
             {visibleProducts.map((producto) => {
             const stock = Number(producto.stock_actual || 0);
             const lowStock = stock < 5;
+            const outOfStock = stock === 0;
             const qtyInCart = cart.find(
               (item) => Number(item.producto_id) === Number(producto.id),
             )?.cantidad || 0;
@@ -137,20 +138,23 @@ const ProductSelectionView = ({
               <div
                 key={producto.id}
                 role="button"
-                tabIndex={0}
-                onClick={() => onAddItem(producto.id)}
+                tabIndex={outOfStock ? -1 : 0}
+                onClick={() => { if (!outOfStock) onAddItem(producto.id); }}
                 onKeyDown={(event) => {
+                  if (outOfStock) return;
                   if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
                     onAddItem(producto.id);
                   }
                 }}
-                className={`relative cursor-pointer rounded-2xl border pt-10 p-3 text-left shadow-sm transition active:scale-[0.99] sm:pt-4 sm:p-4 ${
+                className={`relative rounded-2xl border pt-10 p-3 text-left shadow-sm transition sm:pt-4 sm:p-4 ${
                   qtyInCart > 0
                     ? 'border-rosewood bg-blush-50'
-                    : lowStock
-                      ? 'border-amber-300 bg-amber-50'
-                      : 'border-gray-200 bg-white hover:border-rosewood hover:bg-blush-100'
+                    : outOfStock
+                      ? 'cursor-not-allowed border-gray-200 bg-gray-100 opacity-50'
+                      : lowStock
+                        ? 'cursor-pointer border-amber-300 bg-amber-50 active:scale-[0.99] hover:border-rosewood'
+                        : 'cursor-pointer border-gray-200 bg-white active:scale-[0.99] hover:border-rosewood hover:bg-blush-100'
                 }`}
               >
                 {/* Top-left trash and top-right red counter */}
@@ -201,9 +205,8 @@ const ProductSelectionView = ({
 
                     <div className="w-6 flex-shrink-0" />
                 </div>
-                <p className={`mt-1 text-xs font-medium ${lowStock ? 'text-amber-800' : 'text-gray-500'}`}>
-                  Stock: {stock}
-                  {lowStock ? ' · Bajo' : ''}
+                <p className={`mt-1 text-xs font-medium ${outOfStock ? 'text-red-600' : lowStock ? 'text-amber-800' : 'text-gray-500'}`}>
+                  {outOfStock ? 'Sin stock' : `Stock: ${stock}${lowStock ? ' · Bajo' : ''}`}
                 </p>
                 {/* fallback controls (previously duplicated) removed to simplify mobile layout */}
               </div>
