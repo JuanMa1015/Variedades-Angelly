@@ -95,6 +95,7 @@ describe('Cartera sections smoke tests', () => {
     const setMetodoPago = vi.fn();
     const setReferenciaVenta = vi.fn();
     const setVentaItems = vi.fn();
+    const handleAddProductoVenta = vi.fn();
     const handleOpenVentasHistorial = vi.fn();
     const startNewCliente = vi.fn();
     const startNewProducto = vi.fn();
@@ -122,6 +123,7 @@ describe('Cartera sections smoke tests', () => {
         setReferenciaVenta={setReferenciaVenta}
         ventaItems={[{ producto_id: '', cantidad: 1 }]}
         setVentaItems={setVentaItems}
+        handleAddProductoVenta={handleAddProductoVenta}
         productosById={new Map()}
         todosLosProductos={[{ id: 10, nombre: 'Arroz', catalogo: 'cartera' }]}
         totalVentaEstimado={3500}
@@ -142,10 +144,12 @@ describe('Cartera sections smoke tests', () => {
     fireEvent.click(screen.getByRole('button', { name: /contado/i }));
     expect(setVentaModo).toHaveBeenCalledWith('contado');
 
-    fireEvent.click(screen.getByRole('button', { name: /\+ agregar línea/i }));
-    expect(setVentaItems).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /🍚 Arroz \$0/i }));
+    expect(handleAddProductoVenta).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 10, nombre: 'Arroz' }),
+    );
 
-    fireEvent.click(screen.getByRole('button', { name: /ver historial de ventas/i }));
+    fireEvent.click(screen.getByRole('button', { name: /historial/i }));
     expect(handleOpenVentasHistorial).toHaveBeenCalled();
   });
 
