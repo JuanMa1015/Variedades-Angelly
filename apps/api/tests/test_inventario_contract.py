@@ -192,7 +192,7 @@ def test_patch_stock_aplica_delta_y_valida_casos_invalidos(
     assert "stock no puede quedar negativo" in negative_response.json()["detail"].lower()
 
 
-def test_vendedor_no_puede_editar_producto_admin_patch(
+def test_vendedor_puede_editar_producto(
     inventario_client: tuple[TestClient, sessionmaker[Session]],
 ) -> None:
     client, _ = inventario_client
@@ -203,7 +203,7 @@ def test_vendedor_no_puede_editar_producto_admin_patch(
         "/api/productos",
         headers={"Authorization": f"Bearer {admin_token}"},
         json={
-            "nombre": "Producto Solo Admin",
+            "nombre": "Producto Editable",
             "codigo_barras": "7704445556667",
             "catalogo": "tienda",
             "precio_costo": 1200,
@@ -221,7 +221,8 @@ def test_vendedor_no_puede_editar_producto_admin_patch(
         json={"precio_venta": 2000},
     )
 
-    assert patch_response.status_code == 403
+    assert patch_response.status_code == 200
+    assert patch_response.json()["precio_venta"] == 2000
 
 
 def test_soft_delete_producto_con_historial_ventas(
