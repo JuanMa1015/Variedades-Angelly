@@ -6,6 +6,7 @@ import { apiDelete, apiGet, apiPatch, apiPost } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage'
 import SuccessMessage from '../components/SuccessMessage'
 import useConfirm from '../components/useConfirm'
+import Skeleton from '../components/Skeleton'
 
 const PAGE_SIZE = 10;
 

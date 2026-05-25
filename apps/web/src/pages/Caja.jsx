@@ -253,7 +253,7 @@ const Caja = () => {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="w-full rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300"
+                  className="w-full rounded-lg bg-rosewood px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300"
                 >
                   {submitting ? 'Abriendo caja...' : 'Abrir caja'}
                 </button>
