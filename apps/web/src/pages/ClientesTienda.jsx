@@ -10,15 +10,6 @@ import Skeleton from '../components/Skeleton'
 
 const PAGE_SIZE = 10;
 
-const normalizeWhatsapp = (value) => {
-  const digits = String(value || '').replace(/\D/g, '');
-  if (!digits) return '';
-  if (digits.length === 12 && digits.startsWith('57')) return digits;
-  if (digits.length === 10) return `57${digits}`;
-  if (digits.length === 7) return `57601${digits}`;
-  return '';
-};
-
 const isValidPhone = (value) => {
   const raw = String(value || '').replace(/\D/g, '');
   if (!raw) return true;
@@ -125,7 +116,7 @@ const ClientesTienda = () => {
     }
 
     const fullName = `${n} ${a}`.trim();
-    const normalizedPhone = normalizeWhatsapp(whatsapp);
+    const phoneToSave = rawPhone || null;
 
     try {
       setSaving(true);
@@ -133,12 +124,12 @@ const ClientesTienda = () => {
       if (editingId) {
         await apiPatch(`/api/clientes/tienda-fiado/${editingId}`, {
           nombre: fullName,
-          telefono_whatsapp: normalizedPhone || null,
+          telefono_whatsapp: phoneToSave,
         });
       } else {
         await apiPost('/api/clientes/tienda-fiado', {
           nombre: fullName,
-          telefono_whatsapp: normalizedPhone || null,
+          telefono_whatsapp: phoneToSave,
         });
       }
 
