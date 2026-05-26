@@ -58,6 +58,7 @@ from src.api.routers.ventas_fidelizacion import router as ventas_fidelizacion_ro
 from src.api.routers.superadmin import router as superadmin_router
 from src.api.routers.export import router as export_router
 from src.api.limiter import limiter
+from src.infrastructure.database.connection import get_db
 
 logger = logging.getLogger("tienda_angelly")
 logger.setLevel(logging.INFO)

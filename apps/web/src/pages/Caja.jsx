@@ -253,7 +253,6 @@ const Caja = () => {
                 <input
                   type="number"
                   min="1"
-                  step="100"
                   value={montoInicial}
                   onChange={(event) => setMontoInicial(event.target.value)}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
@@ -308,7 +307,6 @@ const Caja = () => {
                 <input
                   type="number"
                   min="0"
-                  step="100"
                   value={montoCierre}
                   onChange={(event) => setMontoCierre(event.target.value)}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
