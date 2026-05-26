@@ -1,6 +1,8 @@
 import { Component } from 'react';
 import { AlertTriangle } from 'lucide-react';
 
+let hasError = false;
+
 class ErrorBoundary extends Component {
   constructor(props) {
     super(props);
@@ -8,11 +10,17 @@ class ErrorBoundary extends Component {
   }
 
   static getDerivedStateFromError(error) {
+    if (hasError) return null;
+    hasError = true;
     return { hasError: true, error };
   }
 
   componentDidCatch(error, errorInfo) {
     console.error('ErrorBoundary capturo un error:', error, errorInfo);
+  }
+
+  componentWillUnmount() {
+    hasError = false;
   }
 
   render() {
