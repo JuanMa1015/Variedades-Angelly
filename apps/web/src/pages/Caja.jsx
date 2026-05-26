@@ -645,7 +645,7 @@ const Caja = () => {
         </div>
       )}
 
-      <ConfirmModal />
+      {ConfirmModal}
     </div>
   );
 };
