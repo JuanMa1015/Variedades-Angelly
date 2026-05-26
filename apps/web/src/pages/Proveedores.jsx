@@ -654,54 +654,58 @@ const Proveedores = () => {
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
         <h2 className="mb-4 text-xl font-bold text-gray-900">Listado de proveedores</h2>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="border-b border-gray-200 bg-gray-50">
-              <tr>
-                <th className="px-3 py-3 font-semibold text-gray-700">Nombre</th>
-                <th className="px-3 py-3 font-semibold text-gray-700">Contacto</th>
-                <th className="px-3 py-3 font-semibold text-gray-700">Teléfono</th>
-                <th className="px-3 py-3 font-semibold text-gray-700">Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && (
-                <tr>
-                  <td colSpan="4" className="px-3 py-8 text-center text-gray-500">
-                    <Skeleton lines={1} />
-                  </td>
-                </tr>
-              )}
-
-              {!loading && proveedores.length === 0 && (
-                <tr>
-                  <td colSpan="4" className="px-3 py-8 text-center text-gray-500">
-                    No hay proveedores registrados.
-                  </td>
-                </tr>
-              )}
-
-              {!loading && proveedores.map((proveedor) => (
-                <tr key={proveedor.id} className="border-b border-gray-100">
-                  <td className="px-3 py-3 font-medium text-gray-900">{proveedor.nombre}</td>
-                  <td className="px-3 py-3 text-gray-700">{proveedor.contacto || '-'}</td>
-                  <td className="px-3 py-3 text-gray-700">{proveedor.telefono || '-'}</td>
-                  <td className="px-3 py-3">
+        {loading && <Skeleton lines={3} />}
+        {!loading && proveedores.length === 0 && (
+          <p className="py-8 text-center text-sm text-gray-500">No hay proveedores registrados.</p>
+        )}
+        {!loading && (
+          <>
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-gray-200 bg-gray-50">
+                  <tr>
+                    <th className="px-3 py-3 font-semibold text-gray-700">Nombre</th>
+                    <th className="px-3 py-3 font-semibold text-gray-700">Contacto</th>
+                    <th className="px-3 py-3 font-semibold text-gray-700">Teléfono</th>
+                    <th className="px-3 py-3 font-semibold text-gray-700">Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {proveedores.map((proveedor) => (
+                    <tr key={proveedor.id} className="border-b border-gray-100">
+                      <td className="px-3 py-3 font-medium text-gray-900">{proveedor.nombre}</td>
+                      <td className="px-3 py-3 text-gray-700">{proveedor.contacto || '-'}</td>
+                      <td className="px-3 py-3 text-gray-700">{proveedor.telefono || '-'}</td>
+                      <td className="px-3 py-3">
+                        {proveedor.activo ? (
+                          <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800">Activo</span>
+                        ) : (
+                          <span className="rounded-full bg-gray-200 px-2 py-1 text-xs font-semibold text-gray-700">Inactivo</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="space-y-3 md:hidden">
+              {proveedores.map((proveedor) => (
+                <div key={proveedor.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <div className="mb-2 flex items-start justify-between gap-2">
+                    <span className="font-semibold text-gray-900">{proveedor.nombre}</span>
                     {proveedor.activo ? (
-                      <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800">
-                        Activo
-                      </span>
+                      <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">Activo</span>
                     ) : (
-                      <span className="rounded-full bg-gray-200 px-2 py-1 text-xs font-semibold text-gray-700">
-                        Inactivo
-                      </span>
+                      <span className="shrink-0 rounded-full bg-gray-200 px-2 py-0.5 text-xs font-semibold text-gray-700">Inactivo</span>
                     )}
-                  </td>
-                </tr>
+                  </div>
+                  <p className="text-sm text-gray-600">Contacto: {proveedor.contacto || '-'}</p>
+                  <p className="text-sm text-gray-600">Tel: {proveedor.telefono || '-'}</p>
+                </div>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          </>
+        )}
       </section>
     </div>
   );
