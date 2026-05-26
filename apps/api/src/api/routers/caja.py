@@ -123,12 +123,14 @@ def caja_apertura(
         )
 
     cierre = CierreCajaModel(
+        usuario=current_user.username,
+        fecha_apertura=datetime.now(UTC).replace(tzinfo=None),
         monto_inicial=payload.monto_inicial,
         monto_ventas_efectivo=0.0,
         monto_ventas_transferencia=0.0,
         monto_gastos=0.0,
         monto_cierre=None,
-        fecha_apertura=datetime.now(UTC).replace(tzinfo=None),
+        estado="abierta",
         abierto_por=current_user.username,
         cerrado_por=None,
     )
@@ -167,8 +169,9 @@ def caja_cierre(
     caja.monto_ventas_transferencia = float(caja.monto_ventas_transferencia + total_transferencia)
     caja.monto_gastos = float(caja.monto_gastos + total_gastos)
     caja.monto_cierre = payload.monto_cierre
-    caja.fecha_cierre = datetime.now(UTC)
+    caja.fecha_cierre = datetime.now(UTC).replace(tzinfo=None)
     caja.cerrado_por = current_user.username
+    caja.estado = "cerrada"
 
     db.commit()
     db.refresh(caja)

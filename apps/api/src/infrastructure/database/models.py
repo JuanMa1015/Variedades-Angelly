@@ -297,20 +297,24 @@ class CierreCajaModel(Base):
     __tablename__ = "cierres_caja"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    monto_inicial: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    monto_ventas_efectivo: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    monto_ventas_transferencia: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    monto_gastos: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    monto_cierre: Mapped[float | None] = mapped_column(Float, nullable=True)
+    usuario: Mapped[str] = mapped_column(String(50), nullable=False)
     fecha_apertura: Mapped[datetime] = mapped_column(
         DateTime(timezone=False),
         nullable=False,
-        default=_utcnow_naive,
     )
     fecha_cierre: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=False),
         nullable=True,
     )
+    monto_inicial: Mapped[float] = mapped_column(Float, nullable=False)
+    monto_ventas_efectivo: Mapped[float] = mapped_column(Float, nullable=False)
+    monto_ventas_transferencia: Mapped[float] = mapped_column(Float, nullable=False)
+    monto_gastos: Mapped[float] = mapped_column(Float, nullable=False)
+    monto_efectivo_real: Mapped[float | None] = mapped_column(Float, nullable=True)
+    esperado_vs_real: Mapped[float | None] = mapped_column(Float, nullable=True)
+    estado: Mapped[str] = mapped_column(String(20), nullable=False)
+    observaciones: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    monto_cierre: Mapped[float | None] = mapped_column(Float, nullable=True)
     abierto_por: Mapped[str] = mapped_column(String(50), nullable=False)
     cerrado_por: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
