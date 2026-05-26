@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.schemas.caja import (
+    ActualizarCajaRequest,
     AperturaCajaRequest,
     CajaEstadoResponse,
     CajaHistorialItemResponse,
@@ -179,12 +180,12 @@ def caja_cierre(
     return _to_cierre_caja_response(caja)
 
 
-@router.get("/api/caja/historial", response_model=list[CajaHistorialItemResponse])
-def caja_historial(
+@router.get("/api/caja", response_model=list[CajaHistorialItemResponse])
+def caja_listar(
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> list[CajaHistorialItemResponse]:
-    """Historial completo de aperturas y cierres de caja."""
+    """Lista todas las aperturas y cierres de caja."""
     cierres = db.execute(
         select(CierreCajaModel).order_by(CierreCajaModel.fecha_apertura.desc()),
     ).scalars().all()
@@ -206,3 +207,42 @@ def caja_historial(
         )
         for c in cierres
     ]
+
+
+@router.patch("/api/caja/{caja_id}", response_model=CierreCajaResponse)
+def caja_actualizar(
+    caja_id: int,
+    payload: ActualizarCajaRequest,
+    db: Session = Depends(get_db),
+    current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
+) -> CierreCajaResponse:
+    """Actualiza un registro de caja."""
+    caja = db.get(CierreCajaModel, caja_id)
+    if caja is None:
+        raise HTTPException(status_code=404, detail="Registro de caja no encontrado")
+
+    update_data = payload.model_dump(exclude_none=True)
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No hay campos para actualizar")
+
+    for key, value in update_data.items():
+        setattr(caja, key, value)
+
+    db.commit()
+    db.refresh(caja)
+    return _to_cierre_caja_response(caja)
+
+
+@router.delete("/api/caja/{caja_id}", status_code=204)
+def caja_eliminar(
+    caja_id: int,
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("superadmin")),
+) -> None:
+    """Elimina un registro de caja (solo superadmin)."""
+    caja = db.get(CierreCajaModel, caja_id)
+    if caja is None:
+        raise HTTPException(status_code=404, detail="Registro de caja no encontrado")
+
+    db.delete(caja)
+    db.commit()

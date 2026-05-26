@@ -227,28 +227,28 @@ def test_caja_apertura_y_cierre_exitoso(caja_client: tuple[TestClient, dict, dic
     assert data["fecha_cierre"] is not None
 
 
-def test_caja_historial_requiere_auth() -> None:
-    """Verifica que GET /api/caja/historial requiera auth."""
+def test_caja_listar_requiere_auth() -> None:
+    """Verifica que GET /api/caja requiera auth."""
     client = TestClient(app)
-    response = client.get("/api/caja/historial")
+    response = client.get("/api/caja")
     assert response.status_code == 401
 
 
-def test_caja_historial_vacio(caja_client: tuple[TestClient, dict, dict, sessionmaker]) -> None:
-    """Verifica historial vacio inicialmente."""
+def test_caja_listar_vacio(caja_client: tuple[TestClient, dict, dict, sessionmaker]) -> None:
+    """Verifica listado vacio inicialmente."""
     client, _, headers_sa, _ = caja_client
-    response = client.get("/api/caja/historial", headers=headers_sa)
+    response = client.get("/api/caja", headers=headers_sa)
     assert response.status_code == 200
     assert response.json() == []
 
 
-def test_caja_historial_con_registros(caja_client: tuple[TestClient, dict, dict, sessionmaker]) -> None:
-    """Verifica historial con apertura y cierre."""
+def test_caja_listar_con_registros(caja_client: tuple[TestClient, dict, dict, sessionmaker]) -> None:
+    """Verifica listado con apertura y cierre."""
     client, headers, headers_sa, _ = caja_client
     client.post("/api/caja/apertura", json={"monto_inicial": 50000}, headers=headers)
     client.post("/api/caja/cierre", json={"monto_cierre": 50000}, headers=headers)
 
-    response = client.get("/api/caja/historial", headers=headers_sa)
+    response = client.get("/api/caja", headers=headers_sa)
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1

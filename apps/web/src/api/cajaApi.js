@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from './httpClient';
+import { apiDelete, apiGet, apiPatch, apiPost } from './httpClient';
 
 export const fetchCajaEstado = ({ signal } = {}) => {
   return apiGet('/api/caja/estado', { signal });
@@ -13,5 +13,13 @@ export const cerrarCaja = ({ monto_cierre }) => {
 };
 
 export const fetchCajaHistorial = ({ signal } = {}) => {
-  return apiGet('/api/caja/historial', { signal });
+  return apiGet('/api/caja', { signal });
+};
+
+export const updateCaja = (cajaId, payload) => {
+  return apiPatch(`/api/caja/${cajaId}`, payload);
+};
+
+export const deleteCaja = (cajaId) => {
+  return apiDelete(`/api/caja/${cajaId}`);
 };
