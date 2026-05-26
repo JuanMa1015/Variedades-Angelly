@@ -128,6 +128,7 @@ def caja_apertura(
         monto_ventas_transferencia=0.0,
         monto_gastos=0.0,
         monto_cierre=None,
+        fecha_apertura=datetime.now(UTC).replace(tzinfo=None),
         abierto_por=current_user.username,
         cerrado_por=None,
     )
