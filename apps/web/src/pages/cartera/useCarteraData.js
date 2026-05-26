@@ -70,6 +70,7 @@ const toDatetimeLocalValue = (value = new Date()) => {
 
 const normalizeWhatsappNumber = (rawValue) => {
   const digits = String(rawValue || '').replace(/\D/g, '');
+
   if (!digits) return '';
 
   if (digits.length === 12 && digits.startsWith('57')) {
@@ -78,6 +79,10 @@ const normalizeWhatsappNumber = (rawValue) => {
 
   if (digits.length === 10) {
     return `57${digits}`;
+  }
+
+  if (digits.length === 7) {
+    return `57601${digits}`;
   }
 
   return '';

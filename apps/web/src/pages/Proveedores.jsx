@@ -30,12 +30,22 @@ const normalizeWhatsappNumber = (rawValue) => {
   const digits = String(rawValue || '').replace(/\D/g, '');
   if (!digits) return '';
 
-  // Si llega numero local colombiano de 10 digitos, anteponer prefijo pais.
+  // Ya tiene código de país + código de área completo (ej: 573001234567)
+  if (digits.length === 12 && digits.startsWith('57')) {
+    return digits;
+  }
+
+  // Número colombiano de 10 dígitos con código de área (ej: 6012345678, 3001234567)
   if (digits.length === 10) {
     return `57${digits}`;
   }
 
-  return digits;
+  // Número bogotano de 7 dígitos sin código de área (ej: 1234567 → 576011234567)
+  if (digits.length === 7) {
+    return `57601${digits}`;
+  }
+
+  return '';
 };
 
 const buildWhatsappPedidoMessage = (pedido, proveedor) => {
