@@ -12,13 +12,15 @@ import CarteraVentaSection from './cartera/CarteraVentaSection';
 import { useCarteraData } from './cartera/useCarteraData';
 
 const formatDateTime = (value) => {
-  if (!value) return '-';
-  return new Date(value).toLocaleString('es-CO', {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleString('es-CO', {
     year: 'numeric',
     month: 'short',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'America/Bogota',
   });
 };
 

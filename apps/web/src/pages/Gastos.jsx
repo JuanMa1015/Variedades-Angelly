@@ -23,6 +23,7 @@ const formatDateTime = (value) => {
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'America/Bogota',
   });
 };
 

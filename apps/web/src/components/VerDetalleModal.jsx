@@ -132,6 +132,7 @@ const VerDetalleModal = ({ cliente, isOpen, onClose }) => {
                       day: '2-digit',
                       hour: '2-digit',
                       minute: '2-digit',
+                      timeZone: 'America/Bogota',
                     })
                     : 'Sin fecha';
 

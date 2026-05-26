@@ -16,7 +16,6 @@ const MONEY_FORMATTER = new Intl.NumberFormat('es-CO', {
 const formatMoney = (value) => MONEY_FORMATTER.format(Number(value || 0));
 
 const formatDateTime = (value) => {
-  if (!value) return '-';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '-';
   return date.toLocaleString('es-CO', {
@@ -25,6 +24,7 @@ const formatDateTime = (value) => {
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'America/Bogota',
   });
 };
 
