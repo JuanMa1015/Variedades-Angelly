@@ -565,8 +565,6 @@ const Proveedores = () => {
                   {pedidos.map((pedido) => {
                     const estadoNormalizado = String(pedido.estado || '').toLowerCase();
                     const isEnviado = estadoNormalizado === 'enviado' || estadoNormalizado === 'aprobado';
-                    const isLegacyPendiente = estadoNormalizado === 'pendiente';
-                    const isLegacyRechazado = estadoNormalizado === 'rechazado';
                     const proveedor = proveedoresById.get(Number(pedido.proveedor_id));
                     const hasWhatsapp = Boolean(normalizeWhatsappNumber(proveedor?.telefono));
 
