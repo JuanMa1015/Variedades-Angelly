@@ -13,8 +13,16 @@ const PAGE_SIZE = 10;
 const normalizeWhatsapp = (value) => {
   const digits = String(value || '').replace(/\D/g, '');
   if (!digits) return '';
+  if (digits.length === 12 && digits.startsWith('57')) return digits;
   if (digits.length === 10) return `57${digits}`;
-  return digits;
+  if (digits.length === 7) return `57601${digits}`;
+  return '';
+};
+
+const isValidPhone = (value) => {
+  const raw = String(value || '').replace(/\D/g, '');
+  if (!raw) return true;
+  return raw.length === 7 || raw.length === 10 || (raw.length === 12 && raw.startsWith('57'));
 };
 
 const ClientesTienda = () => {
@@ -107,6 +115,12 @@ const ClientesTienda = () => {
     const a = apellido.trim();
     if (!n || !a) {
       setError('Nombre y apellido son obligatorios');
+      return;
+    }
+
+    const rawPhone = String(whatsapp || '').replace(/\D/g, '');
+    if (rawPhone && !isValidPhone(whatsapp)) {
+      setError('El número WhatsApp debe tener 7 (Bogotá), 10 (nacional) o 12 (con 57) dígitos');
       return;
     }
 
@@ -244,13 +258,22 @@ const ClientesTienda = () => {
                 />
               </div>
 
-              <input
-                type="text"
-                value={whatsapp}
-                onChange={(event) => setWhatsapp(event.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
-                placeholder="WhatsApp (+57 por defecto)"
-              />
+              <div>
+                <input
+                  type="text"
+                  value={whatsapp}
+                  onChange={(event) => setWhatsapp(event.target.value)}
+                  className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none ${
+                    whatsapp && !isValidPhone(whatsapp)
+                      ? 'border-red-400 focus:border-red-500'
+                      : 'border-gray-300 focus:border-rosewood'
+                  }`}
+                  placeholder="WhatsApp — 10 dígitos (57 se agrega automático)"
+                />
+                {whatsapp && !isValidPhone(whatsapp) && (
+                  <p className="mt-1 text-xs text-red-600">Debe tener 7 (Bogotá), 10 (nacional) o 12 (con 57) dígitos</p>
+                )}
+              </div>
 
               <button
                 type="submit"
