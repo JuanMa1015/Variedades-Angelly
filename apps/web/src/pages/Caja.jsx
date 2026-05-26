@@ -92,10 +92,15 @@ const Caja = () => {
     setError('');
     setSuccess('');
 
-    const monto = Number(montoInicial);
+    const raw = montoInicial.trim();
+    if (!raw) {
+      setError('Ingresa el monto inicial en efectivo');
+      return;
+    }
 
-    if (!Number.isFinite(monto) || monto < 0) {
-      setError('El monto inicial debe ser un número válido mayor o igual a cero');
+    const monto = Number(raw);
+    if (!Number.isFinite(monto) || monto <= 0) {
+      setError('El monto inicial debe ser un número válido mayor a cero');
       return;
     }
 
@@ -119,8 +124,13 @@ const Caja = () => {
     setError('');
     setSuccess('');
 
-    const monto = Number(montoCierre);
+    const raw = montoCierre.trim();
+    if (!raw) {
+      setError('Ingresa el monto de cierre');
+      return;
+    }
 
+    const monto = Number(raw);
     if (!Number.isFinite(monto) || monto < 0) {
       setError('El monto de cierre debe ser un número válido mayor o igual a cero');
       return;
@@ -242,12 +252,13 @@ const Caja = () => {
               <form className="space-y-3" onSubmit={handleAbrirCaja}>
                 <input
                   type="number"
-                  min="0"
+                  min="1"
                   step="100"
                   value={montoInicial}
                   onChange={(event) => setMontoInicial(event.target.value)}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
                   placeholder="Monto inicial en efectivo"
+                  required
                 />
 
                 <button
@@ -302,6 +313,7 @@ const Caja = () => {
                   onChange={(event) => setMontoCierre(event.target.value)}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
                   placeholder="Monto final en caja"
+                  required
                 />
 
                 <button

@@ -45,18 +45,21 @@ class ClienteFidelizacionUpdateRequest(BaseModel):
 
 @router.get("/api/fidelizacion/clientes", response_model=list[ClienteFidelizacionResponse])
 def list_clientes_fidelizacion(
-    db: Session = Depends(get_db),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=200, ge=1, le=500),
     include_inactivos: bool = Query(default=False),
+    db: Session = Depends(get_db),
     _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> list[ClienteFidelizacionResponse]:
     query = select(ClienteFidelizacionModel)
     if not include_inactivos:
         query = query.where(ClienteFidelizacionModel.activo == True)
+    offset = (page - 1) * limit
     clientes = db.execute(
         query.order_by(
             ClienteFidelizacionModel.puntos_acumulados.desc(),
             ClienteFidelizacionModel.nombre.asc(),
-        ),
+        ).offset(offset).limit(limit),
     ).scalars().all()
 
     return [

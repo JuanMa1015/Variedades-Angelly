@@ -483,9 +483,9 @@ const Proveedores = () => {
               ))}
             </select>
 
-            <div className="space-y-2 rounded-xl border border-gray-200 p-3">
-              {pedidoForm.items.map((item, index) => (
-                  <div key={`pedido-item-${index}`} className="grid grid-cols-[1fr_90px_36px] gap-2">
+              <div className="space-y-2 rounded-xl border border-gray-200 p-3">
+                {pedidoForm.items.map((item, index) => (
+                    <div key={`pedido-item-${index}`} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_90px_36px]">
                   <select
                     value={item.producto_id}
                     onChange={(event) => handlePedidoItemChange(index, 'producto_id', event.target.value)}
@@ -540,154 +540,170 @@ const Proveedores = () => {
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
         <h2 className="mb-4 text-xl font-bold text-gray-900">Pedidos registrados</h2>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[940px] text-left text-sm">
-            <thead className="border-b border-gray-200 bg-gray-50">
-              <tr>
-                <th className="px-3 py-3 font-semibold text-gray-700">Proveedor</th>
-                <th className="px-3 py-3 font-semibold text-gray-700">Descripción</th>
-                <th className="px-3 py-3 font-semibold text-gray-700">Monto</th>
-                <th className="px-3 py-3 font-semibold text-gray-700">Estado</th>
-                <th className="px-3 py-3 font-semibold text-gray-700">Creado por</th>
-                <th className="px-3 py-3 font-semibold text-gray-700">Fecha</th>
-                <th className="px-3 py-3 font-semibold text-gray-700">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && (
-                <tr>
-                  <td colSpan="7" className="px-3 py-8 text-center text-gray-500">
-                    <Skeleton lines={1} />
-                  </td>
-                </tr>
-              )}
+        {loading && <Skeleton lines={3} />}
 
-              {!loading && pedidos.length === 0 && (
-                <tr>
-                  <td colSpan="7" className="px-3 py-8 text-center text-gray-500">
-                    No hay pedidos registrados.
-                  </td>
-                </tr>
-              )}
+        {!loading && pedidos.length === 0 && (
+          <p className="py-8 text-center text-sm text-gray-500">No hay pedidos registrados.</p>
+        )}
 
-              {!loading && pedidos.map((pedido) => {
+        {!loading && (
+          <>
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-gray-200 bg-gray-50">
+                  <tr>
+                    <th className="px-3 py-3 font-semibold text-gray-700">Proveedor</th>
+                    <th className="px-3 py-3 font-semibold text-gray-700">Descripción</th>
+                    <th className="px-3 py-3 font-semibold text-gray-700">Monto</th>
+                    <th className="px-3 py-3 font-semibold text-gray-700">Estado</th>
+                    <th className="px-3 py-3 font-semibold text-gray-700">Creado por</th>
+                    <th className="px-3 py-3 font-semibold text-gray-700">Fecha</th>
+                    <th className="px-3 py-3 font-semibold text-gray-700">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pedidos.map((pedido) => {
+                    const estadoNormalizado = String(pedido.estado || '').toLowerCase();
+                    const isEnviado = estadoNormalizado === 'enviado' || estadoNormalizado === 'aprobado';
+                    const proveedor = proveedoresById.get(Number(pedido.proveedor_id));
+                    const hasWhatsapp = Boolean(normalizeWhatsappNumber(proveedor?.telefono));
+
+                    return (
+                      <tr key={pedido.id} className="border-b border-gray-100">
+                        <td className="px-3 py-3 font-medium text-gray-900">{pedido.proveedor_nombre}</td>
+                        <td className="max-w-[200px] truncate px-3 py-3 text-gray-700" title={pedido.descripcion}>{pedido.descripcion}</td>
+                        <td className="px-3 py-3 font-semibold text-gray-900">{formatMoney(pedido.monto_estimado)}</td>
+                        <td className="px-3 py-3">
+                          {isEnviado && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800">
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              Enviado
+                            </span>
+                          )}
+                          {!isEnviado && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-700">
+                              {pedido.estado || 'Sin estado'}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 text-gray-700">{pedido.creado_por}</td>
+                        <td className="whitespace-nowrap px-3 py-3 text-gray-700">{formatDateTime(pedido.fecha_creacion)}</td>
+                        <td className="px-3 py-3">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleEnviarPedidoWhatsapp(pedido)}
+                              disabled={!hasWhatsapp}
+                              className="whitespace-nowrap rounded-md bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300"
+                            >
+                              WhatsApp
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="space-y-3 md:hidden">
+              {pedidos.map((pedido) => {
                 const estadoNormalizado = String(pedido.estado || '').toLowerCase();
                 const isEnviado = estadoNormalizado === 'enviado' || estadoNormalizado === 'aprobado';
-                const isLegacyPendiente = estadoNormalizado === 'pendiente';
-                const isLegacyRechazado = estadoNormalizado === 'rechazado';
                 const proveedor = proveedoresById.get(Number(pedido.proveedor_id));
                 const hasWhatsapp = Boolean(normalizeWhatsappNumber(proveedor?.telefono));
 
                 return (
-                  <tr key={pedido.id} className="border-b border-gray-100">
-                    <td className="px-3 py-3 font-medium text-gray-900">{pedido.proveedor_nombre}</td>
-                    <td className="px-3 py-3 text-gray-700">{pedido.descripcion}</td>
-                    <td className="px-3 py-3 font-semibold text-gray-900">{formatMoney(pedido.monto_estimado)}</td>
-                    <td className="px-3 py-3">
-                      {isEnviado && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800">
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                          Enviado
-                        </span>
+                  <div key={pedido.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <div className="mb-2 flex items-start justify-between gap-2">
+                      <span className="font-semibold text-gray-900">{pedido.proveedor_nombre}</span>
+                      {isEnviado ? (
+                        <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">Enviado</span>
+                      ) : (
+                        <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">{pedido.estado || 'Sin estado'}</span>
                       )}
-
-                      {isLegacyPendiente && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900">
-                          Pendiente (legado)
-                        </span>
-                      )}
-
-                      {isLegacyRechazado && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-700">
-                          Rechazado (legado)
-                        </span>
-                      )}
-
-                      {!isEnviado && !isLegacyPendiente && !isLegacyRechazado && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-700">
-                          {pedido.estado || 'Sin estado'}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-3 text-gray-700">{pedido.creado_por}</td>
-                    <td className="px-3 py-3 text-gray-700">{formatDateTime(pedido.fecha_creacion)}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleEnviarPedidoWhatsapp(pedido)}
-                          disabled={!hasWhatsapp}
-                          className="rounded-md bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300"
-                          title={hasWhatsapp ? 'Enviar pedido por WhatsApp' : 'Proveedor sin telefono registrado'}
-                        >
-                          Enviar WhatsApp
-                        </button>
-
-                        <span className="inline-flex items-center gap-1 text-xs text-gray-500">
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                          Flujo directo
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
+                    </div>
+                    <p className="mb-2 text-sm text-gray-600 line-clamp-2">{pedido.descripcion}</p>
+                    <div className="mb-2 flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Monto:</span>
+                      <span className="font-semibold text-gray-900">{formatMoney(pedido.monto_estimado)}</span>
+                    </div>
+                    <div className="mb-3 flex items-center justify-between text-sm">
+                      <span className="text-gray-500">{pedido.creado_por}</span>
+                      <span className="text-gray-500">{formatDateTime(pedido.fecha_creacion)}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleEnviarPedidoWhatsapp(pedido)}
+                      disabled={!hasWhatsapp}
+                      className="w-full rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300"
+                    >
+                      Enviar por WhatsApp
+                    </button>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          </>
+        )}
       </section>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
         <h2 className="mb-4 text-xl font-bold text-gray-900">Listado de proveedores</h2>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="border-b border-gray-200 bg-gray-50">
-              <tr>
-                <th className="px-3 py-3 font-semibold text-gray-700">Nombre</th>
-                <th className="px-3 py-3 font-semibold text-gray-700">Contacto</th>
-                <th className="px-3 py-3 font-semibold text-gray-700">Teléfono</th>
-                <th className="px-3 py-3 font-semibold text-gray-700">Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && (
-                <tr>
-                  <td colSpan="4" className="px-3 py-8 text-center text-gray-500">
-                    <Skeleton lines={1} />
-                  </td>
-                </tr>
-              )}
-
-              {!loading && proveedores.length === 0 && (
-                <tr>
-                  <td colSpan="4" className="px-3 py-8 text-center text-gray-500">
-                    No hay proveedores registrados.
-                  </td>
-                </tr>
-              )}
-
-              {!loading && proveedores.map((proveedor) => (
-                <tr key={proveedor.id} className="border-b border-gray-100">
-                  <td className="px-3 py-3 font-medium text-gray-900">{proveedor.nombre}</td>
-                  <td className="px-3 py-3 text-gray-700">{proveedor.contacto || '-'}</td>
-                  <td className="px-3 py-3 text-gray-700">{proveedor.telefono || '-'}</td>
-                  <td className="px-3 py-3">
+        {loading && <Skeleton lines={3} />}
+        {!loading && proveedores.length === 0 && (
+          <p className="py-8 text-center text-sm text-gray-500">No hay proveedores registrados.</p>
+        )}
+        {!loading && (
+          <>
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-gray-200 bg-gray-50">
+                  <tr>
+                    <th className="px-3 py-3 font-semibold text-gray-700">Nombre</th>
+                    <th className="px-3 py-3 font-semibold text-gray-700">Contacto</th>
+                    <th className="px-3 py-3 font-semibold text-gray-700">Teléfono</th>
+                    <th className="px-3 py-3 font-semibold text-gray-700">Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {proveedores.map((proveedor) => (
+                    <tr key={proveedor.id} className="border-b border-gray-100">
+                      <td className="px-3 py-3 font-medium text-gray-900">{proveedor.nombre}</td>
+                      <td className="px-3 py-3 text-gray-700">{proveedor.contacto || '-'}</td>
+                      <td className="px-3 py-3 text-gray-700">{proveedor.telefono || '-'}</td>
+                      <td className="px-3 py-3">
+                        {proveedor.activo ? (
+                          <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800">Activo</span>
+                        ) : (
+                          <span className="rounded-full bg-gray-200 px-2 py-1 text-xs font-semibold text-gray-700">Inactivo</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="space-y-3 md:hidden">
+              {proveedores.map((proveedor) => (
+                <div key={proveedor.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <div className="mb-2 flex items-start justify-between gap-2">
+                    <span className="font-semibold text-gray-900">{proveedor.nombre}</span>
                     {proveedor.activo ? (
-                      <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800">
-                        Activo
-                      </span>
+                      <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">Activo</span>
                     ) : (
-                      <span className="rounded-full bg-gray-200 px-2 py-1 text-xs font-semibold text-gray-700">
-                        Inactivo
-                      </span>
+                      <span className="shrink-0 rounded-full bg-gray-200 px-2 py-0.5 text-xs font-semibold text-gray-700">Inactivo</span>
                     )}
-                  </td>
-                </tr>
+                  </div>
+                  <p className="text-sm text-gray-600">Contacto: {proveedor.contacto || '-'}</p>
+                  <p className="text-sm text-gray-600">Tel: {proveedor.telefono || '-'}</p>
+                </div>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          </>
+        )}
       </section>
     </div>
   );

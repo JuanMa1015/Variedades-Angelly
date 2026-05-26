@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Barcode, Package, Plus, RotateCcw, Search, X } from 'lucide-react';
+import { AlertTriangle, Barcode, Package, Pencil, Plus, RotateCcw, Search, Trash2, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
-import { apiGet, apiPatch, apiPost } from '../api/httpClient';
+import { apiDelete, apiGet, apiPatch, apiPost } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage';
 import SuccessMessage from '../components/SuccessMessage';
 import Skeleton, { SkeletonCard } from '../components/Skeleton';
@@ -14,22 +14,19 @@ const MONEY_FORMATTER = new Intl.NumberFormat('es-CO', {
 
 const formatMoney = (value) => MONEY_FORMATTER.format(Number(value || 0));
 
+const EMPTY_MANUAL_FORM = { nombre: '', codigo_barras: '', precio_costo: '', precio_venta: '', stock_actual: '', stock_minimo: '' };
+
 const Inventario = () => {
   const { token } = useAuth();
 
   const [productos, setProductos] = useState([]);
   const [activeMode, setActiveMode] = useState('manual');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editingProducto, setEditingProducto] = useState(null);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState('');
 
-  const [manualForm, setManualForm] = useState({
-    nombre: '',
-    codigo_barras: '',
-    precio_costo: '',
-    precio_venta: '',
-    stock_actual: '',
-  });
+  const [manualForm, setManualForm] = useState({ ...EMPTY_MANUAL_FORM });
 
   const [barcodeForm, setBarcodeForm] = useState({
     codigo_barras: '',
@@ -39,9 +36,12 @@ const Inventario = () => {
     stock_actual: '',
   });
 
+  const [editForm, setEditForm] = useState({ ...EMPTY_MANUAL_FORM });
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+
   const clearMessages = () => {
     setError('');
     setSuccess('');
@@ -111,15 +111,10 @@ const Inventario = () => {
         precio_costo: Number(manualForm.precio_costo || 0),
         precio_venta: Number(manualForm.precio_venta || 0),
         stock_actual: Number(manualForm.stock_actual || 0),
+        stock_minimo: Number(manualForm.stock_minimo || 0),
         catalogo: 'tienda',
       });
-      setManualForm({
-        nombre: '',
-        codigo_barras: '',
-        precio_costo: '',
-        precio_venta: '',
-        stock_actual: '',
-      });
+      setManualForm({ ...EMPTY_MANUAL_FORM });
       await loadProductos();
       setSuccess('Producto agregado correctamente');
       setIsCreateModalOpen(false);
@@ -192,6 +187,69 @@ const Inventario = () => {
     }
   };
 
+  const handleEdit = (producto) => {
+    setEditForm({
+      nombre: producto.nombre || '',
+      codigo_barras: producto.codigo_barras || '',
+      precio_costo: String(producto.precio_costo || ''),
+      precio_venta: String(producto.precio_venta || ''),
+      stock_actual: String(producto.stock_actual || ''),
+      stock_minimo: String(producto.stock_minimo || ''),
+    });
+    setEditingProducto(producto);
+  };
+
+  const handleSubmitEdit = async (event) => {
+    event.preventDefault();
+    clearMessages();
+
+    const producto = editingProducto;
+    if (!producto) return;
+
+    if (!editForm.nombre.trim()) {
+      setError('El nombre del producto es obligatorio');
+      return;
+    }
+
+    if (Number(editForm.precio_costo) < 0 || Number(editForm.precio_venta) < 0 ||
+        Number(editForm.stock_actual) < 0 || Number(editForm.stock_minimo) < 0) {
+      setError('Los valores numéricos no pueden ser negativos.');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await apiPatch(`/api/productos/${producto.id}`, {
+        nombre: editForm.nombre.trim(),
+        codigo_barras: editForm.codigo_barras.trim() || null,
+        precio_costo: Number(editForm.precio_costo || 0),
+        precio_venta: Number(editForm.precio_venta || 0),
+        stock_actual: Number(editForm.stock_actual || 0),
+        stock_minimo: Number(editForm.stock_minimo || 0),
+      });
+      await loadProductos();
+      setSuccess(`Producto "${editForm.nombre.trim()}" actualizado`);
+      setEditingProducto(null);
+    } catch (err) {
+      setError(err.message || 'No se pudo actualizar el producto');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (producto) => {
+    if (!window.confirm(`¿Desactivar "${producto.nombre}"?`)) return;
+    clearMessages();
+
+    try {
+      await apiDelete(`/api/productos/${producto.id}`);
+      await loadProductos();
+      setSuccess(`Producto "${producto.nombre}" desactivado`);
+    } catch (err) {
+      setError(err.message || 'No se pudo desactivar el producto');
+    }
+  };
+
   const filtered = useMemo(() => {
     if (!searchTerm.trim()) return productos;
     const q = searchTerm.trim().toLowerCase();
@@ -222,7 +280,6 @@ const Inventario = () => {
       </div>
 
       <ErrorMessage message={error} onDismiss={() => setError('')} />
-
       <SuccessMessage message={success} onDismiss={() => setSuccess('')} />
 
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -327,6 +384,14 @@ const Inventario = () => {
                   className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
                   placeholder="Stock inicial (ej: 20)"
                 />
+                <input
+                  type="number"
+                  min="0"
+                  value={manualForm.stock_minimo}
+                  onChange={(event) => setManualForm((c) => ({ ...c, stock_minimo: event.target.value }))}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+                  placeholder="Stock mínimo (ej: 5)"
+                />
                 <button
                   type="submit"
                   disabled={saving}
@@ -388,6 +453,83 @@ const Inventario = () => {
                 </button>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {editingProducto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h3 className="text-xl font-bold text-gray-900">Editar producto</h3>
+              <button
+                type="button"
+                onClick={() => setEditingProducto(null)}
+                className="rounded-full border border-gray-200 p-2 text-gray-500 transition hover:bg-gray-50 hover:text-gray-700"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form className="space-y-3" onSubmit={handleSubmitEdit}>
+              <input
+                type="text"
+                value={editForm.nombre}
+                onChange={(event) => setEditForm((c) => ({ ...c, nombre: event.target.value }))}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+                placeholder="Nombre"
+              />
+              <input
+                type="text"
+                value={editForm.codigo_barras}
+                onChange={(event) => setEditForm((c) => ({ ...c, codigo_barras: event.target.value }))}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+                placeholder="Código barras"
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="number"
+                  min="0"
+                  value={editForm.precio_costo}
+                  onChange={(event) => setEditForm((c) => ({ ...c, precio_costo: event.target.value }))}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+                  placeholder="Precio costo"
+                />
+                <input
+                  type="number"
+                  min="0"
+                  value={editForm.precio_venta}
+                  onChange={(event) => setEditForm((c) => ({ ...c, precio_venta: event.target.value }))}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+                  placeholder="Precio venta"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="number"
+                  min="0"
+                  value={editForm.stock_actual}
+                  onChange={(event) => setEditForm((c) => ({ ...c, stock_actual: event.target.value }))}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+                  placeholder="Stock actual"
+                />
+                <input
+                  type="number"
+                  min="0"
+                  value={editForm.stock_minimo}
+                  onChange={(event) => setEditForm((c) => ({ ...c, stock_minimo: event.target.value }))}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+                  placeholder="Stock mínimo"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={saving}
+                className="w-full rounded-lg bg-rosewood px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300"
+              >
+                {saving ? 'Guardando...' : 'Guardar cambios'}
+              </button>
+            </form>
           </div>
         </div>
       )}
@@ -477,22 +619,23 @@ const Inventario = () => {
             <thead>
               <tr className="border-b border-gray-200">
                 <th className="px-4 py-3 text-left font-semibold text-gray-700">Producto</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700">Código</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700">Stock actual</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700">Mínimo</th>
+                <th className="hidden px-4 py-3 text-left font-semibold text-gray-700 md:table-cell">Código</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700">Stock</th>
+                <th className="hidden px-4 py-3 text-left font-semibold text-gray-700 sm:table-cell">Mín</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700">Precio venta</th>
+                <th className="px-4 py-3 text-right font-semibold text-gray-700">Acciones</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="5" className="px-4 py-6">
+                  <td colSpan="6" className="px-4 py-6">
                     <Skeleton lines={4} />
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr className="border-b border-gray-100 hover:bg-gray-50">
-                  <td colSpan="5" className="py-8 text-center text-gray-500">
+                  <td colSpan="6" className="py-8 text-center text-gray-500">
                     {searchTerm ? 'No se encontraron productos con ese criterio' : 'No hay productos registrados en el catálogo de tienda'}
                   </td>
                 </tr>
@@ -500,10 +643,30 @@ const Inventario = () => {
                 filtered.map((producto) => (
                   <tr key={producto.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-900">{producto.nombre}</td>
-                    <td className="px-4 py-3 text-gray-700">{producto.codigo_barras || '-'}</td>
+                    <td className="hidden px-4 py-3 text-gray-700 md:table-cell">{producto.codigo_barras || '-'}</td>
                     <td className="px-4 py-3 text-gray-700">{producto.stock_actual}</td>
-                    <td className="px-4 py-3 text-gray-700">{producto.stock_minimo}</td>
+                    <td className="hidden px-4 py-3 text-gray-700 sm:table-cell">{producto.stock_minimo}</td>
                     <td className="px-4 py-3 text-gray-700">{formatMoney(producto.precio_venta)}</td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="inline-flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleEdit(producto)}
+                          className="rounded-lg border border-gray-300 p-1.5 text-gray-600 transition hover:bg-gray-100"
+                          title="Editar producto"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(producto)}
+                          className="rounded-lg border border-gray-300 p-1.5 text-red-600 transition hover:bg-red-50"
+                          title="Desactivar producto"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}

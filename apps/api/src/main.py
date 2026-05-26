@@ -49,7 +49,10 @@ from src.api.routers.clientes_cartera_ventas import router as clientes_cartera_v
 from src.api.routers.clientes_tienda_fiado import router as clientes_tienda_fiado_router
 from src.api.routers.dashboard import router as dashboard_router
 from src.api.routers.fidelizacion_clientes import router as fidelizacion_clientes_router
-from src.api.routers.operaciones import router as operaciones_router
+from src.api.routers.proveedores import router as proveedores_router
+from src.api.routers.pedidos_proveedor import router as pedidos_proveedor_router
+from src.api.routers.gastos import router as gastos_router
+from src.api.routers.facturas_compra import router as facturas_compra_router
 from src.api.routers.productos import router as productos_router
 from src.api.routers.ventas_fidelizacion import router as ventas_fidelizacion_router
 from src.api.routers.superadmin import router as superadmin_router
@@ -260,7 +263,10 @@ app.include_router(fidelizacion_clientes_router)
 app.include_router(clientes_cartera_cobros_router)
 app.include_router(clientes_cartera_clientes_router)
 app.include_router(clientes_cartera_ventas_router)
-app.include_router(operaciones_router)
+app.include_router(proveedores_router)
+app.include_router(pedidos_proveedor_router)
+app.include_router(gastos_router)
+app.include_router(facturas_compra_router)
 app.include_router(auditorias_router)
 app.include_router(caja_router)
 app.include_router(export_router)

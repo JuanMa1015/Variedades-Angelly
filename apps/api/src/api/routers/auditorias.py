@@ -66,6 +66,8 @@ def _to_auditoria_response(auditoria: AuditoriaModel) -> AuditoriaResponse:
 @router.get("/api/auditorias", response_model=list[AuditoriaResponse])
 def list_auditorias(
     modulo: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=200, ge=1, le=500),
     db: Session = Depends(get_db),
     _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> list[AuditoriaResponse]:
@@ -73,8 +75,9 @@ def list_auditorias(
     if modulo:
         query = query.where(AuditoriaModel.modulo == modulo.strip())
 
+    offset = (page - 1) * limit
     auditorias = db.execute(
-        query.order_by(AuditoriaModel.fecha.desc(), AuditoriaModel.id.desc()),
+        query.order_by(AuditoriaModel.fecha.desc(), AuditoriaModel.id.desc()).offset(offset).limit(limit),
     ).scalars().all()
     return [_to_auditoria_response(auditoria) for auditoria in auditorias]
 

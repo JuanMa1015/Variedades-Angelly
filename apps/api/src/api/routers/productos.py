@@ -12,7 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.api.dependencies import AuthenticatedUser, require_roles
-from src.api.pagination import PageInfo, build_page
+from src.api.pagination import PageInfo, build_page, search_filter
 from src.domain.producto import Producto
 from src.infrastructure.database.connection import get_db
 from src.infrastructure.database.models import DetalleVentaModel, ProductoModel
@@ -114,14 +114,9 @@ def _to_producto_response_from_model(p: ProductoModel) -> ProductoResponse:
 
 
 def _producto_search_filter(query, q: str | None):
-    if q:
-        pattern = f"%{q.strip()}%"
-        query = query.where(
-            or_(
-                ProductoModel.nombre.ilike(pattern),
-                ProductoModel.codigo_barras.ilike(pattern),
-            ),
-        )
+    filters = search_filter(q.strip() if q else None, ProductoModel.nombre, ProductoModel.codigo_barras)
+    if filters:
+        query = query.where(or_(*filters))
     return query
 
 
@@ -215,7 +210,7 @@ def update_producto(
     producto_id: int,
     payload: ProductoUpdateRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> ProductoResponse:
     """Edita datos de producto en inventario."""
     producto = db.execute(select(ProductoModel).where(ProductoModel.id == producto_id)).scalar_one_or_none()
@@ -284,7 +279,7 @@ def update_producto(
 def delete_producto(
     producto_id: int,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> Response:
     """Desactiva un producto (soft-delete)."""
     producto = db.execute(select(ProductoModel).where(ProductoModel.id == producto_id)).scalar_one_or_none()
@@ -300,7 +295,7 @@ def delete_producto(
 def reactivar_producto(
     producto_id: int,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> dict:
     producto = db.execute(select(ProductoModel).where(ProductoModel.id == producto_id)).scalar_one_or_none()
     if producto is None:

@@ -23,13 +23,19 @@ from src.infrastructure.database.models import (
 router = APIRouter(tags=["export"])
 
 
-def _csv_response(rows: list[list[str]], filename: str) -> StreamingResponse:
+def _csv_response(rows, filename: str) -> StreamingResponse:
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerows(rows)
-    output.seek(0)
+
+    def generate():
+        for row in rows:
+            writer.writerow(row)
+            yield output.getvalue()
+            output.seek(0)
+            output.truncate(0)
+
     return StreamingResponse(
-        iter([output.getvalue()]),
+        generate(),
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )

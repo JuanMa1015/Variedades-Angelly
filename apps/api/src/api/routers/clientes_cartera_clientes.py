@@ -31,15 +31,19 @@ def list_clientes(
         query.order_by(ClienteModel.nombre.asc()),
     ).scalars().all()
 
-    compras_por_cliente_rows = db.execute(
-        select(
-            VentaModel.cliente_id,
-            func.count(VentaModel.id).label("compras_cantidad"),
-            func.coalesce(func.sum(VentaModel.total), 0).label("compras_total"),
-        )
-        .where(VentaModel.cliente_id.is_not(None))
-        .group_by(VentaModel.cliente_id),
-    ).all()
+    cliente_ids = [c.id for c in clientes]
+
+    compras_por_cliente_rows = []
+    if cliente_ids:
+        compras_por_cliente_rows = db.execute(
+            select(
+                VentaModel.cliente_id,
+                func.count(VentaModel.id).label("compras_cantidad"),
+                func.coalesce(func.sum(VentaModel.total), 0).label("compras_total"),
+            )
+            .where(VentaModel.cliente_id.in_(cliente_ids))
+            .group_by(VentaModel.cliente_id),
+        ).all()
 
     compras_por_cliente: dict[int, tuple[int, float]] = {
         int(row.cliente_id): (int(row.compras_cantidad or 0), float(row.compras_total or 0))
