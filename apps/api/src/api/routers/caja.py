@@ -23,33 +23,6 @@ from src.infrastructure.database.models import CierreCajaModel, GastoModel, Vent
 router = APIRouter(tags=["caja"])
 
 
-def _to_cierre_caja_response(cierre: CierreCajaModel) -> CierreCajaResponse:
-    total_ventas_efectivo = float(cierre.monto_ventas_efectivo)
-    total_ventas_transferencia = float(cierre.monto_ventas_transferencia)
-    total_gastos = float(cierre.monto_gastos)
-    monto_inicial = float(cierre.monto_inicial)
-    esta_abierta = cierre.fecha_cierre is None
-    saldo_esperado = monto_inicial + total_ventas_efectivo + total_ventas_transferencia - total_gastos
-
-    return CierreCajaResponse(
-        id=cierre.id,
-        monto_inicial=monto_inicial,
-        monto_ventas_efectivo=total_ventas_efectivo,
-        monto_ventas_transferencia=total_ventas_transferencia,
-        monto_gastos=total_gastos,
-        monto_cierre=float(cierre.monto_cierre) if cierre.monto_cierre is not None else None,
-        fecha_apertura=cierre.fecha_apertura,
-        fecha_cierre=cierre.fecha_cierre,
-        abierto_por=cierre.abierto_por,
-        cerrado_por=cierre.cerrado_por,
-        saldo_esperado=saldo_esperado,
-        total_ingresos=total_ventas_efectivo + total_ventas_transferencia,
-        esta_abierta=esta_abierta,
-        descuadre=cierre.esperado_vs_real if cierre.esperado_vs_real is not None
-                  else (float(cierre.monto_cierre) - saldo_esperado if cierre.monto_cierre is not None else None),
-    )
-
-
 def _calcular_metricas_desde(
     db: Session,
     desde: datetime,
@@ -80,6 +53,46 @@ def _calcular_metricas_desde(
     return total_efectivo, total_transferencia, total_gastos
 
 
+def _to_cierre_caja_response(
+    cierre: CierreCajaModel,
+    db: Session | None = None,
+) -> CierreCajaResponse:
+    esta_abierta = cierre.fecha_cierre is None
+    monto_inicial = float(cierre.monto_inicial)
+    total_gastos = float(cierre.monto_gastos)
+
+    if esta_abierta and db is not None:
+        total_efectivo, total_transferencia, total_gastos_calculado = _calcular_metricas_desde(
+            db, cierre.fecha_apertura,
+        )
+        total_ventas_efectivo = float(cierre.monto_ventas_efectivo + total_efectivo)
+        total_ventas_transferencia = float(cierre.monto_ventas_transferencia + total_transferencia)
+        total_gastos = float(cierre.monto_gastos + total_gastos_calculado)
+    else:
+        total_ventas_efectivo = float(cierre.monto_ventas_efectivo)
+        total_ventas_transferencia = float(cierre.monto_ventas_transferencia)
+
+    saldo_esperado = monto_inicial + total_ventas_efectivo + total_ventas_transferencia - total_gastos
+
+    return CierreCajaResponse(
+        id=cierre.id,
+        monto_inicial=monto_inicial,
+        monto_ventas_efectivo=total_ventas_efectivo,
+        monto_ventas_transferencia=total_ventas_transferencia,
+        monto_gastos=total_gastos,
+        monto_cierre=float(cierre.monto_cierre) if cierre.monto_cierre is not None else None,
+        fecha_apertura=cierre.fecha_apertura,
+        fecha_cierre=cierre.fecha_cierre,
+        abierto_por=cierre.abierto_por,
+        cerrado_por=cierre.cerrado_por,
+        saldo_esperado=saldo_esperado,
+        total_ingresos=total_ventas_efectivo + total_ventas_transferencia,
+        esta_abierta=esta_abierta,
+        descuadre=cierre.esperado_vs_real if cierre.esperado_vs_real is not None
+                  else (float(cierre.monto_cierre) - saldo_esperado if cierre.monto_cierre is not None else None),
+    )
+
+
 @router.get("/api/caja/estado", response_model=CajaEstadoResponse)
 def caja_estado(
     db: Session = Depends(get_db),
@@ -102,7 +115,7 @@ def caja_estado(
 
     return CajaEstadoResponse(
         abierta=caja_abierta is not None,
-        caja_actual=_to_cierre_caja_response(caja_abierta) if caja_abierta is not None else None,
+        caja_actual=_to_cierre_caja_response(caja_abierta, db=db) if caja_abierta is not None else None,
         ultimo_cierre=_to_cierre_caja_response(ultimo_cierre) if ultimo_cierre is not None else None,
     )
 
@@ -220,9 +233,9 @@ def caja_actualizar(
     caja_id: int,
     payload: ActualizarCajaRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> CierreCajaResponse:
-    """Actualiza un registro de caja."""
+    """Actualiza un registro de caja (solo superadmin)."""
     caja = db.get(CierreCajaModel, caja_id)
     if caja is None:
         raise HTTPException(status_code=404, detail="Registro de caja no encontrado")

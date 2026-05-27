@@ -85,7 +85,7 @@ def create_cliente(
         nombre=nombre_normalizado,
         documento=documento,
         telefono_whatsapp=telefono_whatsapp,
-        limite_credito=payload.limite_credito,
+        limite_credito=0,
         deuda_total=0.0,
     )
 
@@ -120,7 +120,6 @@ def update_cliente_cartera(
         payload.nombre is None
         and payload.documento is None
         and payload.telefono_whatsapp is None
-        and payload.limite_credito is None
     ):
         raise HTTPException(status_code=400, detail="No se enviaron campos para actualizar")
 
@@ -144,9 +143,6 @@ def update_cliente_cartera(
 
     if payload.telefono_whatsapp is not None:
         cliente.telefono_whatsapp = payload.telefono_whatsapp.strip() or None
-
-    if payload.limite_credito is not None:
-        cliente.limite_credito = payload.limite_credito
 
     try:
         db.commit()

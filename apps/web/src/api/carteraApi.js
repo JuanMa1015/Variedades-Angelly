@@ -55,6 +55,14 @@ export const saveCarteraProducto = (payload) => {
   return apiPost('/api/productos', payload);
 };
 
+export const updateCarteraProducto = (productoId, payload) => {
+  return apiPatch(`/api/productos/${productoId}`, payload);
+};
+
+export const deleteCarteraProducto = (productoId) => {
+  return apiDelete(`/api/productos/${productoId}`);
+};
+
 export const saveCarteraAbono = ({ clienteId, payload }) => {
   return apiPost(`/api/cartera/clientes/${clienteId}/abonos`, payload);
 };

@@ -17,7 +17,6 @@ class ClienteResponse(BaseModel):
     nombre: str
     documento: str | None
     telefono_whatsapp: str | None = None
-    limite_credito: float
     deuda_total: float
     compras_total: float = 0
     compras_cantidad: int = 0
@@ -80,7 +79,6 @@ class ClienteCreateRequest(BaseModel):
     nombre: Annotated[str, Field(min_length=3, max_length=120)]
     documento: Annotated[str | None, Field(min_length=5, max_length=30)] = None
     telefono_whatsapp: Annotated[str | None, Field(max_length=25)] = None
-    limite_credito: Annotated[float, Field(ge=0)]
 
 
 class ClienteUpdateRequest(BaseModel):
@@ -89,7 +87,6 @@ class ClienteUpdateRequest(BaseModel):
     nombre: Annotated[str | None, Field(min_length=3, max_length=120)] = None
     documento: Annotated[str | None, Field(min_length=5, max_length=30)] = None
     telefono_whatsapp: Annotated[str | None, Field(max_length=25)] = None
-    limite_credito: Annotated[float | None, Field(ge=0)] = None
 
 
 class VentaItemCreateRequest(BaseModel):
