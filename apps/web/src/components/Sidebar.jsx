@@ -34,6 +34,7 @@ const Sidebar = ({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMobile })
     const vendedorItems = [
       { label: 'Caja', path: '/caja', icon: Wallet, description: 'Apertura y cierre de caja' },
       { label: 'Ventas', path: '/ventas', icon: ShoppingCart, description: 'Punto de Venta' },
+      { label: 'Gastos', path: '/gastos', icon: Receipt, description: 'Gastos operativos' },
       { label: 'Clientes', path: '/clientes', icon: Users, description: 'Clientes de tienda' },
       { label: 'Inventario', path: '/inventario', icon: Package, description: 'Gestión de Stock' },
       { label: 'Proveedores', path: '/proveedores', icon: Truck, description: 'Gestión de Proveedores' },

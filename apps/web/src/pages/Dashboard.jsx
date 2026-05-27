@@ -27,6 +27,8 @@ const emptyCarteraResumen = {
   clientes_totales: 0,
   clientes_con_deuda: 0,
   deuda_total: 0,
+  clientes_alto_riesgo: 0,
+  clientes_riesgo_medio: 0,
 };
 
 const formatMoney = (value) => MONEY_FORMATTER.format(Number(value || 0));
@@ -186,6 +188,23 @@ const Dashboard = () => {
                 <div className="rounded-xl border border-gray-200 p-3">
                   <p className="text-[11px] uppercase tracking-[0.1em] text-gray-500">Deuda total</p>
                   <p className="mt-1 text-lg font-bold text-gray-900">{formatMoney(carteraResumen.deuda_total)}</p>
+                </div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-3 gap-2">
+                <div className="rounded-lg bg-emerald-50 p-2 text-center">
+                  <p className="text-xs font-semibold text-emerald-700">Al día</p>
+                  <p className="text-lg font-bold text-emerald-700">
+                    {Math.max(0, carteraResumen.clientes_con_deuda - (carteraResumen.clientes_alto_riesgo || 0) - (carteraResumen.clientes_riesgo_medio || 0))}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-amber-50 p-2 text-center">
+                  <p className="text-xs font-semibold text-amber-700">Alerta</p>
+                  <p className="text-lg font-bold text-amber-700">{carteraResumen.clientes_riesgo_medio || 0}</p>
+                </div>
+                <div className="rounded-lg bg-red-50 p-2 text-center">
+                  <p className="text-xs font-semibold text-red-700">Moroso</p>
+                  <p className="text-lg font-bold text-red-700">{carteraResumen.clientes_alto_riesgo || 0}</p>
                 </div>
               </div>
 

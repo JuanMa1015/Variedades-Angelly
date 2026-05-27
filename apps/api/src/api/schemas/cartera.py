@@ -47,9 +47,8 @@ class CarteraResumenResponse(BaseModel):
     clientes_totales: int
     clientes_con_deuda: int
     deuda_total: float
-    limite_total: float
-    disponible_total: float
     clientes_alto_riesgo: int
+    clientes_riesgo_medio: int
     saldo_promedio: float
 
 

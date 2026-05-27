@@ -33,9 +33,8 @@ const emptyCarteraResumen = {
   clientes_totales: 0,
   clientes_con_deuda: 0,
   deuda_total: 0,
-  limite_total: 0,
-  disponible_total: 0,
   clientes_alto_riesgo: 0,
+  clientes_riesgo_medio: 0,
   saldo_promedio: 0,
 };
 
