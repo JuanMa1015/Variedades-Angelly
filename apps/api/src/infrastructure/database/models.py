@@ -99,6 +99,8 @@ class ProductoModel(Base):
     stock_actual: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     stock_minimo: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    proveedor_id: Mapped[int | None] = mapped_column(ForeignKey("proveedores.id"), nullable=True)
+    proveedor: Mapped["ProveedorModel | None"] = relationship("ProveedorModel", foreign_keys=[proveedor_id])
 
     def __repr__(self) -> str:
         return f"ProductoModel(id={self.id!r}, nombre={self.nombre!r})"

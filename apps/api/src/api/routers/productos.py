@@ -15,7 +15,7 @@ from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.pagination import PageInfo, build_page, search_filter
 from src.domain.producto import Producto
 from src.infrastructure.database.connection import get_db
-from src.infrastructure.database.models import DetalleVentaModel, ProductoModel
+from src.infrastructure.database.models import DetalleVentaModel, ProductoModel, ProveedorModel
 from src.infrastructure.repositories.sqlalchemy_repository import SqlAlchemyProductoRepository
 
 router = APIRouter(tags=["productos"])
@@ -33,6 +33,8 @@ class ProductoResponse(BaseModel):
     stock_actual: int
     stock_minimo: int
     stock_critico: bool
+    proveedor_id: int | None = None
+    proveedor_nombre: str | None = None
 
 
 class ProductoCreateRequest(BaseModel):
@@ -45,6 +47,7 @@ class ProductoCreateRequest(BaseModel):
     precio_venta: Annotated[float, Field(ge=0)]
     stock_actual: Annotated[int, Field(ge=0)] = 0
     stock_minimo: Annotated[int, Field(ge=0)] = 0
+    proveedor_id: int | None = None
 
 
 class ProductoUpdateRequest(BaseModel):
@@ -57,6 +60,7 @@ class ProductoUpdateRequest(BaseModel):
     precio_venta: Annotated[float | None, Field(ge=0)] = None
     stock_actual: Annotated[int | None, Field(ge=0)] = None
     stock_minimo: Annotated[int | None, Field(ge=0)] = None
+    proveedor_id: int | None = None
 
 
 class ProductoStockPatchRequest(BaseModel):
@@ -110,6 +114,8 @@ def _to_producto_response_from_model(p: ProductoModel) -> ProductoResponse:
         stock_actual=p.stock_actual,
         stock_minimo=p.stock_minimo,
         stock_critico=p.stock_actual <= p.stock_minimo,
+        proveedor_id=p.proveedor_id,
+        proveedor_nombre=p.proveedor.nombre if p.proveedor else None,
     )
 
 
@@ -202,6 +208,13 @@ def create_producto(
             detail="No se pudo crear el producto por restriccion de unicidad",
         ) from exc
 
+    if payload.proveedor_id is not None:
+        model = db.execute(select(ProductoModel).where(ProductoModel.id == created.id)).scalar_one()
+        model.proveedor_id = payload.proveedor_id
+        db.commit()
+        db.refresh(model)
+        return _to_producto_response_from_model(model)
+
     return _to_producto_response(created)
 
 
@@ -254,6 +267,9 @@ def update_producto(
     if payload.stock_minimo is not None:
         producto.stock_minimo = payload.stock_minimo
 
+    if payload.proveedor_id is not None:
+        producto.proveedor_id = payload.proveedor_id
+
     db.commit()
     db.refresh(producto)
 
@@ -267,6 +283,8 @@ def update_producto(
         stock_actual=producto.stock_actual,
         stock_minimo=producto.stock_minimo,
         stock_critico=producto.stock_actual <= producto.stock_minimo,
+        proveedor_id=producto.proveedor_id,
+        proveedor_nombre=producto.proveedor.nombre if producto.proveedor else None,
     )
 
 
