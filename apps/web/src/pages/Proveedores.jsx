@@ -380,24 +380,33 @@ const Proveedores = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Activos</p>
-          <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">{resumen.proveedoresActivos}</p>
+      {loading ? (
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5"><Skeleton lines={2} /></div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5"><Skeleton lines={2} /></div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5"><Skeleton lines={2} /></div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5"><Skeleton lines={2} /></div>
         </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Pedidos</p>
-          <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">{resumen.pedidosEmitidos}</p>
+      ) : (
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Activos</p>
+            <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">{resumen.proveedoresActivos}</p>
+          </div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Pedidos</p>
+            <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">{resumen.pedidosEmitidos}</p>
+          </div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Monto solicitado</p>
+            <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">{formatMoney(resumen.montoSolicitado)}</p>
+          </div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">WhatsApp</p>
+            <p className="mt-2 text-2xl font-bold text-emerald-700 sm:text-3xl">{resumen.pedidosConWhatsapp}</p>
+          </div>
         </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Monto solicitado</p>
-          <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">{formatMoney(resumen.montoSolicitado)}</p>
-        </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">WhatsApp</p>
-          <p className="mt-2 text-2xl font-bold text-emerald-700 sm:text-3xl">{resumen.pedidosConWhatsapp}</p>
-        </div>
-      </div>
+      )}
 
       <ErrorMessage message={error} onDismiss={() => setError('')} />
       <SuccessMessage message={success} onDismiss={() => setSuccess('')} />
@@ -435,9 +444,6 @@ const Proveedores = () => {
             </div>
 
             <form className="space-y-3" onSubmit={handleCreateProveedor}>
-              {error && (
-                <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
-              )}
               <input
                 type="text"
                 value={proveedorForm.nombre}

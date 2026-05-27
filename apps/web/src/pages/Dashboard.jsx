@@ -251,95 +251,110 @@ const Dashboard = () => {
         </section>
       )}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div className="kpi-glass rounded-2xl p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-600">Ventas diarias</p>
-          <p className="mt-2 text-3xl font-bold text-gray-900">{formatMoney(resumen.ventas_diarias)}</p>
+      {loading ? (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"><Skeleton lines={2} /></div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"><Skeleton lines={2} /></div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"><Skeleton lines={2} /></div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"><Skeleton lines={2} /></div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"><Skeleton lines={2} /></div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"><Skeleton lines={2} /></div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"><Skeleton lines={2} /></div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"><Skeleton lines={2} /></div>
         </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="kpi-glass rounded-2xl p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-600">Ventas diarias</p>
+              <p className="mt-2 text-3xl font-bold text-gray-900">{formatMoney(resumen.ventas_diarias)}</p>
+            </div>
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Ventas semanales</p>
-          <p className="mt-2 text-3xl font-bold text-gray-900">{formatMoney(resumen.ventas_semanales)}</p>
-        </div>
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Ventas semanales</p>
+              <p className="mt-2 text-3xl font-bold text-gray-900">{formatMoney(resumen.ventas_semanales)}</p>
+            </div>
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Ventas mensuales</p>
-          <p className="mt-2 text-3xl font-bold text-gray-900">{formatMoney(resumen.ventas_mensuales)}</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="mb-2 flex items-center gap-2 text-gray-600">
-            <ReceiptText className="h-4 w-4" />
-            <p className="text-sm font-semibold">Transacciones del día</p>
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Ventas mensuales</p>
+              <p className="mt-2 text-3xl font-bold text-gray-900">{formatMoney(resumen.ventas_mensuales)}</p>
+            </div>
           </div>
-          <p className="text-3xl font-bold text-gray-900">{resumen.transacciones_diarias}</p>
-        </div>
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="mb-2 flex items-center gap-2 text-gray-600">
-            <CalendarDays className="h-4 w-4" />
-            <p className="text-sm font-semibold">Transacciones de la semana</p>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+              <div className="mb-2 flex items-center gap-2 text-gray-600">
+                <ReceiptText className="h-4 w-4" />
+                <p className="text-sm font-semibold">Transacciones del día</p>
+              </div>
+              <p className="text-3xl font-bold text-gray-900">{resumen.transacciones_diarias}</p>
+            </div>
+
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+              <div className="mb-2 flex items-center gap-2 text-gray-600">
+                <CalendarDays className="h-4 w-4" />
+                <p className="text-sm font-semibold">Transacciones de la semana</p>
+              </div>
+              <p className="text-3xl font-bold text-gray-900">{resumen.transacciones_semanales}</p>
+            </div>
+
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+              <div className="mb-2 flex items-center gap-2 text-gray-600">
+                <Clock3 className="h-4 w-4" />
+                <p className="text-sm font-semibold">Transacciones del mes</p>
+              </div>
+              <p className="text-3xl font-bold text-gray-900">{resumen.transacciones_mensuales}</p>
+            </div>
           </div>
-          <p className="text-3xl font-bold text-gray-900">{resumen.transacciones_semanales}</p>
-        </div>
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="mb-2 flex items-center gap-2 text-gray-600">
-            <Clock3 className="h-4 w-4" />
-            <p className="text-sm font-semibold">Transacciones del mes</p>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Dinero en efectivo</p>
+              <p className="mt-2 text-3xl font-bold text-gray-900">{formatMoney(resumen.pagos_efectivo)}</p>
+            </div>
+
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Dinero por transferencia</p>
+              <p className="mt-2 text-3xl font-bold text-gray-900">{formatMoney(resumen.pagos_transferencia)}</p>
+            </div>
           </div>
-          <p className="text-3xl font-bold text-gray-900">{resumen.transacciones_mensuales}</p>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Dinero en efectivo</p>
-          <p className="mt-2 text-3xl font-bold text-gray-900">{formatMoney(resumen.pagos_efectivo)}</p>
-        </div>
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Promedio por transacción (mes)</p>
+              <p className="mt-2 text-2xl font-bold text-gray-900">
+                {formatMoney(metricasDerivadas.promedioPorTransaccion)}
+              </p>
+            </div>
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Dinero por transferencia</p>
-          <p className="mt-2 text-3xl font-bold text-gray-900">{formatMoney(resumen.pagos_transferencia)}</p>
-        </div>
-      </div>
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Participación semanal en el mes</p>
+              <p className="mt-2 text-2xl font-bold text-gray-900">
+                {metricasDerivadas.participacionSemanal.toFixed(1)}%
+              </p>
+              <div className="mt-3 h-2 rounded-full bg-gray-200">
+                <div
+                  className="h-full rounded-full bg-rosewood"
+                  style={{ width: `${Math.min(100, metricasDerivadas.participacionSemanal)}%` }}
+                />
+              </div>
+            </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Promedio por transacción (mes)</p>
-          <p className="mt-2 text-2xl font-bold text-gray-900">
-            {formatMoney(metricasDerivadas.promedioPorTransaccion)}
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Participación semanal en el mes</p>
-          <p className="mt-2 text-2xl font-bold text-gray-900">
-            {metricasDerivadas.participacionSemanal.toFixed(1)}%
-          </p>
-          <div className="mt-3 h-2 rounded-full bg-gray-200">
-            <div
-              className="h-full rounded-full bg-rosewood"
-              style={{ width: `${Math.min(100, metricasDerivadas.participacionSemanal)}%` }}
-            />
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Participación diaria en el mes</p>
+              <p className="mt-2 text-2xl font-bold text-gray-900">
+                {metricasDerivadas.participacionDiaria.toFixed(1)}%
+              </p>
+              <div className="mt-3 h-2 rounded-full bg-gray-200">
+                <div
+                  className="h-full rounded-full bg-gold-200"
+                  style={{ width: `${Math.min(100, metricasDerivadas.participacionDiaria)}%` }}
+                />
+              </div>
+            </div>
           </div>
-        </div>
-
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Participación diaria en el mes</p>
-          <p className="mt-2 text-2xl font-bold text-gray-900">
-            {metricasDerivadas.participacionDiaria.toFixed(1)}%
-          </p>
-          <div className="mt-3 h-2 rounded-full bg-gray-200">
-            <div
-              className="h-full rounded-full bg-gold-200"
-              style={{ width: `${Math.min(100, metricasDerivadas.participacionDiaria)}%` }}
-            />
-          </div>
-        </div>
-      </div>
+        </>
+      )}
 
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
         <h2 className="mb-4 text-xl font-bold text-gray-900">Ventas recientes</h2>
