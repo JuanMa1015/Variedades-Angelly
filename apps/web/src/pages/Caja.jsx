@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Edit, History, Lock, Plus, Trash2, Unlock, Wallet } from 'lucide-react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { ChevronDown, ChevronRight, Edit, History, Lock, Trash2, Unlock, Wallet } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
-import { abrirCaja, cerrarCaja, deleteCaja, fetchCajaEstado, fetchCajaHistorial, updateCaja } from '../api/cajaApi';
+import { abrirCaja, cerrarCaja, deleteCaja, fetchCajaEstado, fetchCajaHistorial, fetchVentasPorRango, updateCaja } from '../api/cajaApi';
 import ErrorMessage from '../components/ErrorMessage'
 import SuccessMessage from '../components/SuccessMessage'
 import Skeleton, { SkeletonCard } from '../components/Skeleton'
@@ -46,6 +46,10 @@ const Caja = () => {
   const [editingCaja, setEditingCaja] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [savingEdit, setSavingEdit] = useState(false);
+
+  const [expandedCajaId, setExpandedCajaId] = useState(null);
+  const [ventasPorCaja, setVentasPorCaja] = useState({});
+  const [loadingVentas, setLoadingVentas] = useState({});
 
   const isSuperadmin = user?.role === 'superadmin';
 
@@ -93,30 +97,39 @@ const Caja = () => {
   const cajaActual = estado?.caja_actual ?? null;
   const abierta = estado?.abierta ?? false;
 
-  const saldoInicial = useMemo(() => {
-    if (!cajaActual) return 0;
-    return Number(cajaActual.monto_inicial || 0);
-  }, [cajaActual]);
-
-  const ventasEfectivo = useMemo(() => {
-    if (!cajaActual) return 0;
-    return Number(cajaActual.monto_ventas_efectivo || 0);
-  }, [cajaActual]);
-
-  const ventasTransferencia = useMemo(() => {
-    if (!cajaActual) return 0;
-    return Number(cajaActual.monto_ventas_transferencia || 0);
-  }, [cajaActual]);
-
-  const gastos = useMemo(() => {
-    if (!cajaActual) return 0;
-    return Number(cajaActual.monto_gastos || 0);
-  }, [cajaActual]);
-
   const saldoEsperado = useMemo(() => {
     if (!cajaActual) return 0;
     return Number(cajaActual.saldo_esperado || 0);
   }, [cajaActual]);
+
+  const loadVentasForCaja = async (caja) => {
+    const cajaId = caja.id;
+    if (ventasPorCaja[cajaId]) return;
+
+    setLoadingVentas((prev) => ({ ...prev, [cajaId]: true }));
+
+    try {
+      const hasta = caja.fecha_cierre || new Date().toISOString();
+      const ventas = await fetchVentasPorRango({
+        fecha_desde: caja.fecha_apertura,
+        fecha_hasta: hasta,
+      });
+      setVentasPorCaja((prev) => ({ ...prev, [cajaId]: Array.isArray(ventas) ? ventas : [] }));
+    } catch {
+      setVentasPorCaja((prev) => ({ ...prev, [cajaId]: [] }));
+    } finally {
+      setLoadingVentas((prev) => ({ ...prev, [cajaId]: false }));
+    }
+  };
+
+  const toggleExpand = (caja) => {
+    if (expandedCajaId === caja.id) {
+      setExpandedCajaId(null);
+    } else {
+      setExpandedCajaId(caja.id);
+      loadVentasForCaja(caja);
+    }
+  };
 
   const handleAbrirCaja = async (event) => {
     event.preventDefault();
@@ -292,76 +305,35 @@ const Caja = () => {
       <ErrorMessage message={error} onDismiss={() => setError('')} />
       <SuccessMessage message={success} onDismiss={() => setSuccess('')} />
 
-      {/* Estado actual */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-        <div className={`rounded-2xl border p-4 shadow-sm sm:p-5 ${abierta ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-white'}`}>
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Estado</p>
-          <p className={`mt-2 flex items-center gap-2 text-2xl font-bold sm:text-3xl ${abierta ? 'text-green-700' : 'text-gray-900'}`}>
-            {abierta ? <><Unlock className="h-5 w-5 sm:h-6 sm:w-6" /> Abierta</> : <><Lock className="h-5 w-5 sm:h-6 sm:w-6" /> Cerrada</>}
-          </p>
-          {cajaActual && (
-            <p className="mt-1 text-xs text-gray-500">por {cajaActual.abierto_por} — {formatDateTime(cajaActual.fecha_apertura)}</p>
-          )}
+      {/* Barra de estado compacta */}
+      <div className={`flex flex-wrap items-center gap-3 rounded-2xl border p-4 shadow-sm sm:p-5 ${abierta ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-white'}`}>
+        <div className={`flex items-center gap-2 text-lg font-bold sm:text-xl ${abierta ? 'text-green-700' : 'text-gray-900'}`}>
+          {abierta ? <Unlock className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
+          Caja {abierta ? 'Abierta' : 'Cerrada'}
         </div>
 
         {abierta && cajaActual && (
           <>
-            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Saldo esperado</p>
-              <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">{formatMoney(saldoEsperado)}</p>
-            </div>
-
-            <div className="rounded-2xl border border-blush-100 bg-blush-100 p-4 shadow-sm sm:p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-rosewood">Abierta por</p>
-              <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">{cajaActual.abierto_por}</p>
-              <p className="text-xs text-gray-500">{formatDateTime(cajaActual.fecha_apertura)}</p>
-            </div>
+            <span className="hidden text-gray-300 sm:inline">|</span>
+            <span className="text-sm text-gray-600">
+              {cajaActual.abierto_por} — {formatDateTime(cajaActual.fecha_apertura)}
+            </span>
+            <span className="hidden text-gray-300 sm:inline">|</span>
+            <span className="text-sm font-semibold text-gray-900">
+              Saldo esperado: {formatMoney(saldoEsperado)}
+            </span>
           </>
         )}
 
-        {!abierta && (
+        {!abierta && estado?.ultimo_cierre && (
           <>
-            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Último cierre</p>
-              <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">
-                {estado?.ultimo_cierre ? formatMoney(estado.ultimo_cierre.monto_cierre) : '-'}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Cerrado por</p>
-              <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">
-                {estado?.ultimo_cierre?.cerrado_por ?? '-'}
-              </p>
-            </div>
+            <span className="hidden text-gray-300 sm:inline">|</span>
+            <span className="text-sm text-gray-600">
+              Último cierre: {formatMoney(estado.ultimo_cierre.monto_cierre)} por {estado.ultimo_cierre.cerrado_por}
+            </span>
           </>
         )}
       </div>
-
-      {/* Detalle de caja abierta */}
-      {abierta && cajaActual && (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Monto inicial</p>
-            <p className="mt-2 text-2xl font-bold text-gray-900">{formatMoney(saldoInicial)}</p>
-          </div>
-
-          <div className="rounded-2xl border border-green-100 bg-green-50 p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-green-600">Ventas efectivo</p>
-            <p className="mt-2 text-2xl font-bold text-green-700">{formatMoney(ventasEfectivo)}</p>
-          </div>
-
-          <div className="rounded-2xl border border-blue-100 bg-blue-50 p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Ventas transferencia</p>
-            <p className="mt-2 text-2xl font-bold text-blue-700">{formatMoney(ventasTransferencia)}</p>
-          </div>
-
-          <div className="rounded-2xl border border-red-100 bg-red-50 p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-red-600">Gastos</p>
-            <p className="mt-2 text-2xl font-bold text-red-700">{formatMoney(gastos)}</p>
-          </div>
-        </div>
-      )}
 
       {/* Acciones */}
       {loading ? (
@@ -411,19 +383,19 @@ const Caja = () => {
               <div className="mb-4 rounded-xl bg-gray-50 p-4 text-sm text-gray-700">
                 <p className="mb-1 flex justify-between">
                   <span>Monto inicial:</span>
-                  <span className="font-semibold">{formatMoney(saldoInicial)}</span>
+                  <span className="font-semibold">{formatMoney(cajaActual?.monto_inicial)}</span>
                 </p>
                 <p className="mb-1 flex justify-between">
                   <span>Ventas efectivo:</span>
-                  <span className="font-semibold text-green-700">{formatMoney(ventasEfectivo)}</span>
+                  <span className="font-semibold text-green-700">{formatMoney(cajaActual?.monto_ventas_efectivo)}</span>
                 </p>
                 <p className="mb-1 flex justify-between">
                   <span>Ventas transferencia:</span>
-                  <span className="font-semibold text-blue-700">{formatMoney(ventasTransferencia)}</span>
+                  <span className="font-semibold text-blue-700">{formatMoney(cajaActual?.monto_ventas_transferencia)}</span>
                 </p>
                 <p className="mb-1 flex justify-between">
                   <span>Gastos:</span>
-                  <span className="font-semibold text-red-700">{formatMoney(gastos)}</span>
+                  <span className="font-semibold text-red-700">{formatMoney(cajaActual?.monto_gastos)}</span>
                 </p>
                 <hr className="my-2 border-gray-200" />
                 <p className="flex justify-between text-base">
@@ -436,12 +408,36 @@ const Caja = () => {
                 <input
                   type="number"
                   min="0"
+                  step="any"
                   value={montoCierre}
                   onChange={(event) => setMontoCierre(event.target.value)}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
                   placeholder="Monto final en caja"
                   required
                 />
+
+                {montoCierre.trim() && (
+                  (() => {
+                    const cierre = Number(montoCierre);
+                    const diff = cierre - saldoEsperado;
+                    const isCuadrado = Math.abs(diff) < 0.01;
+                    return (
+                      <div className={`rounded-lg border p-3 text-sm ${isCuadrado ? 'border-green-200 bg-green-50' : diff > 0 ? 'border-yellow-200 bg-yellow-50' : 'border-red-200 bg-red-50'}`}>
+                        <p className="flex justify-between">
+                          <span className="font-semibold">Descuadre:</span>
+                          <span className={`font-bold ${isCuadrado ? 'text-green-700' : diff > 0 ? 'text-yellow-700' : 'text-red-700'}`}>
+                            {isCuadrado ? '✓ Cuadrado' : `${diff > 0 ? '+' : ''}${formatMoney(diff)}`}
+                          </span>
+                        </p>
+                        {!isCuadrado && (
+                          <p className="mt-1 text-xs text-gray-600">
+                            {diff > 0 ? 'Sobra dinero en caja' : 'Falta dinero en caja'}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()
+                )}
 
                 <button
                   type="submit"
@@ -474,26 +470,56 @@ const Caja = () => {
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead className="border-b border-gray-200 bg-gray-50">
-                  <tr>
-                    <th className="px-3 py-3 font-semibold text-gray-700">#</th>
-                    <th className="px-3 py-3 font-semibold text-gray-700">Fecha apertura</th>
-                    <th className="px-3 py-3 font-semibold text-gray-700">Fecha cierre</th>
-                    <th className="px-3 py-3 font-semibold text-gray-700">Abierto por</th>
-                    <th className="px-3 py-3 font-semibold text-gray-700">Monto inicial</th>
-                    <th className="px-3 py-3 font-semibold text-gray-700">Monto cierre</th>
-                    <th className="px-3 py-3 font-semibold text-gray-700">Estado</th>
-                    <th className="px-3 py-3 font-semibold text-gray-700">Acciones</th>
-                  </tr>
+                    <tr>
+                      <th className="w-10 px-2 py-3"></th>
+                      <th className="px-3 py-3 font-semibold text-gray-700">#</th>
+                      <th className="px-3 py-3 font-semibold text-gray-700">Apertura</th>
+                      <th className="px-3 py-3 font-semibold text-gray-700">Cierre</th>
+                      <th className="px-3 py-3 font-semibold text-gray-700">Abrió</th>
+                      <th className="px-3 py-3 font-semibold text-gray-700">Cerró</th>
+                      <th className="px-3 py-3 font-semibold text-gray-700">Inicial</th>
+                      <th className="px-3 py-3 font-semibold text-gray-700">V. efectivo</th>
+                      <th className="px-3 py-3 font-semibold text-gray-700">V. transf.</th>
+                      <th className="px-3 py-3 font-semibold text-gray-700">Gastos</th>
+                      <th className="px-3 py-3 font-semibold text-gray-700">Esperado</th>
+                      <th className="px-3 py-3 font-semibold text-gray-700">Cierre</th>
+                      <th className="px-3 py-3 font-semibold text-gray-700">Descuadre</th>
+                      <th className="px-3 py-3 font-semibold text-gray-700">Estado</th>
+                      <th className="px-3 py-3 font-semibold text-gray-700">Acciones</th>
+                    </tr>
                 </thead>
                 <tbody>
-                  {historial.map((caja) => (
-                    <tr key={caja.id} className="border-b border-gray-100">
+                    {historial.map((caja) => (
+                    <Fragment key={caja.id}>
+                    <tr className="border-b border-gray-100">
+                      <td className="px-2 py-3">
+                        <button
+                          type="button"
+                          onClick={() => toggleExpand(caja)}
+                          className="rounded-md p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
+                          aria-label="Ver ventas"
+                        >
+                          {expandedCajaId === caja.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        </button>
+                      </td>
                       <td className="px-3 py-3 text-gray-700">{caja.id}</td>
                       <td className="whitespace-nowrap px-3 py-3 text-gray-700">{formatDateTime(caja.fecha_apertura)}</td>
                       <td className="whitespace-nowrap px-3 py-3 text-gray-700">{formatDateTime(caja.fecha_cierre)}</td>
                       <td className="px-3 py-3 text-gray-700">{caja.abierto_por}</td>
-                      <td className="px-3 py-3 font-semibold text-gray-900">{formatMoney(caja.monto_inicial)}</td>
+                      <td className="px-3 py-3 text-gray-700">{caja.cerrado_por || '-'}</td>
+                      <td className="px-3 py-3 text-gray-900">{formatMoney(caja.monto_inicial)}</td>
+                      <td className="px-3 py-3 text-green-700 font-semibold">{formatMoney(caja.monto_ventas_efectivo)}</td>
+                      <td className="px-3 py-3 text-blue-700 font-semibold">{formatMoney(caja.monto_ventas_transferencia)}</td>
+                      <td className="px-3 py-3 text-red-700 font-semibold">{formatMoney(caja.monto_gastos)}</td>
+                      <td className="px-3 py-3 font-bold text-gray-900">{formatMoney(caja.saldo_esperado)}</td>
                       <td className="px-3 py-3 font-semibold text-gray-900">{caja.monto_cierre != null ? formatMoney(caja.monto_cierre) : '-'}</td>
+                      <td className="px-3 py-3">
+                        {caja.descuadre != null ? (
+                          <span className={`font-semibold ${Math.abs(caja.descuadre) < 0.01 ? 'text-green-600' : caja.descuadre > 0 ? 'text-yellow-600' : 'text-red-600'}`}>
+                            {Math.abs(caja.descuadre) < 0.01 ? '✓' : `${caja.descuadre > 0 ? '+' : ''}${formatMoney(caja.descuadre)}`}
+                          </span>
+                        ) : '-'}
+                      </td>
                       <td className="px-3 py-3">
                         {caja.esta_abierta ? (
                           <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">Abierta</span>
@@ -524,6 +550,55 @@ const Caja = () => {
                         </div>
                       </td>
                     </tr>
+
+                    {expandedCajaId === caja.id && (
+                      <tr className="border-b border-gray-100 bg-gray-50">
+                        <td colSpan={15} className="px-6 py-4">
+                          {loadingVentas[caja.id] ? (
+                            <div className="flex items-center justify-center py-4">
+                              <div className="h-5 w-5 animate-spin rounded-full border-2 border-rosewood border-t-transparent" />
+                              <span className="ml-2 text-sm text-gray-500">Cargando ventas...</span>
+                            </div>
+                          ) : ventasPorCaja[caja.id]?.length === 0 ? (
+                            <p className="py-2 text-center text-sm text-gray-500">No hay ventas en este turno.</p>
+                          ) : (
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-left text-xs">
+                                <thead>
+                                  <tr className="border-b border-gray-200 text-gray-500">
+                                    <th className="px-2 py-2 font-semibold">#</th>
+                                    <th className="px-2 py-2 font-semibold">Cliente</th>
+                                    <th className="px-2 py-2 font-semibold">Método</th>
+                                    <th className="px-2 py-2 font-semibold">Total</th>
+                                    <th className="px-2 py-2 font-semibold">Fecha</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {ventasPorCaja[caja.id].map((venta) => (
+                                    <tr key={venta.venta_id} className="border-b border-gray-100">
+                                      <td className="px-2 py-2 text-gray-700">{venta.venta_id}</td>
+                                      <td className="px-2 py-2 text-gray-700">{venta.cliente_nombre || 'Mostrador'}</td>
+                                      <td className="px-2 py-2">
+                                        {venta.metodo_pago === 'efectivo' ? (
+                                          <span className="rounded-full bg-green-100 px-2 py-0.5 font-semibold text-green-700">Efectivo</span>
+                                        ) : venta.metodo_pago === 'transferencia' ? (
+                                          <span className="rounded-full bg-blue-100 px-2 py-0.5 font-semibold text-blue-700">Transferencia</span>
+                                        ) : (
+                                          <span className="rounded-full bg-gray-100 px-2 py-0.5 font-semibold text-gray-600">{venta.metodo_pago || '-'}</span>
+                                        )}
+                                      </td>
+                                      <td className="px-2 py-2 font-semibold text-gray-900">{formatMoney(venta.total)}</td>
+                                      <td className="whitespace-nowrap px-2 py-2 text-gray-500">{formatDateTime(venta.fecha)}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
@@ -531,39 +606,113 @@ const Caja = () => {
 
             <div className="space-y-3 md:hidden">
               {historial.map((caja) => (
-                <div key={caja.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                  <div className="mb-2 flex items-start justify-between gap-2">
-                    <span className="font-semibold text-gray-900">#{caja.id} — {caja.abierto_por}</span>
-                    {caja.esta_abierta ? (
-                      <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">Abierta</span>
-                    ) : (
-                      <span className="shrink-0 rounded-full bg-gray-200 px-2 py-0.5 text-xs font-semibold text-gray-700">Cerrada</span>
-                    )}
-                  </div>
-                  <p className="text-sm text-gray-600">Apertura: {formatDateTime(caja.fecha_apertura)}</p>
-                  <p className="text-sm text-gray-600">Cierre: {formatDateTime(caja.fecha_cierre)}</p>
-                  <p className="text-sm text-gray-600">Inicial: {formatMoney(caja.monto_inicial)}</p>
-                  <p className="text-sm text-gray-600">Cierre: {caja.monto_cierre != null ? formatMoney(caja.monto_cierre) : '-'}</p>
-                  <div className="mt-2 flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => openEditModal(caja)}
-                      className="inline-flex items-center gap-1 rounded-md bg-rosewood px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90"
-                    >
-                      <Edit className="h-3.5 w-3.5" />
-                      Editar
-                    </button>
-                    {isSuperadmin && (
+                <div key={caja.id} className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                  <div className="p-4">
+                    <div className="mb-2 flex items-start justify-between gap-2">
+                      <span className="font-semibold text-gray-900">#{caja.id} — {caja.abierto_por}</span>
+                      {caja.esta_abierta ? (
+                        <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">Abierta</span>
+                      ) : (
+                        <span className="shrink-0 rounded-full bg-gray-200 px-2 py-0.5 text-xs font-semibold text-gray-700">Cerrada</span>
+                      )}
+                    </div>
+                    <div className="space-y-1 text-sm text-gray-600">
+                      <p>Apertura: {formatDateTime(caja.fecha_apertura)} — {caja.abierto_por}</p>
+                      <p>Cierre: {formatDateTime(caja.fecha_cierre)} — {caja.cerrado_por || '-'}</p>
+                    </div>
+                    <hr className="my-2 border-gray-100" />
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                      <span className="text-gray-500">Inicial:</span>
+                      <span className="text-right font-semibold text-gray-900">{formatMoney(caja.monto_inicial)}</span>
+                      <span className="text-green-600">V. efectivo:</span>
+                      <span className="text-right font-semibold text-green-700">{formatMoney(caja.monto_ventas_efectivo)}</span>
+                      <span className="text-blue-600">V. transf.:</span>
+                      <span className="text-right font-semibold text-blue-700">{formatMoney(caja.monto_ventas_transferencia)}</span>
+                      <span className="text-red-600">Gastos:</span>
+                      <span className="text-right font-semibold text-red-700">{formatMoney(caja.monto_gastos)}</span>
+                      <span className="font-semibold text-gray-700">Esperado:</span>
+                      <span className="text-right font-bold text-gray-900">{formatMoney(caja.saldo_esperado)}</span>
+                      {caja.monto_cierre != null && (
+                        <>
+                          <span className="text-gray-500">Cierre real:</span>
+                          <span className="text-right font-semibold text-gray-900">{formatMoney(caja.monto_cierre)}</span>
+                        </>
+                      )}
+                      {caja.descuadre != null && (
+                        <>
+                          <span className="text-gray-500">Descuadre:</span>
+                          <span className={`text-right font-bold ${Math.abs(caja.descuadre) < 0.01 ? 'text-green-600' : caja.descuadre > 0 ? 'text-yellow-600' : 'text-red-600'}`}>
+                            {Math.abs(caja.descuadre) < 0.01 ? '✓ Cuadrado' : `${caja.descuadre > 0 ? '+' : ''}${formatMoney(caja.descuadre)}`}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => handleDelete(caja)}
-                        className="inline-flex items-center gap-1 rounded-md border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50"
+                        onClick={() => toggleExpand(caja)}
+                        className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Eliminar
+                        {expandedCajaId === caja.id ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                        Ventas
                       </button>
-                    )}
+                      <button
+                        type="button"
+                        onClick={() => openEditModal(caja)}
+                        className="inline-flex items-center gap-1 rounded-md bg-rosewood px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90"
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                        Editar
+                      </button>
+                      {isSuperadmin && (
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(caja)}
+                          className="inline-flex items-center gap-1 rounded-md border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Eliminar
+                        </button>
+                      )}
+                    </div>
                   </div>
+
+                  {expandedCajaId === caja.id && (
+                    <div className="border-t border-gray-100 bg-gray-50 px-4 py-3">
+                      {loadingVentas[caja.id] ? (
+                        <div className="flex items-center justify-center py-3">
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-rosewood border-t-transparent" />
+                          <span className="ml-2 text-sm text-gray-500">Cargando ventas...</span>
+                        </div>
+                      ) : ventasPorCaja[caja.id]?.length === 0 ? (
+                        <p className="py-3 text-center text-sm text-gray-500">No hay ventas en este turno.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {ventasPorCaja[caja.id].map((venta) => (
+                            <div key={venta.venta_id} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+                              <div className="flex items-start justify-between gap-2">
+                                <div>
+                                  <span className="font-semibold text-gray-900">#{venta.venta_id}</span>
+                                  <span className="ml-2 text-gray-600">{venta.cliente_nombre || 'Mostrador'}</span>
+                                </div>
+                                <span className="font-bold text-gray-900">{formatMoney(venta.total)}</span>
+                              </div>
+                              <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
+                                {venta.metodo_pago === 'efectivo' ? (
+                                  <span className="rounded-full bg-green-100 px-2 py-0.5 font-semibold text-green-700">Efectivo</span>
+                                ) : venta.metodo_pago === 'transferencia' ? (
+                                  <span className="rounded-full bg-blue-100 px-2 py-0.5 font-semibold text-blue-700">Transferencia</span>
+                                ) : (
+                                  <span className="rounded-full bg-gray-100 px-2 py-0.5 font-semibold text-gray-600">{venta.metodo_pago || '-'}</span>
+                                )}
+                                <span>{formatDateTime(venta.fecha)}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

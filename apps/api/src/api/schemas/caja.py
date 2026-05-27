@@ -46,6 +46,7 @@ class CierreCajaResponse(BaseModel):
     saldo_esperado: float
     total_ingresos: float
     esta_abierta: bool
+    descuadre: float | None = None
 
 
 class CajaEstadoResponse(BaseModel):
@@ -71,3 +72,4 @@ class CajaHistorialItemResponse(BaseModel):
     monto_cierre: float | None
     saldo_esperado: float
     esta_abierta: bool
+    descuadre: float | None = None

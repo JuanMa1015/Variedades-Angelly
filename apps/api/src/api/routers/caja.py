@@ -29,6 +29,7 @@ def _to_cierre_caja_response(cierre: CierreCajaModel) -> CierreCajaResponse:
     total_gastos = float(cierre.monto_gastos)
     monto_inicial = float(cierre.monto_inicial)
     esta_abierta = cierre.fecha_cierre is None
+    saldo_esperado = monto_inicial + total_ventas_efectivo + total_ventas_transferencia - total_gastos
 
     return CierreCajaResponse(
         id=cierre.id,
@@ -41,9 +42,11 @@ def _to_cierre_caja_response(cierre: CierreCajaModel) -> CierreCajaResponse:
         fecha_cierre=cierre.fecha_cierre,
         abierto_por=cierre.abierto_por,
         cerrado_por=cierre.cerrado_por,
-        saldo_esperado=monto_inicial + total_ventas_efectivo + total_ventas_transferencia - total_gastos,
+        saldo_esperado=saldo_esperado,
         total_ingresos=total_ventas_efectivo + total_ventas_transferencia,
         esta_abierta=esta_abierta,
+        descuadre=cierre.esperado_vs_real if cierre.esperado_vs_real is not None
+                  else (float(cierre.monto_cierre) - saldo_esperado if cierre.monto_cierre is not None else None),
     )
 
 
@@ -173,6 +176,8 @@ def caja_cierre(
     caja.fecha_cierre = datetime.now(UTC).replace(tzinfo=None)
     caja.cerrado_por = current_user.username
     caja.estado = "cerrada"
+    saldo_esperado = float(caja.monto_inicial + caja.monto_ventas_efectivo + caja.monto_ventas_transferencia - caja.monto_gastos)
+    caja.esperado_vs_real = float(payload.monto_cierre) - saldo_esperado
 
     db.commit()
     db.refresh(caja)
@@ -204,6 +209,7 @@ def caja_listar(
             monto_cierre=float(c.monto_cierre) if c.monto_cierre is not None else None,
             saldo_esperado=float(c.monto_inicial + c.monto_ventas_efectivo + c.monto_ventas_transferencia - c.monto_gastos),
             esta_abierta=c.fecha_cierre is None,
+            descuadre=float(c.esperado_vs_real) if c.esperado_vs_real is not None else None,
         )
         for c in cierres
     ]
