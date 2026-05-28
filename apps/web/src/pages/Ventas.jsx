@@ -354,6 +354,8 @@ const Ventas = () => {
 
   return (
     <div className="space-y-4">
+      <ErrorMessage message={error} onDismiss={() => setError('')} />
+      <SuccessMessage message={success} onDismiss={() => setSuccess('')} />
 
       {currentView === 'products' && (
         <ProductSelectionView
@@ -403,8 +405,6 @@ const Ventas = () => {
           onConfirmar={handleSubmitVenta}
           onGoToTicket={goToTicket}
           formatMoney={formatMoney}
-          success={success}
-          error={error}
           submittingVenta={submittingVenta}
           cartCount={cartCount}
         />

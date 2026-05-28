@@ -675,7 +675,7 @@ const Admin = ({ moduleKey = null }) => {
   // Gastos
   const handleCreateGasto = async (event) => {
     event.preventDefault();
-    if (Number(gastoForm.monto) < 0) {
+    if (Number(gastoForm.monto) <= 0) {
       notifyError('El monto no puede ser negativo');
       return;
     }

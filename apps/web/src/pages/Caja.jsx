@@ -54,45 +54,49 @@ const Caja = () => {
 
   const isSuperadmin = user?.role === 'superadmin';
 
-  const loadEstado = useCallback(async () => {
+  const loadEstado = useCallback(async (signal) => {
     if (!token) return;
 
     try {
       setLoading(true);
       setError('');
 
-      const payload = await fetchCajaEstado();
+      const payload = await fetchCajaEstado({ signal });
 
       setEstado(payload);
     } catch (err) {
+      if (err?.name === 'AbortError') return;
       setError(err.message || 'No se pudo cargar el estado de caja');
     } finally {
       setLoading(false);
     }
   }, [token]);
 
-  const loadHistorial = useCallback(async () => {
+  const loadHistorial = useCallback(async (signal) => {
     if (!token) return;
 
     try {
       setLoadingHistorial(true);
 
-      const payload = await fetchCajaHistorial();
+      const payload = await fetchCajaHistorial({ signal });
 
       setHistorial(Array.isArray(payload) ? payload : []);
     } catch (err) {
+      if (err?.name === 'AbortError') return;
       setError(err.message || 'No se pudo cargar el historial de caja');
     } finally {
       setLoadingHistorial(false);
     }
   }, [token]);
 
-  const loadAll = useCallback(async () => {
-    await Promise.all([loadEstado(), loadHistorial()]);
+  const loadAll = useCallback(async (signal) => {
+    await Promise.all([loadEstado(signal), loadHistorial(signal)]);
   }, [loadEstado, loadHistorial]);
 
   useEffect(() => {
-    loadAll();
+    const controller = new AbortController();
+    loadAll(controller.signal);
+    return () => controller.abort();
   }, [loadAll]);
 
   const cajaActual = estado?.caja_actual ?? null;

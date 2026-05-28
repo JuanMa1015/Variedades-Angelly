@@ -5,6 +5,7 @@ import { apiDelete, apiGet, apiPatch, apiPost } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage';
 import SuccessMessage from '../components/SuccessMessage';
 import Skeleton, { SkeletonCard } from '../components/Skeleton';
+import useConfirm from '../components/useConfirm';
 
 const MONEY_FORMATTER = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -43,6 +44,7 @@ const Inventario = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const { confirm, ConfirmModal } = useConfirm();
 
   const clearMessages = () => {
     setError('');
@@ -261,7 +263,8 @@ const Inventario = () => {
   };
 
   const handleDelete = async (producto) => {
-    if (!window.confirm(`¿Desactivar "${producto.nombre}"?`)) return;
+    const ok = await confirm({ message: `¿Desactivar "${producto.nombre}"?` });
+    if (!ok) return;
     clearMessages();
 
     try {
@@ -677,7 +680,7 @@ const Inventario = () => {
                 <th className="hidden px-4 py-3 text-left font-semibold text-gray-700 md:table-cell">Código</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700">Stock</th>
                 <th className="hidden px-4 py-3 text-left font-semibold text-gray-700 sm:table-cell">Mín</th>
-                <th className="hidden px-4 py-3 text-left font-semibold text-gray-700 lg:table-cell">Proveedor</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700">Proveedor</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700">Precio venta</th>
                 <th className="px-4 py-3 text-right font-semibold text-gray-700">Acciones</th>
               </tr>
@@ -702,7 +705,7 @@ const Inventario = () => {
                     <td className="hidden px-4 py-3 text-gray-700 md:table-cell">{producto.codigo_barras || '-'}</td>
                     <td className="px-4 py-3 text-gray-700">{producto.stock_actual}</td>
                     <td className="hidden px-4 py-3 text-gray-700 sm:table-cell">{producto.stock_minimo}</td>
-                    <td className="hidden px-4 py-3 text-gray-700 lg:table-cell">{producto.proveedor_nombre || '-'}</td>
+                    <td className="px-4 py-3 text-gray-700">{producto.proveedor_nombre || '-'}</td>
                     <td className="px-4 py-3 text-gray-700">{formatMoney(producto.precio_venta)}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex items-center gap-1">
@@ -731,6 +734,8 @@ const Inventario = () => {
           </table>
         </div>
       </section>
+
+      <ConfirmModal />
     </div>
   );
 };

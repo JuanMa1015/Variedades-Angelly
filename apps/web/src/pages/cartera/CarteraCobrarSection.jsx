@@ -49,6 +49,12 @@ const CarteraCobrarSection = ({
         </div>
       )}
 
+      {!loading && error && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-sm text-red-700 shadow-sm">
+          {error}
+        </div>
+      )}
+
       {!loading && !error && clientes.length === 0 && (
         <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center text-gray-600 shadow-sm">
           {searchTerm ? 'No se encontraron clientes' : 'No hay clientes para cobrar'}

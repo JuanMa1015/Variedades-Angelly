@@ -71,6 +71,7 @@ const EditFormModal = ({ isOpen, title, fields, initialValues, onSave, onClose }
                   type={field.type || 'text'}
                   value={formValues[field.name] ?? ''}
                   onChange={(e) => handleChange(field.name, e.target.value)}
+                  min={field.type === 'number' ? 0 : undefined}
                   className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm transition focus:border-[#eebbbb] focus:outline-none focus:ring-2 focus:ring-[#fbe3e3]"
                 />
               )}
