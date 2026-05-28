@@ -28,7 +28,7 @@ const CarteraCobrarSection = ({
             <h2 className="text-xl font-bold text-gray-900">Cobrar cartera</h2>
             <p className="text-sm text-gray-600">Administra los cobros de cartera.</p>
           </div>
-          <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">{clientes.length} clientes visibles</span>
+          <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">{loading ? '...' : `${clientes.length} clientes visibles`}</span>
         </div>
 
         <div className="relative mt-4">

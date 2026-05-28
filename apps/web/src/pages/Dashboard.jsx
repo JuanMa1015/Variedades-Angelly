@@ -168,6 +168,10 @@ const Dashboard = () => {
 
           <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
             <article className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+              {loading ? (
+                <Skeleton lines={6} />
+              ) : (
+                <>
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Módulo Cartera</p>
@@ -214,9 +218,15 @@ const Dashboard = () => {
               >
                 Abrir Cartera
               </Link>
+              </>
+              )}
             </article>
 
             <article className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+              {loading ? (
+                <Skeleton lines={6} />
+              ) : (
+                <>
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Módulo Ventas</p>
@@ -246,6 +256,8 @@ const Dashboard = () => {
               >
                 Abrir Ventas
               </Link>
+              </>
+              )}
             </article>
           </div>
         </section>
