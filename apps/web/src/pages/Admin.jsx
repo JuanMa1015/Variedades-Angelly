@@ -6,6 +6,7 @@ import ErrorMessage from '../components/ErrorMessage';
 import SuccessMessage from '../components/SuccessMessage';
 import useConfirm from '../components/useConfirm';
 import Skeleton from '../components/Skeleton';
+import Modal from '../components/Modal';
 import EditFormModal from '../components/EditFormModal';
 import { formatDateTime, formatMoney } from '../utils/format';
 
@@ -2140,17 +2141,7 @@ const Admin = ({ moduleKey = null }) => {
 
 
       {createDialog === CREATE_DIALOGS.vendedores && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="w-full max-w-2xl rounded-[28px] bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold text-[#6a3f43]">Crear vendedor</h3>
-                <p className="text-sm text-[#6a3f43]/70">Alta rápida desde modal.</p>
-              </div>
-              <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] p-2 text-[#6a3f43] transition hover:bg-[#fbe3e3]" aria-label="Cerrar modal">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-2xl" title="Crear vendedor" subtitle="Alta rápida desde modal.">
             <form onSubmit={handleCreateVendedor} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                <input value={vendedorForm.username} onChange={(e) => setVendedorForm((c) => ({ ...c, username: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Usuario" required />
                <input type="password" value={vendedorForm.password} onChange={(e) => setVendedorForm((c) => ({ ...c, password: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Contraseña" required />
@@ -2159,22 +2150,11 @@ const Admin = ({ moduleKey = null }) => {
                 <button type="submit" disabled={saving} className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear vendedor</button>
               </div>
             </form>
-          </div>
-        </div>
+      </Modal>
       )}
 
       {createDialog === CREATE_DIALOGS.admins && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="w-full max-w-2xl rounded-[28px] bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold text-[#6a3f43]">Crear admin</h3>
-                <p className="text-sm text-[#6a3f43]/70">Alta rápida desde modal.</p>
-              </div>
-              <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] p-2 text-[#6a3f43] transition hover:bg-[#fbe3e3]" aria-label="Cerrar modal">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-2xl" title="Crear admin" subtitle="Alta rápida desde modal.">
             <form onSubmit={handleCreateAdmin} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                <input value={adminForm.username} onChange={(e) => setAdminForm((c) => ({ ...c, username: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Usuario" required />
                <input type="password" value={adminForm.password} onChange={(e) => setAdminForm((c) => ({ ...c, password: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Contraseña" required />
@@ -2183,22 +2163,11 @@ const Admin = ({ moduleKey = null }) => {
                 <button type="submit" disabled={saving} className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear admin</button>
               </div>
             </form>
-          </div>
-        </div>
+      </Modal>
       )}
 
       {createDialog === CREATE_DIALOGS.productos && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="w-full max-w-4xl rounded-[28px] bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold text-[#6a3f43]">Crear producto</h3>
-                <p className="text-sm text-[#6a3f43]/70">Alta rápida desde modal.</p>
-              </div>
-              <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] p-2 text-[#6a3f43] transition hover:bg-[#fbe3e3]" aria-label="Cerrar modal">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-4xl" title="Crear producto" subtitle="Alta rápida desde modal.">
             <form onSubmit={handleCreateProducto} className="grid grid-cols-1 gap-3 md:grid-cols-3">
               <input value={productoForm.nombre} onChange={(e) => setProductoForm((c) => ({ ...c, nombre: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Nombre" required />
               <input value={productoForm.codigo_barras} onChange={(e) => setProductoForm((c) => ({ ...c, codigo_barras: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Código barras" />
@@ -2215,22 +2184,11 @@ const Admin = ({ moduleKey = null }) => {
                 <button type="submit" disabled={saving} className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear producto</button>
               </div>
             </form>
-          </div>
-        </div>
+      </Modal>
       )}
 
       {createDialog === CREATE_DIALOGS.proveedores && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="w-full max-w-2xl rounded-[28px] bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold text-[#6a3f43]">Crear proveedor</h3>
-                <p className="text-sm text-[#6a3f43]/70">Alta rápida desde modal.</p>
-              </div>
-              <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] p-2 text-[#6a3f43] transition hover:bg-[#fbe3e3]" aria-label="Cerrar modal">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-2xl" title="Crear proveedor" subtitle="Alta rápida desde modal.">
             <form onSubmit={handleCreateProveedor} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <input value={proveedorForm.nombre} onChange={(e) => setProveedorForm((c) => ({ ...c, nombre: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Nombre" required />
               <input value={proveedorForm.contacto} onChange={(e) => setProveedorForm((c) => ({ ...c, contacto: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Contacto" />
@@ -2240,22 +2198,11 @@ const Admin = ({ moduleKey = null }) => {
                 <button type="submit" disabled={saving} className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear proveedor</button>
               </div>
             </form>
-          </div>
-        </div>
+      </Modal>
       )}
 
       {createDialog === CREATE_DIALOGS.auditorias && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="w-full max-w-3xl rounded-[28px] bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold text-[#6a3f43]">Crear auditoria</h3>
-                <p className="text-sm text-[#6a3f43]/70">Alta rápida desde modal.</p>
-              </div>
-              <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] p-2 text-[#6a3f43] transition hover:bg-[#fbe3e3]" aria-label="Cerrar modal">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-3xl" title="Crear auditoria" subtitle="Alta rápida desde modal.">
             <form onSubmit={handleCreateAuditoria} className="grid grid-cols-1 gap-3 md:grid-cols-2">
                <input value={auditoriaForm.modulo} onChange={(e) => setAuditoriaForm((c) => ({ ...c, modulo: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Módulo" required />
                <input value={auditoriaForm.entidad} onChange={(e) => setAuditoriaForm((c) => ({ ...c, entidad: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Entidad" required />
@@ -2267,21 +2214,10 @@ const Admin = ({ moduleKey = null }) => {
                 <button type="submit" disabled={saving} className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear auditoria</button>
               </div>
             </form>
-          </div>
-        </div>
+      </Modal>
       )}
       {createDialog === CREATE_DIALOGS.clientes_cartera && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="w-full max-w-2xl rounded-[28px] bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold text-[#6a3f43]">Crear cliente cartera</h3>
-                <p className="text-sm text-[#6a3f43]/70">Alta rápida desde modal.</p>
-              </div>
-              <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] p-2 text-[#6a3f43] transition hover:bg-[#fbe3e3]" aria-label="Cerrar modal">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-2xl" title="Crear cliente cartera" subtitle="Alta rápida desde modal.">
             <form onSubmit={handleCreateClienteCartera} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <input value={clienteCarteraForm.nombre} onChange={(e) => setClienteCarteraForm((c) => ({ ...c, nombre: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Nombre" required />
               <input value={clienteCarteraForm.documento} onChange={(e) => setClienteCarteraForm((c) => ({ ...c, documento: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Documento (opcional)" />
@@ -2292,22 +2228,11 @@ const Admin = ({ moduleKey = null }) => {
                 <button type="submit" disabled={saving} className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear cliente</button>
               </div>
             </form>
-          </div>
-        </div>
+      </Modal>
       )}
 
       {createDialog === CREATE_DIALOGS.clientes_tienda && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="w-full max-w-2xl rounded-[28px] bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold text-[#6a3f43]">Crear cliente tienda</h3>
-                <p className="text-sm text-[#6a3f43]/70">Alta rápida desde modal.</p>
-              </div>
-              <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] p-2 text-[#6a3f43] transition hover:bg-[#fbe3e3]" aria-label="Cerrar modal">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-2xl" title="Crear cliente tienda" subtitle="Alta rápida desde modal.">
             <form onSubmit={handleCreateClienteTienda} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <input value={clienteTiendaForm.nombre} onChange={(e) => setClienteTiendaForm((c) => ({ ...c, nombre: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Nombre" required />
               <input value={clienteTiendaForm.telefono_whatsapp} onChange={(e) => setClienteTiendaForm((c) => ({ ...c, telefono_whatsapp: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Teléfono (opcional)" />
@@ -2316,22 +2241,11 @@ const Admin = ({ moduleKey = null }) => {
                 <button type="submit" disabled={saving} className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear cliente</button>
               </div>
             </form>
-          </div>
-        </div>
+      </Modal>
       )}
 
       {createDialog === CREATE_DIALOGS.clientes_fidelizacion && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="w-full max-w-2xl rounded-[28px] bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold text-[#6a3f43]">Crear cliente fidelizacion</h3>
-                <p className="text-sm text-[#6a3f43]/70">Alta rápida desde modal.</p>
-              </div>
-              <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] p-2 text-[#6a3f43] transition hover:bg-[#fbe3e3]" aria-label="Cerrar modal">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-2xl" title="Crear cliente fidelizacion" subtitle="Alta rápida desde modal.">
             <form onSubmit={handleCreateClienteFidelizacion} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <input value={clienteFidelizacionForm.nombre} onChange={(e) => setClienteFidelizacionForm((c) => ({ ...c, nombre: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Nombre" required />
               <input value={clienteFidelizacionForm.telefono_whatsapp} onChange={(e) => setClienteFidelizacionForm((c) => ({ ...c, telefono_whatsapp: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Teléfono" />
@@ -2341,22 +2255,11 @@ const Admin = ({ moduleKey = null }) => {
                 <button type="submit" disabled={saving} className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear cliente</button>
               </div>
             </form>
-          </div>
-        </div>
+      </Modal>
       )}
 
       {createDialog === CREATE_DIALOGS.ventas && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="w-full max-w-3xl rounded-[28px] bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold text-[#6a3f43]">Crear venta</h3>
-                <p className="text-sm text-[#6a3f43]/70">Alta rápida desde modal. Use JSON en 'items' similar a: {'[{"producto_id":1,"cantidad":2,"precio":10000}]'}</p>
-              </div>
-              <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] p-2 text-[#6a3f43] transition hover:bg-[#fbe3e3]" aria-label="Cerrar modal">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-3xl" title="Crear venta" subtitle={`Alta rápida desde modal. Use JSON en 'items' similar a: {'[{"producto_id":1,"cantidad":2,"precio":10000}]'}`}>
             <form onSubmit={handleCreateVenta} className="grid grid-cols-1 gap-3">
                <input value={ventaForm.cliente_id} onChange={(e) => setVentaForm((c) => ({ ...c, cliente_id: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="ID del cliente (opcional)" />
                <textarea value={ventaForm.items_json} onChange={(e) => setVentaForm((c) => ({ ...c, items_json: e.target.value }))} className="min-h-28 rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder='[{"producto_id":1,"cantidad":2}]' />
@@ -2365,22 +2268,11 @@ const Admin = ({ moduleKey = null }) => {
                 <button type="submit" disabled={saving} className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear venta</button>
               </div>
             </form>
-          </div>
-        </div>
+      </Modal>
       )}
 
       {createDialog === CREATE_DIALOGS.pedidos_proveedor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="w-full max-w-2xl rounded-[28px] bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold text-[#6a3f43]">Crear pedido proveedor</h3>
-                <p className="text-sm text-[#6a3f43]/70">Alta rápida desde modal.</p>
-              </div>
-              <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] p-2 text-[#6a3f43] transition hover:bg-[#fbe3e3]" aria-label="Cerrar modal">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-2xl" title="Crear pedido proveedor" subtitle="Alta rápida desde modal.">
             <form onSubmit={handleCreatePedidoProveedor} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <input value={pedidoProveedorForm.proveedor_id} onChange={(e) => setPedidoProveedorForm((c) => ({ ...c, proveedor_id: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="ID del proveedor" required />
               <input value={pedidoProveedorForm.descripcion} onChange={(e) => setPedidoProveedorForm((c) => ({ ...c, descripcion: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Descripción" required />
@@ -2390,22 +2282,11 @@ const Admin = ({ moduleKey = null }) => {
                 <button type="submit" disabled={saving} className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear pedido</button>
               </div>
             </form>
-          </div>
-        </div>
+      </Modal>
       )}
 
       {createDialog === CREATE_DIALOGS.facturas_compra && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="w-full max-w-3xl rounded-[28px] bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold text-[#6a3f43]">Crear factura compra</h3>
-                <p className="text-sm text-[#6a3f43]/70">Alta rápida desde modal. Items como JSON en 'items'.</p>
-              </div>
-              <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] p-2 text-[#6a3f43] transition hover:bg-[#fbe3e3]" aria-label="Cerrar modal">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-3xl" title="Crear factura compra" subtitle="Alta rápida desde modal. Items como JSON en 'items'.">
             <form onSubmit={handleCreateFacturaCompra} className="grid grid-cols-1 gap-3">
                <input value={facturaCompraForm.proveedor_id} onChange={(e) => setFacturaCompraForm((c) => ({ ...c, proveedor_id: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="ID del proveedor" required />
                <textarea value={facturaCompraForm.items_json} onChange={(e) => setFacturaCompraForm((c) => ({ ...c, items_json: e.target.value }))} className="min-h-28 rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder='[{"producto_id":1,"cantidad":2}]' />
@@ -2414,22 +2295,11 @@ const Admin = ({ moduleKey = null }) => {
                 <button type="submit" disabled={saving} className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear factura</button>
               </div>
             </form>
-          </div>
-        </div>
+      </Modal>
       )}
 
       {createDialog === CREATE_DIALOGS.gastos && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="w-full max-w-2xl rounded-[28px] bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold text-[#6a3f43]">Crear gasto</h3>
-                <p className="text-sm text-[#6a3f43]/70">Alta rápida desde modal.</p>
-              </div>
-              <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] p-2 text-[#6a3f43] transition hover:bg-[#fbe3e3]" aria-label="Cerrar modal">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-2xl" title="Crear gasto" subtitle="Alta rápida desde modal.">
             <form onSubmit={handleCreateGasto} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <input value={gastoForm.categoria} onChange={(e) => setGastoForm((c) => ({ ...c, categoria: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Categoria" required />
               <input value={gastoForm.descripcion} onChange={(e) => setGastoForm((c) => ({ ...c, descripcion: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Descripcion" />
@@ -2439,22 +2309,11 @@ const Admin = ({ moduleKey = null }) => {
                 <button type="submit" disabled={saving} className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear gasto</button>
               </div>
             </form>
-          </div>
-        </div>
+      </Modal>
       )}
 
       {createDialog === CREATE_DIALOGS.abonos_cartera && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="w-full max-w-2xl rounded-[28px] bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold text-[#6a3f43]">Crear abono cartera</h3>
-                <p className="text-sm text-[#6a3f43]/70">Alta rápida desde modal.</p>
-              </div>
-              <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] p-2 text-[#6a3f43] transition hover:bg-[#fbe3e3]" aria-label="Cerrar modal">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-2xl" title="Crear abono cartera" subtitle="Alta rápida desde modal.">
             <form onSubmit={handleCreateAbonoCartera} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <input type="number" min="1" value={abonoCarteraForm.cliente_id} onChange={(e) => setAbonoCarteraForm((c) => ({ ...c, cliente_id: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="ID del cliente" required />
               <input type="number" min="0" step="0.01" value={abonoCarteraForm.monto} onChange={(e) => setAbonoCarteraForm((c) => ({ ...c, monto: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Monto" required />
@@ -2468,8 +2327,7 @@ const Admin = ({ moduleKey = null }) => {
                 <button type="submit" disabled={saving} className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear abono</button>
               </div>
             </form>
-          </div>
-        </div>
+      </Modal>
       )}
       {ConfirmModal}
       <EditFormModal

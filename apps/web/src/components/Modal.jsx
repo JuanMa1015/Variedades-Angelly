@@ -1,6 +1,6 @@
 import { X } from 'lucide-react';
 
-const Modal = ({ isOpen, onClose, title, maxWidth = 'max-w-lg', variant = 'default', children }) => {
+const Modal = ({ isOpen, onClose, title, subtitle, maxWidth = 'max-w-lg', variant = 'default', children }) => {
   if (!isOpen) return null;
 
   const backdropClass = variant === 'admin' ? 'bg-black/45' : 'bg-black/50';
@@ -15,7 +15,14 @@ const Modal = ({ isOpen, onClose, title, maxWidth = 'max-w-lg', variant = 'defau
     <div className={`fixed inset-0 z-50 flex items-center justify-center ${backdropClass} px-4 py-6`} onClick={onClose}>
       <div className={containerClass} onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-start justify-between gap-3">
-          <h3 className={`text-xl font-bold ${variant === 'admin' ? 'text-[#6a3f43]' : 'text-gray-900'}`}>{title}</h3>
+          {subtitle ? (
+            <div>
+              <h3 className={`text-xl font-bold ${variant === 'admin' ? 'text-[#6a3f43]' : 'text-gray-900'}`}>{title}</h3>
+              <p className={`text-sm ${variant === 'admin' ? 'text-[#6a3f43]/70' : 'text-gray-500'}`}>{subtitle}</p>
+            </div>
+          ) : (
+            <h3 className={`text-xl font-bold ${variant === 'admin' ? 'text-[#6a3f43]' : 'text-gray-900'}`}>{title}</h3>
+          )}
           <button type="button" onClick={onClose} className={closeBtnClass} aria-label="Cerrar modal">
             <X className="h-5 w-5" />
           </button>
