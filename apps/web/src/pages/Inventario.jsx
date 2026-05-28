@@ -6,14 +6,7 @@ import ErrorMessage from '../components/ErrorMessage';
 import SuccessMessage from '../components/SuccessMessage';
 import Skeleton, { SkeletonCard } from '../components/Skeleton';
 import useConfirm from '../components/useConfirm';
-
-const MONEY_FORMATTER = new Intl.NumberFormat('es-CO', {
-  style: 'currency',
-  currency: 'COP',
-  maximumFractionDigits: 0,
-});
-
-const formatMoney = (value) => MONEY_FORMATTER.format(Number(value || 0));
+import { formatMoney } from '../utils/format';
 
 const EMPTY_MANUAL_FORM = { nombre: '', codigo_barras: '', precio_costo: '', precio_venta: '', stock_actual: '', stock_minimo: '', proveedor_id: '' };
 

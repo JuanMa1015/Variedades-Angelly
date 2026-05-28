@@ -5,14 +5,7 @@ import { apiGet, apiPost } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage'
 import SuccessMessage from '../components/SuccessMessage'
 import Skeleton from '../components/Skeleton'
-
-const MONEY_FORMATTER = new Intl.NumberFormat('es-CO', {
-  style: 'currency',
-  currency: 'COP',
-  maximumFractionDigits: 0,
-});
-
-const formatMoney = (value) => MONEY_FORMATTER.format(Number(value || 0));
+import { formatMoney } from '../utils/format';
 
 const formatDateTime = (value) => {
   const date = new Date(value);

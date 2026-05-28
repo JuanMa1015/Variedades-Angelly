@@ -7,14 +7,7 @@ import SuccessMessage from '../components/SuccessMessage';
 import useConfirm from '../components/useConfirm';
 import Skeleton from '../components/Skeleton';
 import EditFormModal from '../components/EditFormModal';
-
-const MONEY_FORMATTER = new Intl.NumberFormat('es-CO', {
-  style: 'currency',
-  currency: 'COP',
-  maximumFractionDigits: 0,
-});
-
-const formatMoney = (value) => MONEY_FORMATTER.format(Number(value || 0));
+import { formatMoney } from '../utils/format';
 
 const formatDateTime = (value) => {
   const date = new Date(value);

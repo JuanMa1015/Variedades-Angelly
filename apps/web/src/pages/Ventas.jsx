@@ -7,14 +7,7 @@ import SuccessMessage from '../components/SuccessMessage';
 import ProductSelectionView from './Ventas/ProductSelectionView';
 import TicketReviewView from './Ventas/TicketReviewView';
 import CheckoutView from './Ventas/CheckoutView';
-
-const MONEY_FORMATTER = new Intl.NumberFormat('es-CO', {
-  style: 'currency',
-  currency: 'COP',
-  maximumFractionDigits: 0,
-});
-
-const formatMoney = (value) => MONEY_FORMATTER.format(Number(value || 0));
+import { formatMoney } from '../utils/format';
 
 const fetchJson = async ({ endpoint, signal, errorMessage }) => {
   try {

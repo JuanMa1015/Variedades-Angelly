@@ -5,12 +5,7 @@ import { useAuth } from '../auth/AuthContext';
 import { apiGet } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage'
 import Skeleton from '../components/Skeleton'
-
-const MONEY_FORMATTER = new Intl.NumberFormat('es-CO', {
-  style: 'currency',
-  currency: 'COP',
-  maximumFractionDigits: 0,
-});
+import { formatMoney } from '../utils/format';
 
 const emptyResumen = {
   ventas_diarias: 0,
@@ -30,8 +25,6 @@ const emptyCarteraResumen = {
   clientes_alto_riesgo: 0,
   clientes_riesgo_medio: 0,
 };
-
-const formatMoney = (value) => MONEY_FORMATTER.format(Number(value || 0));
 
 const formatDateTime = (value) => {
   const date = new Date(value);
