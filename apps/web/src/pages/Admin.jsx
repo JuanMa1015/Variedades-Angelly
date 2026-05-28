@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { ChevronDown, ChevronRight, Database, PencilLine, Plus, RefreshCw, Shield, Trash2, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { apiDelete, apiRequest } from '../api/httpClient';
@@ -75,7 +76,9 @@ const CREATE_DIALOGS = {
   auditorias: 'auditorias',
 };
 
-const Admin = ({ moduleKey = null }) => {
+const Admin = ({ moduleKey: moduleKeyProp }) => {
+  const { moduleKey: moduleKeyParam } = useParams();
+  const moduleKey = moduleKeyProp ?? moduleKeyParam ?? null;
   const { token, isSuperAdmin } = useAuth();
 
   const [activeTab, setActiveTab] = useState(moduleKey ?? 'productos');
