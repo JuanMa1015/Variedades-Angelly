@@ -8,6 +8,7 @@ import ProductSelectionView from './Ventas/ProductSelectionView';
 import TicketReviewView from './Ventas/TicketReviewView';
 import CheckoutView from './Ventas/CheckoutView';
 import { formatMoney } from '../utils/format';
+import Modal from '../components/Modal';
 
 const fetchJson = async ({ endpoint, signal, errorMessage }) => {
   try {

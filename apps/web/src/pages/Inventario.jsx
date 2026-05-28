@@ -7,6 +7,7 @@ import SuccessMessage from '../components/SuccessMessage';
 import Skeleton, { SkeletonCard } from '../components/Skeleton';
 import useConfirm from '../components/useConfirm';
 import { formatMoney } from '../utils/format';
+import Modal from '../components/Modal';
 
 const EMPTY_MANUAL_FORM = { nombre: '', codigo_barras: '', precio_costo: '', precio_venta: '', stock_actual: '', stock_minimo: '', proveedor_id: '' };
 
@@ -324,20 +325,7 @@ const Inventario = () => {
         </div>
       </section>
 
-      {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
-          <div className="w-full max-w-4xl rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h3 className="text-xl font-bold text-gray-900">Agregar producto al inventario</h3>
-              <button
-                type="button"
-                onClick={() => setIsCreateModalOpen(false)}
-                className="rounded-full border border-gray-200 p-2 text-gray-500 transition hover:bg-gray-50 hover:text-gray-700"
-                aria-label="Cerrar modal"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+      <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Agregar producto al inventario" maxWidth="max-w-4xl">
 
             <div className="mb-4 flex flex-wrap gap-2">
               <button
@@ -494,23 +482,9 @@ const Inventario = () => {
                 </button>
               </form>
             )}
-          </div>
-        </div>
-      )}
+      </Modal>
 
-      {editingProducto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h3 className="text-xl font-bold text-gray-900">Editar producto</h3>
-              <button
-                type="button"
-                onClick={() => setEditingProducto(null)}
-                className="rounded-full border border-gray-200 p-2 text-gray-500 transition hover:bg-gray-50 hover:text-gray-700"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+      <Modal isOpen={editingProducto !== null} onClose={() => setEditingProducto(null)} title="Editar producto">
 
             <form className="space-y-3" onSubmit={handleSubmitEdit}>
               <input
@@ -581,9 +555,7 @@ const Inventario = () => {
                 {saving ? 'Guardando...' : 'Guardar cambios'}
               </button>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         {loading ? (

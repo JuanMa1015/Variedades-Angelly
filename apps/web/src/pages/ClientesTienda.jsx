@@ -7,6 +7,7 @@ import ErrorMessage from '../components/ErrorMessage'
 import SuccessMessage from '../components/SuccessMessage'
 import useConfirm from '../components/useConfirm'
 import Skeleton from '../components/Skeleton'
+import Modal from '../components/Modal';
 
 const PAGE_SIZE = 10;
 
@@ -212,20 +213,7 @@ const ClientesTienda = () => {
         </div>
       </section>
 
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6" onClick={() => { if (!editingId) setIsModalOpen(false); }}>
-          <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl sm:p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h3 className="text-xl font-bold text-gray-900">{editingId ? 'Editar cliente' : 'Nuevo cliente'}</h3>
-              <button
-                type="button"
-                onClick={resetForm}
-                className="rounded-full border border-gray-200 p-2 text-gray-500 transition hover:bg-gray-50 hover:text-gray-700"
-                aria-label="Cerrar modal"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+      <Modal isOpen={isModalOpen} onClose={resetForm} title={editingId ? 'Editar cliente' : 'Nuevo cliente'}>
 
             {error && (
               <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
@@ -275,9 +263,7 @@ const ClientesTienda = () => {
                 {saving ? 'Guardando...' : editingId ? 'Actualizar' : 'Guardar'}
               </button>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">

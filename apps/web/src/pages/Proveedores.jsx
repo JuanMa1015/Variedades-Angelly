@@ -6,6 +6,7 @@ import ErrorMessage from '../components/ErrorMessage'
 import SuccessMessage from '../components/SuccessMessage'
 import Skeleton from '../components/Skeleton'
 import { formatMoney } from '../utils/format';
+import Modal from '../components/Modal';
 
 const formatDateTime = (value) => {
   const date = new Date(value);
@@ -384,34 +385,6 @@ const Proveedores = () => {
         </div>
       </div>
 
-      {loading ? (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5"><Skeleton lines={2} /></div>
-          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5"><Skeleton lines={2} /></div>
-          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5"><Skeleton lines={2} /></div>
-          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5"><Skeleton lines={2} /></div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Activos</p>
-            <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">{resumen.proveedoresActivos}</p>
-          </div>
-          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Pedidos</p>
-            <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">{resumen.pedidosEmitidos}</p>
-          </div>
-          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Monto solicitado</p>
-            <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">{formatMoney(resumen.montoSolicitado)}</p>
-          </div>
-          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">WhatsApp</p>
-            <p className="mt-2 text-2xl font-bold text-emerald-700 sm:text-3xl">{resumen.pedidosConWhatsapp}</p>
-          </div>
-        </div>
-      )}
-
       <ErrorMessage message={error} onDismiss={() => setError('')} />
       <SuccessMessage message={success} onDismiss={() => setSuccess('')} />
 
@@ -432,20 +405,7 @@ const Proveedores = () => {
         </div>
       </section>
 
-      {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6" onClick={() => setIsCreateModalOpen(false)}>
-          <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl sm:p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h3 className="text-xl font-bold text-gray-900">Nuevo proveedor</h3>
-              <button
-                type="button"
-                onClick={() => setIsCreateModalOpen(false)}
-                className="rounded-full border border-gray-200 p-2 text-gray-500 transition hover:bg-gray-50 hover:text-gray-700"
-                aria-label="Cerrar modal"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+      <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Nuevo proveedor">
 
             <form className="space-y-3" onSubmit={handleCreateProveedor}>
               <input
@@ -483,9 +443,7 @@ const Proveedores = () => {
                 {savingProveedor ? 'Guardando proveedor...' : 'Guardar proveedor'}
               </button>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
 
         <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
           <h2 className="mb-4 text-xl font-bold text-gray-900">Crear pedido a proveedor</h2>
