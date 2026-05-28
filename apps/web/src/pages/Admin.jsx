@@ -101,6 +101,7 @@ const Admin = ({ moduleKey = null }) => {
   const [expandedRole, setExpandedRole] = useState('Vendedor');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -322,6 +323,7 @@ const Admin = ({ moduleKey = null }) => {
       notifyError('El limite de credito no puede ser negativo');
       return;
     }
+    setSaving(true);
     try {
       await request({
         endpoint: '/api/cartera/clientes',
@@ -339,6 +341,8 @@ const Admin = ({ moduleKey = null }) => {
       notifySuccess('Cliente creado');
     } catch (err) {
       notifyError(err.message || 'No se pudo crear cliente');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -384,6 +388,7 @@ const Admin = ({ moduleKey = null }) => {
   // Clientes tienda fiado
   const handleCreateClienteTienda = async (event) => {
     event.preventDefault();
+    setSaving(true);
     try {
       await request({
         endpoint: '/api/clientes/tienda-fiado',
@@ -399,6 +404,8 @@ const Admin = ({ moduleKey = null }) => {
       notifySuccess('Cliente tienda creado');
     } catch (err) {
       notifyError(err.message || 'No se pudo crear cliente tienda');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -444,6 +451,7 @@ const Admin = ({ moduleKey = null }) => {
       notifyError('Los puntos acumulados no pueden ser negativos');
       return;
     }
+    setSaving(true);
     try {
       await request({
         endpoint: '/api/fidelizacion/clientes',
@@ -460,6 +468,8 @@ const Admin = ({ moduleKey = null }) => {
       notifySuccess('Cliente fidelizacion creado');
     } catch (err) {
       notifyError(err.message || 'No se pudo crear cliente fidelizacion');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -507,6 +517,7 @@ const Admin = ({ moduleKey = null }) => {
   // Ventas
   const handleCreateVenta = async (event) => {
     event.preventDefault();
+    setSaving(true);
     try {
       const items = parseItemsJson(ventaForm.items_json);
       await request({
@@ -528,6 +539,8 @@ const Admin = ({ moduleKey = null }) => {
       notifySuccess('Venta creada');
     } catch (err) {
       notifyError(err.message || 'No se pudo crear venta');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -568,6 +581,7 @@ const Admin = ({ moduleKey = null }) => {
   // Pedidos proveedor
   const handleCreatePedidoProveedor = async (event) => {
     event.preventDefault();
+    setSaving(true);
     try {
       await request({
         endpoint: '/api/proveedores/pedidos',
@@ -584,6 +598,8 @@ const Admin = ({ moduleKey = null }) => {
       notifySuccess('Pedido creado');
     } catch (err) {
       notifyError(err.message || 'No se pudo crear pedido');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -623,6 +639,7 @@ const Admin = ({ moduleKey = null }) => {
   // Facturas compra
   const handleCreateFacturaCompra = async (event) => {
     event.preventDefault();
+    setSaving(true);
     try {
       const items = parseItemsJson(facturaCompraForm.items_json);
       await request({
@@ -639,6 +656,8 @@ const Admin = ({ moduleKey = null }) => {
       notifySuccess('Factura creada');
     } catch (err) {
       notifyError(err.message || 'No se pudo crear factura');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -679,6 +698,7 @@ const Admin = ({ moduleKey = null }) => {
       notifyError('El monto no puede ser negativo');
       return;
     }
+    setSaving(true);
     try {
       await request({
         endpoint: '/api/gastos',
@@ -695,6 +715,8 @@ const Admin = ({ moduleKey = null }) => {
       notifySuccess('Gasto creado');
     } catch (err) {
       notifyError(err.message || 'No se pudo crear gasto');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -735,6 +757,7 @@ const Admin = ({ moduleKey = null }) => {
   // Abonos cartera
   const handleCreateAbonoCartera = async (event) => {
     event.preventDefault();
+    setSaving(true);
     try {
       await request({
         endpoint: '/api/cartera/abonos',
@@ -752,6 +775,8 @@ const Admin = ({ moduleKey = null }) => {
       notifySuccess('Abono creado');
     } catch (err) {
       notifyError(err.message || 'No se pudo crear abono');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -788,6 +813,7 @@ const Admin = ({ moduleKey = null }) => {
   // Admins
   const handleCreateAdmin = async (event) => {
     event.preventDefault();
+    setSaving(true);
     try {
       await request({
         endpoint: '/api/superadmin/usuarios/admins',
@@ -800,6 +826,8 @@ const Admin = ({ moduleKey = null }) => {
       notifySuccess('Admin creado');
     } catch (err) {
       notifyError(err.message || 'No se pudo crear admin');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -840,6 +868,7 @@ const Admin = ({ moduleKey = null }) => {
   // Vendedores
   const handleCreateVendedor = async (event) => {
     event.preventDefault();
+    setSaving(true);
     try {
       await request({
         endpoint: '/api/superadmin/usuarios/vendedores',
@@ -852,6 +881,8 @@ const Admin = ({ moduleKey = null }) => {
       notifySuccess('Vendedor creado');
     } catch (err) {
       notifyError(err.message || 'No se pudo crear vendedor');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -908,6 +939,7 @@ const Admin = ({ moduleKey = null }) => {
       notifyError('El stock minimo no puede ser negativo');
       return;
     }
+    setSaving(true);
     try {
       await request({
         endpoint: '/api/superadmin/productos',
@@ -928,6 +960,8 @@ const Admin = ({ moduleKey = null }) => {
       notifySuccess('Producto creado');
     } catch (err) {
       notifyError(err.message || 'No se pudo crear producto');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -966,6 +1000,7 @@ const Admin = ({ moduleKey = null }) => {
   // Proveedores
   const handleCreateProveedor = async (event) => {
     event.preventDefault();
+    setSaving(true);
     try {
       await request({
         endpoint: '/api/superadmin/proveedores',
@@ -982,6 +1017,8 @@ const Admin = ({ moduleKey = null }) => {
       notifySuccess('Proveedor creado');
     } catch (err) {
       notifyError(err.message || 'No se pudo crear proveedor');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -1019,6 +1056,7 @@ const Admin = ({ moduleKey = null }) => {
   // Auditorias
   const handleCreateAuditoria = async (event) => {
     event.preventDefault();
+    setSaving(true);
     try {
       await request({
         endpoint: '/api/superadmin/auditorias',
@@ -1038,6 +1076,8 @@ const Admin = ({ moduleKey = null }) => {
       notifySuccess('Auditoria creada');
     } catch (err) {
       notifyError(err.message || 'No se pudo crear auditoria');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -2136,7 +2176,7 @@ const Admin = ({ moduleKey = null }) => {
                <input type="password" value={vendedorForm.password} onChange={(e) => setVendedorForm((c) => ({ ...c, password: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Contraseña" required />
               <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
                 <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
-                <button type="submit" className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear vendedor</button>
+                <button type="submit" disabled={saving} className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear vendedor</button>
               </div>
             </form>
           </div>
@@ -2160,7 +2200,7 @@ const Admin = ({ moduleKey = null }) => {
                <input type="password" value={adminForm.password} onChange={(e) => setAdminForm((c) => ({ ...c, password: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Contraseña" required />
               <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
                 <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
-                <button type="submit" className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear admin</button>
+                <button type="submit" disabled={saving} className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear admin</button>
               </div>
             </form>
           </div>
@@ -2192,7 +2232,7 @@ const Admin = ({ moduleKey = null }) => {
               <input type="number" min="0" value={productoForm.stock_minimo} onChange={(e) => setProductoForm((c) => ({ ...c, stock_minimo: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Stock minimo" />
               <div className="md:col-span-3 flex justify-end gap-2 pt-2">
                 <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
-                <button type="submit" className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear producto</button>
+                <button type="submit" disabled={saving} className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear producto</button>
               </div>
             </form>
           </div>
@@ -2217,7 +2257,7 @@ const Admin = ({ moduleKey = null }) => {
               <input value={proveedorForm.telefono} onChange={(e) => setProveedorForm((c) => ({ ...c, telefono: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Telefono" />
               <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
                 <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
-                <button type="submit" className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear proveedor</button>
+                <button type="submit" disabled={saving} className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear proveedor</button>
               </div>
             </form>
           </div>
@@ -2244,7 +2284,7 @@ const Admin = ({ moduleKey = null }) => {
               <textarea value={auditoriaForm.detalle} onChange={(e) => setAuditoriaForm((c) => ({ ...c, detalle: e.target.value }))} className="min-h-28 rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none md:col-span-2" placeholder="Detalle" />
               <div className="md:col-span-2 flex justify-end gap-2 pt-2">
                 <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
-                <button type="submit" className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear auditoria</button>
+                <button type="submit" disabled={saving} className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear auditoria</button>
               </div>
             </form>
           </div>
@@ -2269,7 +2309,7 @@ const Admin = ({ moduleKey = null }) => {
               <input type="number" min="0" value={clienteCarteraForm.limite_credito} onChange={(e) => setClienteCarteraForm((c) => ({ ...c, limite_credito: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Límite crédito" />
               <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
                 <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
-                <button type="submit" className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear cliente</button>
+                <button type="submit" disabled={saving} className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear cliente</button>
               </div>
             </form>
           </div>
@@ -2293,7 +2333,7 @@ const Admin = ({ moduleKey = null }) => {
               <input value={clienteTiendaForm.telefono_whatsapp} onChange={(e) => setClienteTiendaForm((c) => ({ ...c, telefono_whatsapp: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Teléfono (opcional)" />
               <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
                 <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
-                <button type="submit" className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear cliente</button>
+                <button type="submit" disabled={saving} className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear cliente</button>
               </div>
             </form>
           </div>
@@ -2318,7 +2358,7 @@ const Admin = ({ moduleKey = null }) => {
               <input type="number" min="0" value={clienteFidelizacionForm.puntos_acumulados} onChange={(e) => setClienteFidelizacionForm((c) => ({ ...c, puntos_acumulados: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Puntos" />
               <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
                 <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
-                <button type="submit" className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear cliente</button>
+                <button type="submit" disabled={saving} className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear cliente</button>
               </div>
             </form>
           </div>
@@ -2342,7 +2382,7 @@ const Admin = ({ moduleKey = null }) => {
                <textarea value={ventaForm.items_json} onChange={(e) => setVentaForm((c) => ({ ...c, items_json: e.target.value }))} className="min-h-28 rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder='[{"producto_id":1,"cantidad":2}]' />
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
-                <button type="submit" className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear venta</button>
+                <button type="submit" disabled={saving} className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear venta</button>
               </div>
             </form>
           </div>
@@ -2367,7 +2407,7 @@ const Admin = ({ moduleKey = null }) => {
               <input type="number" min="0" value={pedidoProveedorForm.monto_estimado} onChange={(e) => setPedidoProveedorForm((c) => ({ ...c, monto_estimado: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Monto estimado" />
               <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
                 <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
-                <button type="submit" className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear pedido</button>
+                <button type="submit" disabled={saving} className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear pedido</button>
               </div>
             </form>
           </div>
@@ -2391,7 +2431,7 @@ const Admin = ({ moduleKey = null }) => {
                <textarea value={facturaCompraForm.items_json} onChange={(e) => setFacturaCompraForm((c) => ({ ...c, items_json: e.target.value }))} className="min-h-28 rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder='[{"producto_id":1,"cantidad":2}]' />
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
-                <button type="submit" className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear factura</button>
+                <button type="submit" disabled={saving} className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear factura</button>
               </div>
             </form>
           </div>
@@ -2416,7 +2456,7 @@ const Admin = ({ moduleKey = null }) => {
               <input type="number" min="0" value={gastoForm.monto} onChange={(e) => setGastoForm((c) => ({ ...c, monto: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Monto" required />
               <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
                 <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
-                <button type="submit" className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear gasto</button>
+                <button type="submit" disabled={saving} className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear gasto</button>
               </div>
             </form>
           </div>
@@ -2445,7 +2485,7 @@ const Admin = ({ moduleKey = null }) => {
               <input value={abonoCarteraForm.referencia} onChange={(e) => setAbonoCarteraForm((c) => ({ ...c, referencia: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Referencia (opcional)" />
               <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
                 <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
-                <button type="submit" className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear abono</button>
+                <button type="submit" disabled={saving} className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear abono</button>
               </div>
             </form>
           </div>
