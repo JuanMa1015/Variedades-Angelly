@@ -5,19 +5,7 @@ import { apiGet, apiPost } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage'
 import SuccessMessage from '../components/SuccessMessage'
 import Skeleton from '../components/Skeleton'
-import { formatMoney } from '../utils/format';
-
-const formatDate = (dateStr) => {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('es-CO', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
+import { formatDate, formatMoney } from '../utils/format';
 
 const EMPTY_ITEM = {
   producto_id: '',
