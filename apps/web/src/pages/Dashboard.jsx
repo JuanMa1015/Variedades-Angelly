@@ -5,7 +5,7 @@ import { useAuth } from '../auth/AuthContext';
 import { apiGet } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage'
 import Skeleton from '../components/Skeleton'
-import { formatMoney } from '../utils/format';
+import { formatDateTime, formatMoney } from '../utils/format';
 
 const emptyResumen = {
   ventas_diarias: 0,
@@ -24,19 +24,6 @@ const emptyCarteraResumen = {
   deuda_total: 0,
   clientes_alto_riesgo: 0,
   clientes_riesgo_medio: 0,
-};
-
-const formatDateTime = (value) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '-';
-  return date.toLocaleString('es-CO', {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'America/Bogota',
-  });
 };
 
 const Dashboard = () => {

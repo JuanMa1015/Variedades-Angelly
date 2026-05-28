@@ -7,20 +7,7 @@ import SuccessMessage from '../components/SuccessMessage';
 import useConfirm from '../components/useConfirm';
 import Skeleton from '../components/Skeleton';
 import EditFormModal from '../components/EditFormModal';
-import { formatMoney } from '../utils/format';
-
-const formatDateTime = (value) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '-';
-  return date.toLocaleString('es-CO', {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'America/Bogota',
-  });
-};
+import { formatDateTime, formatMoney } from '../utils/format';
 
 const ROLE_GROUPS = [
   {

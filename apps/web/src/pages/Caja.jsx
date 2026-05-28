@@ -6,22 +6,8 @@ import ErrorMessage from '../components/ErrorMessage'
 import SuccessMessage from '../components/SuccessMessage'
 import Skeleton, { SkeletonCard } from '../components/Skeleton'
 import useConfirm from '../components/useConfirm'
-import { formatMoney } from '../utils/format';
+import { formatDateTime, formatMoney } from '../utils/format';
 import Modal from '../components/Modal';
-
-const formatDateTime = (value) => {
-  if (value == null) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '-';
-  return date.toLocaleString('es-CO', {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'America/Bogota',
-  });
-};
 
 const Caja = () => {
   const { token, user } = useAuth();
