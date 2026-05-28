@@ -196,8 +196,8 @@ const Facturas = () => {
         @media print {
           body * { visibility: hidden !important; }
           #print-ticket, #print-ticket * { visibility: visible !important; }
-          #print-ticket { position: fixed !important; left: 0 !important; top: 0 !important; width: 100% !important; height: 100% !important; display: flex !important; align-items: center !important; justify-content: center !important; background: white !important; z-index: 99999 !important; }
-          #print-ticket > div { width: 80mm !important; max-width: 80mm !important; border: none !important; box-shadow: none !important; padding: 8px 4px !important; }
+          #print-ticket { position: fixed !important; left: 0 !important; top: 0 !important; width: 210mm !important; height: 297mm !important; background: white !important; z-index: 99999 !important; display: block !important; padding: 20mm 15mm !important; }
+          #print-ticket > div { width: 100% !important; max-width: 100% !important; border: none !important; box-shadow: none !important; padding: 0 !important; }
           .no-print { display: none !important; }
         }
       `}</style>
@@ -404,72 +404,80 @@ const Facturas = () => {
       </section>
 
       {selectedPrintFactura && (
-        <div id="print-ticket" className="fixed inset-0 z-50 flex items-center justify-center bg-white/95 print:static print:inset-auto print:z-auto">
-          <div className="w-[80mm] max-w-sm rounded-xl border border-gray-300 bg-white p-6 shadow-2xl print:border-0 print:shadow-none print:p-4">
-            <div className="mb-4 text-center">
-              <h2 className="text-lg font-bold uppercase tracking-wide text-gray-900">Variedades Angelly</h2>
-              <p className="text-xs text-gray-600">NIT: 123.456.789-0</p>
-              <p className="text-xs text-gray-600">Carrera XX #YY-ZZ, Ciudad</p>
-              <p className="text-xs text-gray-600">Tel: (123) 456-7890</p>
+        <div id="print-ticket" className="fixed inset-0 z-50 flex items-start justify-center bg-white/95 print:static print:inset-auto print:z-auto print:items-start">
+          <div className="w-[80mm] rounded-xl border border-gray-300 bg-white p-6 shadow-2xl print:w-full print:max-w-none print:border-0 print:shadow-none print:p-0">
+            <div className="text-center print:mb-8">
+              <h2 className="text-lg font-bold uppercase tracking-wide text-gray-900 print:text-2xl">Variedades Angelly</h2>
+              <p className="text-xs text-gray-600 print:text-sm">NIT: 123.456.789-0</p>
+              <p className="text-xs text-gray-600 print:text-sm">Carrera XX #YY-ZZ, Ciudad</p>
+              <p className="text-xs text-gray-600 print:text-sm">Tel: (123) 456-7890</p>
             </div>
 
-            <div className="mb-3 border-t border-dashed border-gray-400" />
+            <div className="my-3 border-t border-dashed border-gray-400 print:my-6 print:border-gray-300" />
 
-            <div className="mb-2 text-center">
-              <h3 className="text-sm font-bold uppercase tracking-wide text-gray-900">Factura de Compra</h3>
-              <p className="text-xs text-gray-600">#{selectedPrintFactura.id}</p>
+            <div className="mb-4">
+              <h3 className="text-center text-sm font-bold uppercase tracking-wide text-gray-900 print:text-lg">Factura de Compra</h3>
+              <p className="text-center text-xs text-gray-600 print:text-sm">No. {selectedPrintFactura.id}</p>
             </div>
 
-            <div className="mb-3 border-t border-dashed border-gray-400" />
+            <div className="my-3 border-t border-dashed border-gray-400 print:my-4 print:border-gray-300" />
 
-            <div className="mb-2 space-y-0.5 text-xs text-gray-700">
+            <div className="mb-4 space-y-1 text-xs text-gray-700 print:grid print:grid-cols-2 print:gap-2 print:text-sm">
               <p><span className="font-semibold">Proveedor:</span> {selectedPrintFactura.proveedor_nombre}</p>
               <p><span className="font-semibold">Fecha:</span> {formatDate(selectedPrintFactura.fecha_creacion)}</p>
             </div>
 
-            <div className="mb-1 border-t border-dashed border-gray-400" />
+            <div className="my-3 border-t border-dashed border-gray-400 print:my-4 print:border-gray-300" />
 
-            <div className="grid grid-cols-[2fr_1fr_1fr] gap-x-1 gap-y-0.5 text-xs font-semibold text-gray-700">
-              <span>Producto</span>
-              <span className="text-right">Cant</span>
-              <span className="text-right">Precio</span>
-            </div>
+            <table className="w-full text-xs text-gray-700 print:text-sm">
+              <thead>
+                <tr className="border-b border-gray-300 font-semibold text-gray-900">
+                  <th className="py-1 text-left print:py-2">Producto</th>
+                  <th className="py-1 text-right print:py-2">Cant</th>
+                  <th className="py-1 text-right print:py-2">Precio unit.</th>
+                  <th className="py-1 text-right print:py-2">Subtotal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Array.isArray(selectedPrintFactura.items) && selectedPrintFactura.items.map((item, idx) => {
+                  const cantidad = Number(item.cantidad || 0);
+                  const precio = Number(item.precio_unitario || 0);
+                  const subtotal = cantidad * precio;
+                  return (
+                    <tr key={idx} className="border-b border-gray-100">
+                      <td className="py-1 pr-2 print:py-1.5">{item.producto_nombre || `Producto #${item.producto_id}`}</td>
+                      <td className="py-1 text-right print:py-1.5">{cantidad}</td>
+                      <td className="py-1 text-right print:py-1.5">{formatMoney(precio)}</td>
+                      <td className="py-1 text-right font-medium print:py-1.5">{formatMoney(subtotal)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
 
-            <div className="mb-1 border-b border-dashed border-gray-400" />
+            <div className="my-3 border-t border-dashed border-gray-400 print:my-4 print:border-gray-300" />
 
-            <div className="space-y-0.5 text-xs text-gray-700">
-              {Array.isArray(selectedPrintFactura.items) && selectedPrintFactura.items.map((item, idx) => (
-                <div key={idx} className="grid grid-cols-[2fr_1fr_1fr] gap-x-1">
-                  <span className="truncate">{item.producto_nombre || `Producto #${item.producto_id}`}</span>
-                  <span className="text-right">{item.cantidad}</span>
-                  <span className="text-right">{formatMoney(item.precio_unitario || 0)}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="my-2 border-t border-dashed border-gray-400" />
-
-            <div className="space-y-0.5 text-xs text-gray-700">
+            <div className="space-y-1 text-xs text-gray-700 print:ml-auto print:w-72 print:text-sm">
               <div className="flex justify-between">
                 <span>Subtotal:</span>
-                <span className="font-semibold">{formatMoney(selectedPrintFactura.subtotal || 0)}</span>
+                <span>{formatMoney(selectedPrintFactura.subtotal || 0)}</span>
               </div>
               <div className="flex justify-between">
                 <span>IVA (19%):</span>
-                <span className="font-semibold">{formatMoney(selectedPrintFactura.total_iva || 0)}</span>
+                <span>{formatMoney(selectedPrintFactura.total_iva || 0)}</span>
               </div>
             </div>
 
-            <div className="my-2 border-t border-double border-gray-800" />
+            <div className="my-3 border-t border-double border-gray-800 print:my-4" />
 
-            <div className="flex justify-between text-sm font-bold text-gray-900">
+            <div className="flex justify-between text-sm font-bold text-gray-900 print:text-lg">
               <span>TOTAL:</span>
               <span>{formatMoney(selectedPrintFactura.total_factura || 0)}</span>
             </div>
 
-            <div className="mt-4 border-t border-dashed border-gray-400" />
+            <div className="mt-8 border-t border-gray-300" />
 
-            <p className="mt-3 text-center text-xs text-gray-500">¡Gracias por su preferencia!</p>
+            <p className="mt-2 text-center text-xs text-gray-500 print:text-sm">¡Gracias por su preferencia!</p>
 
             <button
               type="button"
