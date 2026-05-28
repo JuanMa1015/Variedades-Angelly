@@ -114,11 +114,11 @@ const Sidebar = ({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMobile })
       )}
 
       <aside
-        className={`fixed left-0 top-0 z-40 flex h-dvh flex-col border-r border-[#eebbbb] bg-[linear-gradient(180deg,#fdf1f1_0%,#fbe3e3_50%,#f9d6d5_100%)] shadow-[0_28px_80px_rgba(106,63,67,0.12)] backdrop-blur transition-all duration-300 ease-in-out w-[min(88vw,19rem)] md:w-[18rem] lg:w-[19rem] ${isMobileOpen ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0 pointer-events-none'} ${isCollapsed ? 'md:-translate-x-full md:opacity-0 md:pointer-events-none' : 'md:translate-x-0 md:opacity-100 md:pointer-events-auto'}`}>
-        <div className="flex h-16 items-center justify-between border-b border-[#eebbbb] px-4">
+        className={`fixed left-0 top-0 z-40 flex h-dvh flex-col border-r border-blush-300 bg-[linear-gradient(180deg,#fdf1f1_0%,#fbe3e3_50%,#f9d6d5_100%)] shadow-[0_28px_80px_rgba(106,63,67,0.12)] backdrop-blur transition-all duration-300 ease-in-out w-[min(88vw,19rem)] md:w-[18rem] lg:w-[19rem] ${isMobileOpen ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0 pointer-events-none'} ${isCollapsed ? 'md:-translate-x-full md:opacity-0 md:pointer-events-none' : 'md:translate-x-0 md:opacity-100 md:pointer-events-auto'}`}>
+        <div className="flex h-16 items-center justify-between border-b border-blush-300 px-4">
           <div className={`${isCollapsed ? 'md:hidden' : 'block'}`}>
-            <h2 className="text-lg font-black tracking-tight text-[#6a3f43]">Angelly</h2>
-            <p className="text-[11px] uppercase tracking-[0.22em] text-[#a9646a]">Panel operativo</p>
+            <h2 className="text-lg font-black tracking-tight text-rosewood">Angelly</h2>
+            <p className="text-[11px] uppercase tracking-[0.22em] text-rosewood/80">Panel operativo</p>
           </div>
 
           {isCollapsed && (
@@ -131,7 +131,7 @@ const Sidebar = ({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMobile })
             type="button"
             aria-label="Cerrar menú"
             onClick={onCloseMobile}
-            className="inline-flex items-center justify-center rounded-full border border-[#eebbbb] p-2 text-[#6a3f43] hover:bg-[#fbe3e3] md:hidden"
+            className="inline-flex items-center justify-center rounded-full border border-blush-300 p-2 text-rosewood hover:bg-blush-50 md:hidden"
           >
             <X className="h-4 w-4" />
           </button>
@@ -139,14 +139,14 @@ const Sidebar = ({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMobile })
 
         <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-4">
           {user?.role === 'superadmin' && (
-            <div className="mx-1 rounded-2xl border border-[#e6b4b7] bg-white/70 px-3 py-2 text-xs text-[#6a3f43] shadow-sm">
-              <p className="uppercase tracking-[0.18em] text-[#a9646a]">Módulo activo</p>
+            <div className="mx-1 rounded-2xl border border-[#e6b4b7] bg-white/70 px-3 py-2 text-xs text-rosewood shadow-sm">
+              <p className="uppercase tracking-[0.18em] text-rosewood/80">Módulo activo</p>
               <p className="mt-1 text-sm font-bold">{currentModule}</p>
             </div>
           )}
           {sections.map((section) => (
             <div key={section.title} className="space-y-2">
-              <div className="px-3 text-xs font-bold uppercase text-[#a9646a]/90">{section.title}</div>
+              <div className="px-3 text-xs font-bold uppercase text-rosewood/80/90">{section.title}</div>
               <div className="space-y-2">
                 {section.items.map((item) => {
                   const Icon = item.icon;
@@ -157,16 +157,16 @@ const Sidebar = ({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMobile })
                       to={item.path}
                       className={`group flex items-center gap-3 rounded-2xl px-4 py-3 transition-all duration-200 ${
                         active
-                          ? 'border border-[#eebbbb] bg-white/75 text-[#6a3f43] shadow-sm'
-                          : 'border border-transparent text-[#6a3f43]/75 hover:border-[#eebbbb] hover:bg-white/55'
+                          ? 'border border-blush-300 bg-white/75 text-rosewood shadow-sm'
+                          : 'border border-transparent text-rosewood/75 hover:border-blush-300 hover:bg-white/55'
                       }`}
                       title={isCollapsed ? item.label : ''}
                       onClick={onCloseMobile}
                     >
-                      <Icon className="h-5 w-5 flex-shrink-0 text-[#a9646a] transition group-hover:text-[#6a3f43]" />
+                      <Icon className="h-5 w-5 flex-shrink-0 text-rosewood/80 transition group-hover:text-rosewood" />
                       <div className={`flex flex-1 flex-col ${isCollapsed ? 'md:hidden' : ''}`}>
                         <span className="text-sm font-semibold">{item.label}</span>
-                        <span className="text-xs text-[#6a3f43]/60">{item.description}</span>
+                        <span className="text-xs text-rosewood/60">{item.description}</span>
                       </div>
                     </Link>
                   );
@@ -176,10 +176,10 @@ const Sidebar = ({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMobile })
           ))}
         </nav>
 
-        <div className="space-y-2 border-t border-[#eebbbb] p-2">
+        <div className="space-y-2 border-t border-blush-300 p-2">
           <button
             onClick={handleLogout}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-white/80 px-4 py-3 text-[#6a3f43] transition-colors duration-200 hover:bg-white"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-white/80 px-4 py-3 text-rosewood transition-colors duration-200 hover:bg-white"
             title="Cerrar sesión"
           >
             <LogOut className="h-5 w-5" />
@@ -188,7 +188,7 @@ const Sidebar = ({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMobile })
 
           <button
             onClick={onToggleCollapse}
-            className="hidden w-full items-center justify-center gap-2 rounded-2xl bg-white/70 px-4 py-3 text-[#6a3f43] transition-colors duration-200 hover:bg-white md:flex"
+            className="hidden w-full items-center justify-center gap-2 rounded-2xl bg-white/70 px-4 py-3 text-rosewood transition-colors duration-200 hover:bg-white md:flex"
             title={isCollapsed ? 'Expandir' : 'Contraer'}
           >
             {isCollapsed ? (

@@ -62,7 +62,7 @@ const EditFormModal = ({ isOpen, title, fields, initialValues, onSave, onClose }
                   ref={i === 0 ? firstInputRef : null}
                   value={formValues[field.name] ?? ''}
                   onChange={(e) => handleChange(field.name, e.target.value)}
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm transition focus:border-[#eebbbb] focus:outline-none focus:ring-2 focus:ring-[#fbe3e3]"
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm transition focus:border-blush-300 focus:outline-none focus:ring-2 focus:ring-blush-50"
                   rows={3}
                 />
               ) : (
@@ -72,7 +72,7 @@ const EditFormModal = ({ isOpen, title, fields, initialValues, onSave, onClose }
                   value={formValues[field.name] ?? ''}
                   onChange={(e) => handleChange(field.name, e.target.value)}
                   min={field.type === 'number' ? 0 : undefined}
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm transition focus:border-[#eebbbb] focus:outline-none focus:ring-2 focus:ring-[#fbe3e3]"
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm transition focus:border-blush-300 focus:outline-none focus:ring-2 focus:ring-blush-50"
                 />
               )}
             </div>
@@ -82,14 +82,14 @@ const EditFormModal = ({ isOpen, title, fields, initialValues, onSave, onClose }
             <button
               type="button"
               onClick={onClose}
-              className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]"
+              className="rounded-full border border-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-50"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7] disabled:opacity-50"
+              className="rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-[#f6c8c7] disabled:opacity-50"
             >
               {saving ? 'Guardando...' : 'Guardar'}
             </button>

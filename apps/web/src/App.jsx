@@ -48,10 +48,10 @@ function App() {
       <ToastProvider>
         <BrowserRouter>
           <Suspense fallback={
-            <div className="flex h-screen items-center justify-center bg-[#fdf1f1]">
+            <div className="flex h-screen items-center justify-center bg-blush-50">
               <div className="text-center">
-                <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-[#eebbbb] border-t-[#6a3f43]" />
-                <p className="mt-4 text-sm text-[#6a3f43]/70">Cargando...</p>
+                <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-blush-300 border-t-rosewood" />
+                <p className="mt-4 text-sm text-rosewood/70">Cargando...</p>
               </div>
             </div>
           }>
