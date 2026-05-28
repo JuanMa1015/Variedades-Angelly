@@ -90,7 +90,7 @@ const normalizeWhatsappNumber = (rawValue) => {
 const formatMoney = (value) => MONEY_FORMATTER.format(Number(value || 0));
 const formatMoneyWhatsapp = (value) => {
   const num = Number(value || 0);
-  return `$${Math.round(num).toLocaleString('es-CO', { useGrouping: false, maximumFractionDigits: 0 })}`;
+  return `$${Math.round(num).toLocaleString('es-CO', { maximumFractionDigits: 0 })}`;
 };
 
 export const useCarteraData = () => {
@@ -430,7 +430,7 @@ export const useCarteraData = () => {
         productosRegistrados = ventas
           .filter((v) => v.articulo)
           .slice(0, 5)
-          .map((v) => `- ${v.articulo} ($${Math.round(Number(v.monto)).toLocaleString('es-CO', { useGrouping: false, maximumFractionDigits: 0 })})`)
+          .map((v) => `- ${v.articulo} (${formatMoneyWhatsapp(v.monto)})`)
           .join('\n');
       }
     } catch {

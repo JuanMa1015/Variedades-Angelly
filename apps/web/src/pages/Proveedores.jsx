@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Plus, Truck, X } from 'lucide-react';
+import { CheckCircle2, Plus, Trash2, Truck, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { apiGet, apiPost } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage'
@@ -110,6 +110,12 @@ const Proveedores = () => {
     [proveedores],
   );
 
+  const productosFiltrados = useMemo(() => {
+    const proveedorId = Number(pedidoForm.proveedor_id);
+    if (!proveedorId) return [];
+    return productos.filter((p) => Number(p.proveedor_id) === proveedorId);
+  }, [productos, pedidoForm.proveedor_id]);
+
   const loadData = useCallback(
     async (signal) => {
       if (!token) return;
@@ -218,10 +224,15 @@ const Proveedores = () => {
   };
 
   const handlePedidoChange = (key, value) => {
-    setPedidoForm((current) => ({
-      ...current,
-      [key]: value,
-    }));
+    setPedidoForm((current) => {
+      if (key === 'proveedor_id' && value !== current.proveedor_id) {
+        return {
+          proveedor_id: value,
+          items: [{ producto_id: '', cantidad: 1 }],
+        };
+      }
+      return { ...current, [key]: value };
+    });
   };
 
   const handlePedidoItemChange = (index, key, value) => {
@@ -501,6 +512,10 @@ const Proveedores = () => {
             </select>
 
               <div className="space-y-2 rounded-xl border border-gray-200 p-3">
+                {!pedidoForm.proveedor_id ? (
+                  <p className="py-4 text-center text-sm text-gray-400">Selecciona un proveedor primero</p>
+                ) : (
+                  <>
                 {pedidoForm.items.map((item, index) => (
                     <div key={`pedido-item-${index}`} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_90px_36px]">
                   <select
@@ -509,11 +524,15 @@ const Proveedores = () => {
                     className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
                   >
                     <option value="">Selecciona producto</option>
-                    {productos.map((producto) => (
+                    {productosFiltrados.length === 0 ? (
+                      <option value="" disabled>No hay productos para este proveedor</option>
+                    ) : (
+                      productosFiltrados.map((producto) => (
                       <option key={producto.id} value={producto.id}>
                         {producto.nombre}
                       </option>
-                    ))}
+                      ))
+                    )}
                   </select>
 
                   <input
@@ -528,9 +547,10 @@ const Proveedores = () => {
                   <button
                     type="button"
                     onClick={() => handleRemovePedidoItem(index)}
-                    className="flex items-center justify-center rounded-lg border border-gray-300 px-2 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    className="flex items-center justify-center rounded-lg border border-red-200 p-2 text-red-600 transition hover:bg-red-50"
+                    title="Eliminar producto"
                   >
-                    -
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
               ))}
@@ -538,10 +558,13 @@ const Proveedores = () => {
               <button
                 type="button"
                 onClick={handleAddPedidoItem}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                className="w-full rounded-lg border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
               >
+                <Plus className="mr-1.5 inline h-4 w-4" />
                 Agregar producto
               </button>
+                  </>
+                )}
             </div>
 
             <button
