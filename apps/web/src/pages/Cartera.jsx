@@ -51,7 +51,6 @@ const Cartera = () => {
     setProductoForm,
     isClienteModalOpen,
     isProductoModalOpen,
-    setIsProductoModalOpen,
     editingClienteId,
     editingProductoId,
     savingCliente,

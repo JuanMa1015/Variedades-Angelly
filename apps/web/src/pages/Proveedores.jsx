@@ -172,26 +172,6 @@ const Proveedores = () => {
     return () => controller.abort();
   }, [loadData, token]);
 
-  const resumen = useMemo(() => {
-    const proveedoresActivos = proveedores.filter((item) => Boolean(item.activo)).length;
-    const pedidosEmitidos = pedidos.length;
-    const montoSolicitado = pedidos.reduce(
-      (acc, item) => acc + Number(item.monto_estimado || 0),
-      0,
-    );
-    const pedidosConWhatsapp = pedidos.filter((item) => {
-      const proveedor = proveedoresById.get(Number(item.proveedor_id));
-      return Boolean(normalizeWhatsappNumber(proveedor?.telefono));
-    }).length;
-
-    return {
-      proveedoresActivos,
-      pedidosEmitidos,
-      montoSolicitado,
-      pedidosConWhatsapp,
-    };
-  }, [pedidos, proveedores, proveedoresById]);
-
   const clearMessages = () => {
     setError('');
     setSuccess('');

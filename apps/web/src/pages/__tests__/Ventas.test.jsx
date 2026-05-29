@@ -4,7 +4,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const apiGetMock = vi.hoisted(() => vi.fn());
 const apiPostMock = vi.hoisted(() => vi.fn());
 const useAuthMock = vi.hoisted(() => vi.fn());
-const formatMoneyMock = vi.hoisted(() => vi.fn((val) => `$${Number(val || 0).toLocaleString('es-CO')}`));
 
 vi.mock('../../api/httpClient', () => ({
   apiGet: apiGetMock,
@@ -16,7 +15,7 @@ vi.mock('../../auth/AuthContext', () => ({
 }));
 
 vi.mock('../Ventas/ProductSelectionView', () => ({
-  default: ({ productos, cart, onAddItem, onGoToTicket, formatMoney, loading }) => (
+  default: ({ productos, cart, onAddItem, onGoToTicket, loading }) => (
     <div data-testid="product-selection">
       <h2>Product Selection</h2>
       <p>Products: {productos.length}</p>
@@ -57,7 +56,7 @@ vi.mock('../Ventas/TicketReviewView', () => ({
 vi.mock('../Ventas/CheckoutView', () => ({
   default: ({
     totalEstimado, esFiado, onSetEsFiado, montoPago, onSetMontoPago,
-    metodoPago, onSetMetodoPago, clientesTiendaFiado, clienteTiendaId,
+    clientesTiendaFiado, clienteTiendaId,
     onSetClienteTiendaId, onCrearCliente, onConfirmar, onGoToTicket,
     formatMoney, submittingVenta, cartCount,
   }) => (
@@ -77,9 +76,7 @@ vi.mock('../Ventas/CheckoutView', () => ({
         value={montoPago}
         onChange={(e) => onSetMontoPago(Number(e.target.value))}
       />
-      <button data-testid="metodo-pago" onClick={() => onSetMetodoPago('nequi')}>
-        Nequi
-      </button>
+
       <select
         data-testid="cliente-select"
         value={clienteTiendaId}
@@ -125,12 +122,6 @@ const mockApiGet = () => {
     if (endpoint === '/api/clientes/tienda-fiado') return Promise.resolve(validClientes);
     return Promise.resolve([]);
   });
-};
-
-const renderVentas = () => {
-  useAuthMock.mockReturnValue({ token: 'fake-token' });
-  mockApiGet();
-  return render(<Ventas />);
 };
 
 describe('Ventas page', () => {

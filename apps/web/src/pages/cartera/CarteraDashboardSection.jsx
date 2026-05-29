@@ -119,7 +119,7 @@ const CarteraDashboardSection = ({
           </div>
 
           <div className="mt-4 space-y-3">
-            {clientesRanking.map((cliente, index) => {
+            {clientesRanking.map((cliente) => {
               const deuda = Number(cliente.deuda_total || 0);
               const nivel = nivelDeuda(deuda);
               const porcentaje = Math.min(100, (deuda / DEUDA_MAX_REF) * 100);
