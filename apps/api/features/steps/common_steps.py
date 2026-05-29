@@ -52,6 +52,25 @@ def step_existen_productos(context):
                 precio_venta=int(row["precio_venta"]),
                 stock_actual=int(row["stock_actual"]),
                 stock_minimo=int(row["stock_minimo"]),
+                codigo_barras=row.get("codigo_barras") or None,
+                catalogo=row.get("catalogo", "tienda"),
+            )
+            session.add(producto)
+        session.commit()
+
+
+@given("existe un producto:")
+def step_existe_producto(context):
+    with context.db_session() as session:
+        for row in context.table:
+            producto = ProductoModel(
+                nombre=row["nombre"],
+                precio_costo=int(row["precio_costo"]),
+                precio_venta=int(row["precio_venta"]),
+                stock_actual=int(row["stock_actual"]),
+                stock_minimo=int(row["stock_minimo"]),
+                codigo_barras=row.get("codigo_barras") or None,
+                catalogo=row.get("catalogo", "tienda"),
             )
             session.add(producto)
         session.commit()
@@ -269,4 +288,69 @@ def step_saldo_cliente(context, nombre, saldo):
         assert cliente is not None, f"Cliente '{nombre}' no encontrado"
         assert cliente.deuda_total == float(saldo), (
             f"Expected saldo {saldo}, got {cliente.deuda_total}"
+        )
+
+
+@when('creo un producto con nombre "{nombre}" codigo_barras "{codigo}" precio_costo {costo:d} precio_venta {venta:d} stock_actual {stock:d} stock_minimo {minimo:d} catalogo "{catalogo}"')
+def step_crear_producto(context, nombre, codigo, costo, venta, stock, minimo, catalogo):
+    context.response = context.client.post(
+        "/api/productos",
+        headers={"Authorization": f"Bearer {context.token}"},
+        json={
+            "nombre": nombre,
+            "codigo_barras": codigo or None,
+            "precio_costo": costo,
+            "precio_venta": venta,
+            "stock_actual": stock,
+            "stock_minimo": minimo,
+            "catalogo": catalogo,
+        },
+    )
+
+
+@when('intento crear un producto con nombre "{nombre}" codigo_barras "{codigo}" precio_costo {costo:d} precio_venta {venta:d} stock_actual {stock:d} stock_minimo {minimo:d} catalogo "{catalogo}"')
+def step_intentar_crear_producto(context, nombre, codigo, costo, venta, stock, minimo, catalogo):
+    context.response = context.client.post(
+        "/api/productos",
+        headers={"Authorization": f"Bearer {context.token}"},
+        json={
+            "nombre": nombre,
+            "codigo_barras": codigo or None,
+            "precio_costo": costo,
+            "precio_venta": venta,
+            "stock_actual": stock,
+            "stock_minimo": minimo,
+            "catalogo": catalogo,
+        },
+    )
+
+
+@when('actualizo el precio del producto "{nombre}" a {precio:d}')
+def step_actualizar_precio_producto(context, nombre, precio):
+    producto_id = _producto_id(context, nombre)
+    context.response = context.client.patch(
+        f"/api/productos/{producto_id}",
+        headers={"Authorization": f"Bearer {context.token}"},
+        json={"precio_venta": precio},
+    )
+
+
+@when('elimino el producto "{nombre}"')
+def step_eliminar_producto(context, nombre):
+    producto_id = _producto_id(context, nombre)
+    context.response = context.client.delete(
+        f"/api/productos/{producto_id}",
+        headers={"Authorization": f"Bearer {context.token}"},
+    )
+
+
+@then('el producto "{nombre}" tiene precio_venta {precio:d}')
+def step_producto_precio(context, nombre, precio):
+    with context.db_session() as session:
+        producto = session.execute(
+            select(ProductoModel).where(ProductoModel.nombre == nombre),
+        ).scalar_one_or_none()
+        assert producto is not None, f"Producto '{nombre}' no encontrado"
+        assert producto.precio_venta == precio, (
+            f"Expected precio_venta {precio}, got {producto.precio_venta}"
         )
