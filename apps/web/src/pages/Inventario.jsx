@@ -5,21 +5,17 @@ import { apiDelete, apiGet, apiPatch, apiPost } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage';
 import SuccessMessage from '../components/SuccessMessage';
 import Skeleton, { SkeletonCard } from '../components/Skeleton';
+import useConfirm from '../components/useConfirm';
+import { formatMoney } from '../utils/format';
+import Modal from '../components/Modal';
 
-const MONEY_FORMATTER = new Intl.NumberFormat('es-CO', {
-  style: 'currency',
-  currency: 'COP',
-  maximumFractionDigits: 0,
-});
-
-const formatMoney = (value) => MONEY_FORMATTER.format(Number(value || 0));
-
-const EMPTY_MANUAL_FORM = { nombre: '', codigo_barras: '', precio_costo: '', precio_venta: '', stock_actual: '', stock_minimo: '' };
+const EMPTY_MANUAL_FORM = { nombre: '', codigo_barras: '', precio_costo: '', precio_venta: '', stock_actual: '', stock_minimo: '', proveedor_id: '' };
 
 const Inventario = () => {
   const { token } = useAuth();
 
   const [productos, setProductos] = useState([]);
+  const [proveedores, setProveedores] = useState([]);
   const [activeMode, setActiveMode] = useState('manual');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingProducto, setEditingProducto] = useState(null);
@@ -34,6 +30,7 @@ const Inventario = () => {
     precio_costo: '',
     precio_venta: '',
     stock_actual: '',
+    proveedor_id: '',
   });
 
   const [editForm, setEditForm] = useState({ ...EMPTY_MANUAL_FORM });
@@ -41,6 +38,7 @@ const Inventario = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const { confirm, ConfirmModal } = useConfirm();
 
   const clearMessages = () => {
     setError('');
@@ -54,9 +52,17 @@ const Inventario = () => {
     setProductos(Array.isArray(payload) ? payload : []);
   }, [token]);
 
+  const loadProveedores = useCallback(async (signal) => {
+    if (!token) return;
+    const payload = await apiGet('/api/proveedores', { signal });
+    if (signal?.aborted) return;
+    setProveedores(Array.isArray(payload) ? payload : []);
+  }, [token]);
+
   useEffect(() => {
     if (!token) {
       setProductos([]);
+      setProveedores([]);
       setLoading(false);
       return;
     }
@@ -67,7 +73,10 @@ const Inventario = () => {
       try {
         setLoading(true);
         setError('');
-        await loadProductos(controller.signal);
+        await Promise.all([
+          loadProductos(controller.signal),
+          loadProveedores(controller.signal),
+        ]);
       } catch (err) {
         if (controller.signal.aborted) return;
         setError(err.message || 'No fue posible cargar el inventario');
@@ -79,7 +88,7 @@ const Inventario = () => {
 
     fetchData();
     return () => controller.abort();
-  }, [token, loadProductos]);
+  }, [token, loadProductos, loadProveedores]);
 
   const createProducto = async (payload) => {
     return apiPost('/api/productos', payload);
@@ -113,6 +122,7 @@ const Inventario = () => {
         stock_actual: Number(manualForm.stock_actual || 0),
         stock_minimo: Number(manualForm.stock_minimo || 0),
         catalogo: 'tienda',
+        proveedor_id: manualForm.proveedor_id ? Number(manualForm.proveedor_id) : null,
       });
       setManualForm({ ...EMPTY_MANUAL_FORM });
       await loadProductos();
@@ -152,6 +162,11 @@ const Inventario = () => {
         await apiPatch(`/api/productos/${existing.id}/stock`, {
           delta: Number(barcodeForm.stock_actual || 1),
         });
+        if (barcodeForm.proveedor_id) {
+          await apiPatch(`/api/productos/${existing.id}`, {
+            proveedor_id: Number(barcodeForm.proveedor_id),
+          });
+        }
         await loadProductos();
         setSuccess(`Stock actualizado para ${existing.nombre}`);
         setIsCreateModalOpen(false);
@@ -167,6 +182,7 @@ const Inventario = () => {
           precio_venta: Number(barcodeForm.precio_venta || 0),
           stock_actual: Number(barcodeForm.stock_actual || 1),
           catalogo: 'tienda',
+          proveedor_id: barcodeForm.proveedor_id ? Number(barcodeForm.proveedor_id) : null,
         });
         await loadProductos();
         setSuccess('Producto creado por código de barras');
@@ -179,6 +195,7 @@ const Inventario = () => {
         precio_costo: '',
         precio_venta: '',
         stock_actual: '',
+        proveedor_id: '',
       });
     } catch (err) {
       setError(err.message || 'No se pudo procesar el código de barras');
@@ -195,6 +212,7 @@ const Inventario = () => {
       precio_venta: String(producto.precio_venta || ''),
       stock_actual: String(producto.stock_actual || ''),
       stock_minimo: String(producto.stock_minimo || ''),
+      proveedor_id: producto.proveedor_id ? String(producto.proveedor_id) : '',
     });
     setEditingProducto(producto);
   };
@@ -226,6 +244,7 @@ const Inventario = () => {
         precio_venta: Number(editForm.precio_venta || 0),
         stock_actual: Number(editForm.stock_actual || 0),
         stock_minimo: Number(editForm.stock_minimo || 0),
+        proveedor_id: editForm.proveedor_id ? Number(editForm.proveedor_id) : null,
       });
       await loadProductos();
       setSuccess(`Producto "${editForm.nombre.trim()}" actualizado`);
@@ -238,7 +257,8 @@ const Inventario = () => {
   };
 
   const handleDelete = async (producto) => {
-    if (!window.confirm(`¿Desactivar "${producto.nombre}"?`)) return;
+    const ok = await confirm({ message: `¿Desactivar "${producto.nombre}"?` });
+    if (!ok) return;
     clearMessages();
 
     try {
@@ -254,7 +274,9 @@ const Inventario = () => {
     if (!searchTerm.trim()) return productos;
     const q = searchTerm.trim().toLowerCase();
     return productos.filter(
-      (p) => p.nombre.toLowerCase().includes(q) || (p.codigo_barras && p.codigo_barras.toLowerCase().includes(q)),
+      (p) => p.nombre.toLowerCase().includes(q)
+        || (p.codigo_barras && p.codigo_barras.toLowerCase().includes(q))
+        || (p.proveedor_nombre && p.proveedor_nombre.toLowerCase().includes(q)),
     );
   }, [productos, searchTerm]);
 
@@ -303,20 +325,7 @@ const Inventario = () => {
         </div>
       </section>
 
-      {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
-          <div className="w-full max-w-4xl rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h3 className="text-xl font-bold text-gray-900">Agregar producto al inventario</h3>
-              <button
-                type="button"
-                onClick={() => setIsCreateModalOpen(false)}
-                className="rounded-full border border-gray-200 p-2 text-gray-500 transition hover:bg-gray-50 hover:text-gray-700"
-                aria-label="Cerrar modal"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+      <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Agregar producto al inventario" maxWidth="max-w-4xl">
 
             <div className="mb-4 flex flex-wrap gap-2">
               <button
@@ -392,6 +401,16 @@ const Inventario = () => {
                   className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
                   placeholder="Stock mínimo (ej: 5)"
                 />
+                <select
+                  value={manualForm.proveedor_id}
+                  onChange={(event) => setManualForm((c) => ({ ...c, proveedor_id: event.target.value }))}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+                >
+                  <option value="">Sin proveedor</option>
+                  {proveedores.filter((p) => p.activo).map((prov) => (
+                    <option key={prov.id} value={prov.id}>{prov.nombre}</option>
+                  ))}
+                </select>
                 <button
                   type="submit"
                   disabled={saving}
@@ -443,6 +462,16 @@ const Inventario = () => {
                   className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
                   placeholder="Precio venta nuevo (ej: 4500)"
                 />
+                <select
+                  value={barcodeForm.proveedor_id}
+                  onChange={(event) => setBarcodeForm((c) => ({ ...c, proveedor_id: event.target.value }))}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+                >
+                  <option value="">Sin proveedor</option>
+                  {proveedores.filter((p) => p.activo).map((prov) => (
+                    <option key={prov.id} value={prov.id}>{prov.nombre}</option>
+                  ))}
+                </select>
                 <button
                   type="submit"
                   disabled={saving}
@@ -453,23 +482,9 @@ const Inventario = () => {
                 </button>
               </form>
             )}
-          </div>
-        </div>
-      )}
+      </Modal>
 
-      {editingProducto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h3 className="text-xl font-bold text-gray-900">Editar producto</h3>
-              <button
-                type="button"
-                onClick={() => setEditingProducto(null)}
-                className="rounded-full border border-gray-200 p-2 text-gray-500 transition hover:bg-gray-50 hover:text-gray-700"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+      <Modal isOpen={editingProducto !== null} onClose={() => setEditingProducto(null)} title="Editar producto">
 
             <form className="space-y-3" onSubmit={handleSubmitEdit}>
               <input
@@ -522,6 +537,16 @@ const Inventario = () => {
                   placeholder="Stock mínimo"
                 />
               </div>
+              <select
+                value={editForm.proveedor_id}
+                onChange={(event) => setEditForm((c) => ({ ...c, proveedor_id: event.target.value }))}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+              >
+                <option value="">Sin proveedor</option>
+                {proveedores.filter((p) => p.activo).map((prov) => (
+                  <option key={prov.id} value={prov.id}>{prov.nombre}</option>
+                ))}
+              </select>
               <button
                 type="submit"
                 disabled={saving}
@@ -530,9 +555,7 @@ const Inventario = () => {
                 {saving ? 'Guardando...' : 'Guardar cambios'}
               </button>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         {loading ? (
@@ -622,6 +645,7 @@ const Inventario = () => {
                 <th className="hidden px-4 py-3 text-left font-semibold text-gray-700 md:table-cell">Código</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700">Stock</th>
                 <th className="hidden px-4 py-3 text-left font-semibold text-gray-700 sm:table-cell">Mín</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700">Proveedor</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700">Precio venta</th>
                 <th className="px-4 py-3 text-right font-semibold text-gray-700">Acciones</th>
               </tr>
@@ -629,13 +653,13 @@ const Inventario = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="6" className="px-4 py-6">
+                  <td colSpan="7" className="px-4 py-6">
                     <Skeleton lines={4} />
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr className="border-b border-gray-100 hover:bg-gray-50">
-                  <td colSpan="6" className="py-8 text-center text-gray-500">
+                  <td colSpan="7" className="py-8 text-center text-gray-500">
                     {searchTerm ? 'No se encontraron productos con ese criterio' : 'No hay productos registrados en el catálogo de tienda'}
                   </td>
                 </tr>
@@ -646,6 +670,7 @@ const Inventario = () => {
                     <td className="hidden px-4 py-3 text-gray-700 md:table-cell">{producto.codigo_barras || '-'}</td>
                     <td className="px-4 py-3 text-gray-700">{producto.stock_actual}</td>
                     <td className="hidden px-4 py-3 text-gray-700 sm:table-cell">{producto.stock_minimo}</td>
+                    <td className="px-4 py-3 text-gray-700">{producto.proveedor_nombre || '-'}</td>
                     <td className="px-4 py-3 text-gray-700">{formatMoney(producto.precio_venta)}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex items-center gap-1">
@@ -674,6 +699,8 @@ const Inventario = () => {
           </table>
         </div>
       </section>
+
+      <ConfirmModal />
     </div>
   );
 };

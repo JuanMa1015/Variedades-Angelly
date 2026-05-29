@@ -7,14 +7,8 @@ import SuccessMessage from '../components/SuccessMessage';
 import ProductSelectionView from './Ventas/ProductSelectionView';
 import TicketReviewView from './Ventas/TicketReviewView';
 import CheckoutView from './Ventas/CheckoutView';
-
-const MONEY_FORMATTER = new Intl.NumberFormat('es-CO', {
-  style: 'currency',
-  currency: 'COP',
-  maximumFractionDigits: 0,
-});
-
-const formatMoney = (value) => MONEY_FORMATTER.format(Number(value || 0));
+import { formatMoney } from '../utils/format';
+import Modal from '../components/Modal';
 
 const fetchJson = async ({ endpoint, signal, errorMessage }) => {
   try {
@@ -354,6 +348,8 @@ const Ventas = () => {
 
   return (
     <div className="space-y-4">
+      <ErrorMessage message={error} onDismiss={() => setError('')} />
+      <SuccessMessage message={success} onDismiss={() => setSuccess('')} />
 
       {currentView === 'products' && (
         <ProductSelectionView
@@ -403,8 +399,6 @@ const Ventas = () => {
           onConfirmar={handleSubmitVenta}
           onGoToTicket={goToTicket}
           formatMoney={formatMoney}
-          success={success}
-          error={error}
           submittingVenta={submittingVenta}
           cartCount={cartCount}
         />
@@ -467,6 +461,91 @@ const Ventas = () => {
           </div>
         </div>
       )}
+
+      <style>{`
+        @media print {
+          body * { visibility: hidden !important; }
+          #print-receipt, #print-receipt * { visibility: visible !important; }
+          #print-receipt { position: fixed !important; left: 0 !important; top: 0 !important; width: 100% !important; height: 100% !important; display: flex !important; align-items: center !important; justify-content: center !important; background: white !important; z-index: 99999 !important; }
+          #print-receipt > div { width: 80mm !important; max-width: 80mm !important; border: none !important; box-shadow: none !important; padding: 8px 4px !important; }
+          .no-print { display: none !important; }
+        }
+      `}</style>
+
+      <div id="print-receipt" className="hidden print:block">
+        <div className="mx-auto bg-white p-2 text-xs text-gray-800">
+          <div className="mb-3 text-center">
+            <p className="text-base font-bold uppercase tracking-wide">Variedades Angelly</p>
+            <p className="text-[10px] text-gray-600">NIT: 123.456.789-0</p>
+            <p className="text-[10px] text-gray-600">Carrera XX #YY-ZZ, Ciudad</p>
+            <p className="text-[10px] text-gray-600">Tel: (123) 456-7890</p>
+          </div>
+
+          <div className="mb-2 border-t border-dashed border-gray-400" />
+
+          <div className="mb-2 text-center">
+            <p className="text-xs font-bold uppercase tracking-wide">Factura de Venta</p>
+            <p className="text-[10px] text-gray-600">{new Date().toLocaleDateString('es-CO', { year: 'numeric', month: '2-digit', day: '2-digit' })} {new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</p>
+          </div>
+
+          <div className="mb-2 border-t border-dashed border-gray-400" />
+
+          {currentView === 'checkout' && (
+            <p className="mb-2 text-[10px] text-gray-600">Método de pago: {metodoPago === 'efectivo' ? 'Efectivo' : metodoPago === 'nequi' ? 'Nequi' : 'Tarjeta'}</p>
+          )}
+
+          <table className="w-full text-[10px]">
+            <thead>
+              <tr className="border-b border-dashed border-gray-400 font-semibold">
+                <th className="py-1 text-left">Producto</th>
+                <th className="py-1 text-right">Cant</th>
+                <th className="py-1 text-right">Precio</th>
+                <th className="py-1 text-right">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cartItems.map((item, idx) => {
+                const producto = productosById.get(Number(item.producto_id));
+                const cantidad = Number(item.cantidad || 0);
+                const precio = Number(producto?.precio_venta || 0);
+                return (
+                  <tr key={idx}>
+                    <td className="py-1 pr-1">{producto?.nombre || `#${item.producto_id}`}</td>
+                    <td className="py-1 text-right">{cantidad}</td>
+                    <td className="py-1 text-right">{formatMoney(precio)}</td>
+                    <td className="py-1 text-right font-medium">{formatMoney(cantidad * precio)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          <div className="my-2 border-t border-dashed border-gray-400" />
+
+          <div className="space-y-0.5 text-[10px]">
+            <div className="flex justify-between font-bold">
+              <span>TOTAL:</span>
+              <span>{formatMoney(totalEstimado)}</span>
+            </div>
+            {currentView === 'checkout' && !esFiado && (
+              <>
+                <div className="flex justify-between">
+                  <span>Pago:</span>
+                  <span>{formatMoney(Number(montoPago || 0))}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Cambio:</span>
+                  <span>{formatMoney(cambioContado)}</span>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="mt-4 border-t border-dashed border-gray-400" />
+
+          <p className="mt-2 text-center text-[10px] text-gray-500">¡Gracias por su preferencia!</p>
+        </div>
+      </div>
 
     </div>
   );

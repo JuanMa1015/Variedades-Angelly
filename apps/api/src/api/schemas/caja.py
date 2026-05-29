@@ -20,6 +20,16 @@ class CierreCajaRequest(BaseModel):
     monto_cierre: Annotated[float, Field(ge=0)]
 
 
+class ActualizarCajaRequest(BaseModel):
+    """Entrada para actualizar un registro de caja."""
+
+    monto_inicial: Annotated[float | None, Field(gt=0)] = None
+    monto_cierre: Annotated[float | None, Field(ge=0)] = None
+    monto_efectivo_real: Annotated[float | None, Field(ge=0)] = None
+    observaciones: str | None = None
+    estado: str | None = None
+
+
 class CierreCajaResponse(BaseModel):
     """Salida de un registro de apertura/cierre de caja."""
 
@@ -36,6 +46,7 @@ class CierreCajaResponse(BaseModel):
     saldo_esperado: float
     total_ingresos: float
     esta_abierta: bool
+    descuadre: float | None = None
 
 
 class CajaEstadoResponse(BaseModel):
@@ -61,3 +72,4 @@ class CajaHistorialItemResponse(BaseModel):
     monto_cierre: float | None
     saldo_esperado: float
     esta_abierta: bool
+    descuadre: float | None = None

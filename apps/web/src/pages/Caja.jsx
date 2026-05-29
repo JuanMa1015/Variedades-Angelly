@@ -1,91 +1,141 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { History, Lock, Unlock, Wallet } from 'lucide-react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { ChevronDown, ChevronRight, Edit, History, Lock, Trash2, Unlock, Wallet } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
-import { abrirCaja, cerrarCaja, fetchCajaEstado } from '../api/cajaApi';
+import { abrirCaja, cerrarCaja, deleteCaja, fetchCajaEstado, fetchCajaHistorial, fetchVentasPorRango, updateCaja } from '../api/cajaApi';
 import ErrorMessage from '../components/ErrorMessage'
 import SuccessMessage from '../components/SuccessMessage'
-import { SkeletonCard } from '../components/Skeleton'
-
-const MONEY_FORMATTER = new Intl.NumberFormat('es-CO', {
-  style: 'currency',
-  currency: 'COP',
-  maximumFractionDigits: 0,
-});
-
-const formatMoney = (value) => MONEY_FORMATTER.format(Number(value || 0));
-
-const formatDateTime = (value) => {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '-';
-  return date.toLocaleString('es-CO', {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
+import Skeleton, { SkeletonCard } from '../components/Skeleton'
+import useConfirm from '../components/useConfirm'
+import { formatDateTime, formatMoney } from '../utils/format';
+import Modal from '../components/Modal';
 
 const Caja = () => {
   const { token, user } = useAuth();
+  const { confirm, ConfirmModal } = useConfirm();
 
   const [estado, setEstado] = useState(null);
+  const [historial, setHistorial] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingHistorial, setLoadingHistorial] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [montoInicial, setMontoInicial] = useState('');
   const [montoCierre, setMontoCierre] = useState('');
 
-  const loadEstado = useCallback(async () => {
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingCaja, setEditingCaja] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const [expandedCajaId, setExpandedCajaId] = useState(null);
+  const [ventasPorCaja, setVentasPorCaja] = useState({});
+  const [loadingVentas, setLoadingVentas] = useState({});
+
+  const isSuperadmin = user?.role === 'superadmin';
+
+  const loadEstado = useCallback(async (signal) => {
     if (!token) return;
 
     try {
       setLoading(true);
       setError('');
 
-      const payload = await fetchCajaEstado();
+      const payload = await fetchCajaEstado({ signal });
 
       setEstado(payload);
     } catch (err) {
+      if (err?.name === 'AbortError') return;
       setError(err.message || 'No se pudo cargar el estado de caja');
     } finally {
       setLoading(false);
     }
   }, [token]);
 
+  const loadHistorial = useCallback(async (signal) => {
+    if (!token) return;
+
+    try {
+      setLoadingHistorial(true);
+
+      const payload = await fetchCajaHistorial({ signal });
+
+      setHistorial(Array.isArray(payload) ? payload : []);
+    } catch (err) {
+      if (err?.name === 'AbortError') return;
+      setError(err.message || 'No se pudo cargar el historial de caja');
+    } finally {
+      setLoadingHistorial(false);
+    }
+  }, [token]);
+
+  const loadAll = useCallback(async (signal) => {
+    await Promise.all([loadEstado(signal), loadHistorial(signal)]);
+  }, [loadEstado, loadHistorial]);
+
   useEffect(() => {
-    loadEstado();
-  }, [loadEstado]);
+    const controller = new AbortController();
+    loadAll(controller.signal);
+    return () => controller.abort();
+  }, [loadAll]);
 
   const cajaActual = estado?.caja_actual ?? null;
   const abierta = estado?.abierta ?? false;
 
-  const saldoInicial = useMemo(() => {
-    if (!cajaActual) return 0;
-    return Number(cajaActual.monto_inicial || 0);
-  }, [cajaActual]);
+  useEffect(() => {
+    if (!abierta || !cajaActual) return;
+    if (ventasPorCaja[cajaActual.id]) return;
 
-  const ventasEfectivo = useMemo(() => {
-    if (!cajaActual) return 0;
-    return Number(cajaActual.monto_ventas_efectivo || 0);
-  }, [cajaActual]);
-
-  const ventasTransferencia = useMemo(() => {
-    if (!cajaActual) return 0;
-    return Number(cajaActual.monto_ventas_transferencia || 0);
-  }, [cajaActual]);
-
-  const gastos = useMemo(() => {
-    if (!cajaActual) return 0;
-    return Number(cajaActual.monto_gastos || 0);
-  }, [cajaActual]);
+    const load = async () => {
+      setLoadingVentas((prev) => ({ ...prev, [cajaActual.id]: true }));
+      try {
+        const ventas = await fetchVentasPorRango({
+          fecha_desde: cajaActual.fecha_apertura,
+          fecha_hasta: new Date().toISOString(),
+        });
+        setVentasPorCaja((prev) => ({ ...prev, [cajaActual.id]: Array.isArray(ventas) ? ventas : [] }));
+      } catch {
+        setVentasPorCaja((prev) => ({ ...prev, [cajaActual.id]: [] }));
+      } finally {
+        setLoadingVentas((prev) => ({ ...prev, [cajaActual.id]: false }));
+      }
+    };
+    load();
+  }, [abierta, cajaActual]);
 
   const saldoEsperado = useMemo(() => {
     if (!cajaActual) return 0;
     return Number(cajaActual.saldo_esperado || 0);
   }, [cajaActual]);
+
+  const loadVentasForCaja = async (caja) => {
+    const cajaId = caja.id;
+    if (ventasPorCaja[cajaId]) return;
+
+    setLoadingVentas((prev) => ({ ...prev, [cajaId]: true }));
+
+    try {
+      const hasta = caja.fecha_cierre || new Date().toISOString();
+      const ventas = await fetchVentasPorRango({
+        fecha_desde: caja.fecha_apertura,
+        fecha_hasta: hasta,
+      });
+      setVentasPorCaja((prev) => ({ ...prev, [cajaId]: Array.isArray(ventas) ? ventas : [] }));
+    } catch {
+      setVentasPorCaja((prev) => ({ ...prev, [cajaId]: [] }));
+    } finally {
+      setLoadingVentas((prev) => ({ ...prev, [cajaId]: false }));
+    }
+  };
+
+  const toggleExpand = (caja) => {
+    if (expandedCajaId === caja.id) {
+      setExpandedCajaId(null);
+    } else {
+      setExpandedCajaId(caja.id);
+      loadVentasForCaja(caja);
+    }
+  };
 
   const handleAbrirCaja = async (event) => {
     event.preventDefault();
@@ -111,7 +161,7 @@ const Caja = () => {
 
       setMontoInicial('');
       setSuccess('Caja abierta correctamente');
-      await loadEstado();
+      await loadAll();
     } catch (err) {
       setError(err.message || 'No se pudo abrir la caja');
     } finally {
@@ -143,7 +193,7 @@ const Caja = () => {
 
       setMontoCierre('');
       setSuccess('Caja cerrada correctamente');
-      await loadEstado();
+      await loadAll();
     } catch (err) {
       setError(err.message || 'No se pudo cerrar la caja');
     } finally {
@@ -151,7 +201,102 @@ const Caja = () => {
     }
   };
 
-  const isSuperadmin = user?.role === 'superadmin';
+  const openEditModal = (caja) => {
+    setEditingCaja(caja);
+    setEditForm({
+      monto_inicial: String(Number(caja.monto_inicial) || ''),
+      monto_cierre: caja.monto_cierre != null ? String(Number(caja.monto_cierre)) : '',
+      observaciones: caja.observaciones || '',
+      estado: caja.esta_abierta ? 'abierta' : 'cerrada',
+    });
+    setError('');
+    setSuccess('');
+    setEditModalOpen(true);
+  };
+
+  const closeEditModal = () => {
+    setEditModalOpen(false);
+    setEditingCaja(null);
+    setEditForm({});
+  };
+
+  const handleEditChange = (key, value) => {
+    setEditForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleSaveEdit = async (event) => {
+    event.preventDefault();
+    if (!editingCaja) return;
+
+    setSavingEdit(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const payload = {};
+
+      if (editForm.monto_inicial !== '') {
+        const val = Number(editForm.monto_inicial);
+        if (!Number.isFinite(val) || val <= 0) {
+          setError('El monto inicial debe ser mayor a cero');
+          setSavingEdit(false);
+          return;
+        }
+        payload.monto_inicial = val;
+      }
+
+      if (editForm.monto_cierre !== '') {
+        const val = Number(editForm.monto_cierre);
+        if (!Number.isFinite(val) || val < 0) {
+          setError('El monto de cierre no puede ser negativo');
+          setSavingEdit(false);
+          return;
+        }
+        payload.monto_cierre = val;
+      }
+
+      if (editForm.observaciones !== (editingCaja.observaciones || '')) {
+        payload.observaciones = editForm.observaciones || null;
+      }
+
+      if (editForm.estado !== (editingCaja.esta_abierta ? 'abierta' : 'cerrada')) {
+        payload.estado = editForm.estado;
+      }
+
+      if (Object.keys(payload).length === 0) {
+        setError('No hay cambios para guardar');
+        setSavingEdit(false);
+        return;
+      }
+
+      await updateCaja(editingCaja.id, payload);
+
+      setSuccess('Registro de caja actualizado correctamente');
+      closeEditModal();
+      await loadAll();
+    } catch (err) {
+      setError(err.message || 'No se pudo actualizar el registro');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleDelete = async (caja) => {
+    const confirmed = await confirm({ title: 'Eliminar registro', message: `¿Eliminar registro de caja #${caja.id} del ${formatDateTime(caja.fecha_apertura)}?` });
+    if (!confirmed) return;
+
+    try {
+      setError('');
+      setSuccess('');
+
+      await deleteCaja(caja.id);
+
+      setSuccess('Registro de caja eliminado correctamente');
+      await loadAll();
+    } catch (err) {
+      setError(err.message || 'No fue posible eliminar el registro');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -159,80 +304,42 @@ const Caja = () => {
         <Wallet className="h-8 w-8 text-rosewood" />
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Caja</h1>
-          <p className="text-gray-600">Apertura y cierre de caja del turno</p>
+          <p className="text-gray-600">Apertura, cierre y gestión de caja del turno</p>
         </div>
       </div>
 
       <ErrorMessage message={error} onDismiss={() => setError('')} />
       <SuccessMessage message={success} onDismiss={() => setSuccess('')} />
 
-      {/* Estado actual */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-        <div className={`rounded-2xl border p-4 shadow-sm sm:p-5 ${abierta ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-white'}`}>
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Estado</p>
-          <p className={`mt-2 flex items-center gap-2 text-2xl font-bold sm:text-3xl ${abierta ? 'text-green-700' : 'text-gray-900'}`}>
-            {abierta ? <><Unlock className="h-5 w-5 sm:h-6 sm:w-6" /> Abierta</> : <><Lock className="h-5 w-5 sm:h-6 sm:w-6" /> Cerrada</>}
-          </p>
+      {/* Barra de estado compacta */}
+      <div className={`flex flex-wrap items-center gap-3 rounded-2xl border p-4 shadow-sm sm:p-5 ${abierta ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-white'}`}>
+        <div className={`flex items-center gap-2 text-lg font-bold sm:text-xl ${abierta ? 'text-green-700' : 'text-gray-900'}`}>
+          {abierta ? <Unlock className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
+          Caja {abierta ? 'Abierta' : 'Cerrada'}
         </div>
 
         {abierta && cajaActual && (
           <>
-            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Saldo esperado</p>
-              <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">{formatMoney(saldoEsperado)}</p>
-            </div>
-
-            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Abierta por</p>
-              <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">{cajaActual.abierto_por}</p>
-              <p className="text-xs text-gray-500">{formatDateTime(cajaActual.fecha_apertura)}</p>
-            </div>
+            <span className="hidden text-gray-300 sm:inline">|</span>
+            <span className="text-sm text-gray-600">
+              {cajaActual.abierto_por} — {formatDateTime(cajaActual.fecha_apertura)}
+            </span>
+            <span className="hidden text-gray-300 sm:inline">|</span>
+            <span className="text-sm font-semibold text-gray-900">
+              Saldo esperado: {formatMoney(saldoEsperado)}
+            </span>
           </>
         )}
 
-        {!abierta && (
+        {!abierta && estado?.ultimo_cierre && (
           <>
-            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Último cierre</p>
-              <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">
-                {estado?.ultimo_cierre ? formatMoney(estado.ultimo_cierre.monto_cierre) : '-'}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Cerrado por</p>
-              <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">
-                {estado?.ultimo_cierre?.cerrado_por ?? '-'}
-              </p>
-            </div>
+            <span className="hidden text-gray-300 sm:inline">|</span>
+            <span className="text-sm text-gray-600">
+              Último cierre: {formatMoney(estado.ultimo_cierre.monto_cierre)} por {estado.ultimo_cierre.cerrado_por}
+            </span>
           </>
         )}
       </div>
-
-      {/* Detalle de caja abierta */}
-      {abierta && cajaActual && (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Monto inicial</p>
-            <p className="mt-2 text-2xl font-bold text-gray-900">{formatMoney(saldoInicial)}</p>
-          </div>
-
-          <div className="rounded-2xl border border-green-100 bg-green-50 p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-green-600">Ventas efectivo</p>
-            <p className="mt-2 text-2xl font-bold text-green-700">{formatMoney(ventasEfectivo)}</p>
-          </div>
-
-          <div className="rounded-2xl border border-blue-100 bg-blue-50 p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Ventas transferencia</p>
-            <p className="mt-2 text-2xl font-bold text-blue-700">{formatMoney(ventasTransferencia)}</p>
-          </div>
-
-          <div className="rounded-2xl border border-red-100 bg-red-50 p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-red-600">Gastos</p>
-            <p className="mt-2 text-2xl font-bold text-red-700">{formatMoney(gastos)}</p>
-          </div>
-        </div>
-      )}
 
       {/* Acciones */}
       {loading ? (
@@ -282,19 +389,19 @@ const Caja = () => {
               <div className="mb-4 rounded-xl bg-gray-50 p-4 text-sm text-gray-700">
                 <p className="mb-1 flex justify-between">
                   <span>Monto inicial:</span>
-                  <span className="font-semibold">{formatMoney(saldoInicial)}</span>
+                  <span className="font-semibold">{formatMoney(cajaActual?.monto_inicial)}</span>
                 </p>
                 <p className="mb-1 flex justify-between">
                   <span>Ventas efectivo:</span>
-                  <span className="font-semibold text-green-700">{formatMoney(ventasEfectivo)}</span>
+                  <span className="font-semibold text-green-700">{formatMoney(cajaActual?.monto_ventas_efectivo)}</span>
                 </p>
                 <p className="mb-1 flex justify-between">
                   <span>Ventas transferencia:</span>
-                  <span className="font-semibold text-blue-700">{formatMoney(ventasTransferencia)}</span>
+                  <span className="font-semibold text-blue-700">{formatMoney(cajaActual?.monto_ventas_transferencia)}</span>
                 </p>
                 <p className="mb-1 flex justify-between">
                   <span>Gastos:</span>
-                  <span className="font-semibold text-red-700">{formatMoney(gastos)}</span>
+                  <span className="font-semibold text-red-700">{formatMoney(cajaActual?.monto_gastos)}</span>
                 </p>
                 <hr className="my-2 border-gray-200" />
                 <p className="flex justify-between text-base">
@@ -307,12 +414,36 @@ const Caja = () => {
                 <input
                   type="number"
                   min="0"
+                  step="any"
                   value={montoCierre}
                   onChange={(event) => setMontoCierre(event.target.value)}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
                   placeholder="Monto final en caja"
                   required
                 />
+
+                {montoCierre.trim() && (
+                  (() => {
+                    const cierre = Number(montoCierre);
+                    const diff = cierre - saldoEsperado;
+                    const isCuadrado = Math.abs(diff) < 0.01;
+                    return (
+                      <div className={`rounded-lg border p-3 text-sm ${isCuadrado ? 'border-green-200 bg-green-50' : diff > 0 ? 'border-yellow-200 bg-yellow-50' : 'border-red-200 bg-red-50'}`}>
+                        <p className="flex justify-between">
+                          <span className="font-semibold">Descuadre:</span>
+                          <span className={`font-bold ${isCuadrado ? 'text-green-700' : diff > 0 ? 'text-yellow-700' : 'text-red-700'}`}>
+                            {isCuadrado ? '✓ Cuadrado' : `${diff > 0 ? '+' : ''}${formatMoney(diff)}`}
+                          </span>
+                        </p>
+                        {!isCuadrado && (
+                          <p className="mt-1 text-xs text-gray-600">
+                            {diff > 0 ? 'Sobra dinero en caja' : 'Falta dinero en caja'}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()
+                )}
 
                 <button
                   type="submit"
@@ -324,48 +455,277 @@ const Caja = () => {
               </form>
             </section>
           )}
-
-          {/* Historial (solo superadmin) */}
-          {isSuperadmin && (
-            <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
-              <div className="mb-4 flex items-center gap-2">
-                <History className="h-5 w-5 text-rosewood" />
-                <h2 className="text-xl font-bold text-gray-900">Historial de cierres</h2>
-              </div>
-
-              {!estado?.ultimo_cierre ? (
-                <p className="text-sm text-gray-500">No hay cierres previos.</p>
-              ) : (
-                <div className="space-y-3">
-                  <div className="rounded-xl bg-gray-50 p-4 text-sm text-gray-700">
-                    <p className="mb-1 flex justify-between">
-                      <span>Apertura:</span>
-                      <span className="font-semibold">{formatDateTime(estado.ultimo_cierre.fecha_apertura)}</span>
-                    </p>
-                    <p className="mb-1 flex justify-between">
-                      <span>Cierre:</span>
-                      <span className="font-semibold">{formatDateTime(estado.ultimo_cierre.fecha_cierre)}</span>
-                    </p>
-                    <p className="mb-1 flex justify-between">
-                      <span>Abierto por:</span>
-                      <span className="font-semibold">{estado.ultimo_cierre.abierto_por}</span>
-                    </p>
-                    <p className="mb-1 flex justify-between">
-                      <span>Cerrado por:</span>
-                      <span className="font-semibold">{estado.ultimo_cierre.cerrado_por}</span>
-                    </p>
-                    <hr className="my-2 border-gray-200" />
-                    <p className="flex justify-between text-base">
-                      <span className="font-bold">Monto cierre:</span>
-                      <span className="font-bold">{formatMoney(estado.ultimo_cierre.monto_cierre)}</span>
-                    </p>
-                  </div>
-                </div>
-              )}
-            </section>
-          )}
         </div>
       )}
+
+      {/* Ventas del turno actual */}
+      {abierta && cajaActual && (
+        <section className="rounded-2xl border border-blush-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="mb-4 flex items-center gap-2">
+            <Wallet className="h-5 w-5 text-rosewood" />
+            <h2 className="text-xl font-bold text-gray-900">Ventas del turno</h2>
+          </div>
+
+          {loadingVentas[cajaActual.id] ? (
+            <Skeleton lines={2} />
+          ) : !ventasPorCaja[cajaActual.id] || ventasPorCaja[cajaActual.id].length === 0 ? (
+            <p className="py-4 text-center text-sm text-gray-500">No hay ventas registradas en este turno.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="bg-blush-100 text-rosewood">
+                    <th className="rounded-tl-2xl px-4 py-3 font-semibold">#</th>
+                    <th className="px-4 py-3 font-semibold">Cliente</th>
+                    <th className="px-4 py-3 font-semibold">Método</th>
+                    <th className="px-4 py-3 font-semibold">Total</th>
+                    <th className="rounded-tr-2xl px-4 py-3 font-semibold">Fecha</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ventasPorCaja[cajaActual.id].map((venta, index) => (
+                    <tr key={venta.venta_id} className={`border-b border-blush-100 transition hover:bg-blush-100/30 ${index % 2 === 0 ? 'bg-white' : 'bg-blush-100/10'}`}>
+                      <td className="px-4 py-3 font-medium text-rosewood">{venta.venta_id}</td>
+                      <td className="px-4 py-3 text-gray-700">{venta.cliente_nombre || 'Mostrador'}</td>
+                      <td className="px-4 py-3">
+                        {venta.metodo_pago === 'efectivo' ? (
+                          <span className="rounded-full bg-rosewood/10 px-2.5 py-0.5 text-xs font-semibold text-rosewood">Efectivo</span>
+                        ) : venta.metodo_pago === 'transferencia' ? (
+                          <span className="rounded-full bg-gold-50 px-2.5 py-0.5 text-xs font-semibold text-gold-200">Transferencia</span>
+                        ) : (
+                          <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600">{venta.metodo_pago || '-'}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 font-bold text-rosewood">{formatMoney(venta.total)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-gray-500">{formatDateTime(venta.fecha)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Tabla de historial */}
+      <section className="rounded-2xl border border-blush-200 bg-white p-5 shadow-sm sm:p-6">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <History className="h-5 w-5 text-rosewood" />
+            <h2 className="text-xl font-bold text-gray-900">Historial de caja</h2>
+          </div>
+        </div>
+
+        {loadingHistorial ? (
+          <Skeleton lines={3} />
+        ) : historial.length === 0 ? (
+          <p className="py-8 text-center text-sm text-gray-500">No hay registros de caja.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="bg-blush-100 text-rosewood">
+                  <th className="w-10 rounded-tl-2xl px-2 py-3"></th>
+                  <th className="px-3 py-3 font-semibold">#</th>
+                  <th className="px-3 py-3 font-semibold">Abrió</th>
+                  <th className="px-3 py-3 font-semibold">Apertura</th>
+                  <th className="px-3 py-3 font-semibold">Cierre</th>
+                  <th className="px-3 py-3 font-semibold">Inicial</th>
+                  <th className="px-3 py-3 font-semibold">V. efectivo</th>
+                  <th className="px-3 py-3 font-semibold">V. transf.</th>
+                  <th className="px-3 py-3 font-semibold">Gastos</th>
+                  <th className="px-3 py-3 font-semibold">Esperado</th>
+                  <th className="px-3 py-3 font-semibold">Cierre</th>
+                  <th className="px-3 py-3 font-semibold">Descuadre</th>
+                  <th className="px-3 py-3 font-semibold">Estado</th>
+                  <th className="rounded-tr-2xl px-3 py-3 font-semibold">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {historial.map((caja, index) => (
+                  <Fragment key={caja.id}>
+                    <tr className={`border-b border-blush-100 transition hover:bg-blush-100/30 ${
+                      index % 2 === 0 ? 'bg-white' : 'bg-blush-100/10'
+                    } ${caja.esta_abierta ? 'border-l-2 border-l-rosewood' : ''}`}>
+                      <td className="px-2 py-3">
+                        <button
+                          type="button"
+                          onClick={() => toggleExpand(caja)}
+                          className="rounded-md p-1 text-rosewood/50 transition hover:bg-blush-100 hover:text-rosewood"
+                          aria-label="Ver ventas"
+                        >
+                          {expandedCajaId === caja.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        </button>
+                      </td>
+                      <td className="px-3 py-3 font-bold text-rosewood">{caja.id}</td>
+                      <td className="px-3 py-3 text-gray-700">{caja.abierto_por}</td>
+                      <td className="whitespace-nowrap px-3 py-3 text-gray-700">{formatDateTime(caja.fecha_apertura)}</td>
+                      <td className="whitespace-nowrap px-3 py-3 text-gray-700">{formatDateTime(caja.fecha_cierre)}</td>
+                      <td className="px-3 py-3 font-semibold text-rosewood">{formatMoney(caja.monto_inicial)}</td>
+                      <td className="px-3 py-3 font-semibold text-rosewood">{formatMoney(caja.monto_ventas_efectivo)}</td>
+                      <td className="px-3 py-3 font-semibold text-gold-200">{formatMoney(caja.monto_ventas_transferencia)}</td>
+                      <td className="px-3 py-3 font-semibold text-gold-200">{formatMoney(caja.monto_gastos)}</td>
+                      <td className="px-3 py-3 font-bold text-rosewood">{formatMoney(caja.saldo_esperado)}</td>
+                      <td className="px-3 py-3 font-semibold text-gray-900">{caja.monto_cierre != null ? formatMoney(caja.monto_cierre) : '-'}</td>
+                      <td className="px-3 py-3">
+                        {caja.descuadre != null ? (
+                          <span className={`font-semibold ${Math.abs(caja.descuadre) < 0.01 ? 'text-gold-200' : 'text-rosewood'}`}>
+                            {Math.abs(caja.descuadre) < 0.01 ? '✓' : `${caja.descuadre > 0 ? '+' : ''}${formatMoney(caja.descuadre)}`}
+                          </span>
+                        ) : '-'}
+                      </td>
+                      <td className="px-3 py-3">
+                        {caja.esta_abierta ? (
+                          <span className="rounded-full bg-rosewood/10 px-2 py-0.5 text-xs font-semibold text-rosewood">Abierta</span>
+                        ) : (
+                          <span className="rounded-full bg-gold-50 px-2 py-0.5 text-xs font-semibold text-gold-200">Cerrada</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => toggleExpand(caja)}
+                            className="rounded-md px-2 py-1 text-xs font-semibold text-rosewood transition hover:bg-blush-100"
+                          >
+                            Ventas
+                          </button>
+                          {isSuperadmin && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => openEditModal(caja)}
+                                className="rounded-md px-2 py-1 text-xs font-semibold text-rosewood transition hover:bg-blush-100"
+                              >
+                                <Edit className="mr-0.5 inline h-3 w-3" />
+                                Editar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(caja)}
+                                className="rounded-md px-2 py-1 text-xs font-semibold text-rosewood transition hover:bg-blush-100"
+                              >
+                                <Trash2 className="mr-0.5 inline h-3 w-3" />
+                                Eliminar
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+
+                    {expandedCajaId === caja.id && (
+                      <tr className="border-b border-blush-200 bg-blush-100/20">
+                        <td colSpan={14} className="px-6 py-4">
+                          {loadingVentas[caja.id] ? (
+                            <div className="flex items-center justify-center py-4">
+                              <div className="h-5 w-5 animate-spin rounded-full border-2 border-rosewood border-t-transparent" />
+                              <span className="ml-2 text-sm text-gray-500">Cargando ventas...</span>
+                            </div>
+                          ) : ventasPorCaja[caja.id]?.length === 0 ? (
+                            <p className="py-2 text-center text-sm text-gray-500">No hay ventas en este turno.</p>
+                          ) : (
+                            <table className="w-full text-left text-xs">
+                              <thead>
+                                <tr className="border-b border-blush-200 text-rosewood">
+                                  <th className="px-2 py-2 font-semibold">#</th>
+                                  <th className="px-2 py-2 font-semibold">Cliente</th>
+                                  <th className="px-2 py-2 font-semibold">Método</th>
+                                  <th className="px-2 py-2 font-semibold">Total</th>
+                                  <th className="px-2 py-2 font-semibold">Fecha</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {ventasPorCaja[caja.id].map((venta) => (
+                                  <tr key={venta.venta_id} className="border-b border-blush-100 hover:bg-white/60">
+                                    <td className="px-2 py-2 text-gray-700">{venta.venta_id}</td>
+                                    <td className="px-2 py-2 text-gray-700">{venta.cliente_nombre || 'Mostrador'}</td>
+                                    <td className="px-2 py-2">
+                                      {venta.metodo_pago === 'efectivo' ? (
+                                        <span className="rounded-full bg-rosewood/10 px-2 py-0.5 font-semibold text-rosewood">Efectivo</span>
+                                      ) : venta.metodo_pago === 'transferencia' ? (
+                                        <span className="rounded-full bg-gold-50 px-2 py-0.5 font-semibold text-gold-200">Transferencia</span>
+                                      ) : (
+                                        <span className="rounded-full bg-gray-100 px-2 py-0.5 font-semibold text-gray-600">{venta.metodo_pago || '-'}</span>
+                                      )}
+                                    </td>
+                                    <td className="px-2 py-2 font-semibold text-rosewood">{formatMoney(venta.total)}</td>
+                                    <td className="whitespace-nowrap px-2 py-2 text-gray-500">{formatDateTime(venta.fecha)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <Modal isOpen={editModalOpen && editingCaja !== null} onClose={closeEditModal} title={'Editar registro #' + editingCaja?.id}>
+
+            <form className="space-y-3" onSubmit={handleSaveEdit}>
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Monto inicial</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={editForm.monto_inicial}
+                  onChange={(e) => handleEditChange('monto_inicial', e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Monto cierre</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={editForm.monto_cierre}
+                  onChange={(e) => handleEditChange('monto_cierre', e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Estado</label>
+                <select
+                  value={editForm.estado}
+                  onChange={(e) => handleEditChange('estado', e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+                >
+                  <option value="abierta">Abierta</option>
+                  <option value="cerrada">Cerrada</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Observaciones</label>
+                <textarea
+                  value={editForm.observaciones}
+                  onChange={(e) => handleEditChange('observaciones', e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+                  rows={3}
+                  maxLength={500}
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={savingEdit}
+                className="w-full rounded-lg bg-rosewood px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300"
+              >
+                {savingEdit ? 'Guardando cambios...' : 'Guardar cambios'}
+              </button>
+            </form>
+      </Modal>
+
+      {ConfirmModal}
     </div>
   );
 };

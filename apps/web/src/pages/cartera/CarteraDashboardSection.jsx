@@ -1,5 +1,20 @@
 import { CalendarDays, CircleDollarSign, Wallet } from 'lucide-react';
 
+const NIVEL_DEUDA = {
+  verde: { max: 200000, label: 'Al día', dot: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700', bar: 'bg-emerald-500' },
+  amarillo: { max: 400000, label: 'Alerta', dot: 'bg-amber-500', bg: 'bg-amber-50', text: 'text-amber-700', bar: 'bg-amber-500' },
+  rojo: { max: Infinity, label: 'Moroso', dot: 'bg-red-500', bg: 'bg-red-50', text: 'text-red-700', bar: 'bg-red-500' },
+};
+
+const nivelDeuda = (deuda) => {
+  const monto = Number(deuda || 0);
+  if (monto <= NIVEL_DEUDA.verde.max) return NIVEL_DEUDA.verde;
+  if (monto <= NIVEL_DEUDA.amarillo.max) return NIVEL_DEUDA.amarillo;
+  return NIVEL_DEUDA.rojo;
+};
+
+const DEUDA_MAX_REF = 400000;
+
 const CarteraDashboardSection = ({
   resumenCartera,
   dashboardVentas,
@@ -77,17 +92,17 @@ const CarteraDashboardSection = ({
           </div>
 
           <div className="mt-4 space-y-3">
-            <div className="rounded-xl bg-gray-50 p-4">
-              <p className="text-xs uppercase tracking-[0.1em] text-gray-500">Clientes alto riesgo</p>
+            <div className="rounded-xl bg-red-50 p-4">
+              <p className="text-xs uppercase tracking-[0.1em] text-red-700">Clientes morosos</p>
               <p className="mt-1 text-2xl font-bold text-red-700">{resumenCartera.clientes_alto_riesgo}</p>
             </div>
-            <div className="rounded-xl bg-gray-50 p-4">
-              <p className="text-xs uppercase tracking-[0.1em] text-gray-500">Saldo promedio con deuda</p>
-              <p className="mt-1 text-2xl font-bold text-gray-900">{formatMoney(resumenCartera.saldo_promedio)}</p>
+            <div className="rounded-xl bg-amber-50 p-4">
+              <p className="text-xs uppercase tracking-[0.1em] text-amber-700">Clientes en alerta</p>
+              <p className="mt-1 text-2xl font-bold text-amber-700">{resumenCartera.clientes_riesgo_medio || 0}</p>
             </div>
-            <div className="rounded-xl bg-gray-50 p-4">
-              <p className="text-xs uppercase tracking-[0.1em] text-gray-500">Limite total asignado</p>
-              <p className="mt-1 text-2xl font-bold text-gray-900">{formatMoney(resumenCartera.limite_total)}</p>
+            <div className="rounded-xl bg-emerald-50 p-4">
+              <p className="text-xs uppercase tracking-[0.1em] text-emerald-700">Saldo promedio con deuda</p>
+              <p className="mt-1 text-2xl font-bold text-emerald-700">{formatMoney(resumenCartera.saldo_promedio)}</p>
             </div>
           </div>
         </div>
@@ -104,28 +119,29 @@ const CarteraDashboardSection = ({
           </div>
 
           <div className="mt-4 space-y-3">
-            {clientesRanking.map((cliente, index) => {
+            {clientesRanking.map((cliente) => {
               const deuda = Number(cliente.deuda_total || 0);
-              const limite = Number(cliente.limite_credito || 0);
-              const porcentaje = limite > 0 ? Math.min(100, (deuda / limite) * 100) : 0;
+              const nivel = nivelDeuda(deuda);
+              const porcentaje = Math.min(100, (deuda / DEUDA_MAX_REF) * 100);
 
               return (
                 <div key={cliente.id} className="rounded-2xl border border-gray-200 p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.1em] text-gray-500">#{index + 1}</p>
-                      <p className="text-base font-bold text-gray-900">{cliente.nombre}</p>
-                      <p className="text-sm text-gray-600">Deuda: {formatMoney(deuda)} · Límite: {formatMoney(limite)}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold text-gray-900">{porcentaje.toFixed(0)}%</p>
-                      <p className="text-xs text-gray-500">Uso del cupo</p>
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${nivel.bg} ${nivel.text}`}>
+                        <span className={`h-2 w-2 rounded-full ${nivel.dot}`} />
+                        {nivel.label}
+                      </span>
+                      <div>
+                        <p className="text-sm font-bold text-gray-900">{cliente.nombre}</p>
+                        <p className="text-xs text-gray-500">Deuda: {formatMoney(deuda)}</p>
+                      </div>
                     </div>
                   </div>
 
                   <div className="mt-3 h-2 rounded-full bg-gray-200">
                     <div
-                      className={`h-full rounded-full ${porcentaje >= 80 ? 'bg-red-500' : porcentaje >= 50 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                      className={`h-full rounded-full ${nivel.bar}`}
                       style={{ width: `${porcentaje}%` }}
                     />
                   </div>

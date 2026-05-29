@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { ChevronDown, ChevronRight, Database, PencilLine, Plus, RefreshCw, Shield, Trash2, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { apiDelete, apiRequest } from '../api/httpClient';
@@ -6,27 +7,9 @@ import ErrorMessage from '../components/ErrorMessage';
 import SuccessMessage from '../components/SuccessMessage';
 import useConfirm from '../components/useConfirm';
 import Skeleton from '../components/Skeleton';
+import Modal from '../components/Modal';
 import EditFormModal from '../components/EditFormModal';
-
-const MONEY_FORMATTER = new Intl.NumberFormat('es-CO', {
-  style: 'currency',
-  currency: 'COP',
-  maximumFractionDigits: 0,
-});
-
-const formatMoney = (value) => MONEY_FORMATTER.format(Number(value || 0));
-
-const formatDateTime = (value) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '-';
-  return date.toLocaleString('es-CO', {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
+import { formatDateTime, formatMoney } from '../utils/format';
 
 const ROLE_GROUPS = [
   {
@@ -93,13 +76,16 @@ const CREATE_DIALOGS = {
   auditorias: 'auditorias',
 };
 
-const Admin = ({ moduleKey = null }) => {
+const Admin = ({ moduleKey: moduleKeyProp }) => {
+  const { moduleKey: moduleKeyParam } = useParams();
+  const moduleKey = moduleKeyProp ?? moduleKeyParam ?? null;
   const { token, isSuperAdmin } = useAuth();
 
   const [activeTab, setActiveTab] = useState(moduleKey ?? 'productos');
   const [expandedRole, setExpandedRole] = useState('Vendedor');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -321,6 +307,7 @@ const Admin = ({ moduleKey = null }) => {
       notifyError('El limite de credito no puede ser negativo');
       return;
     }
+    setSaving(true);
     try {
       await request({
         endpoint: '/api/cartera/clientes',
@@ -338,6 +325,8 @@ const Admin = ({ moduleKey = null }) => {
       notifySuccess('Cliente creado');
     } catch (err) {
       notifyError(err.message || 'No se pudo crear cliente');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -383,6 +372,7 @@ const Admin = ({ moduleKey = null }) => {
   // Clientes tienda fiado
   const handleCreateClienteTienda = async (event) => {
     event.preventDefault();
+    setSaving(true);
     try {
       await request({
         endpoint: '/api/clientes/tienda-fiado',
@@ -398,6 +388,8 @@ const Admin = ({ moduleKey = null }) => {
       notifySuccess('Cliente tienda creado');
     } catch (err) {
       notifyError(err.message || 'No se pudo crear cliente tienda');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -443,6 +435,7 @@ const Admin = ({ moduleKey = null }) => {
       notifyError('Los puntos acumulados no pueden ser negativos');
       return;
     }
+    setSaving(true);
     try {
       await request({
         endpoint: '/api/fidelizacion/clientes',
@@ -459,6 +452,8 @@ const Admin = ({ moduleKey = null }) => {
       notifySuccess('Cliente fidelizacion creado');
     } catch (err) {
       notifyError(err.message || 'No se pudo crear cliente fidelizacion');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -506,6 +501,7 @@ const Admin = ({ moduleKey = null }) => {
   // Ventas
   const handleCreateVenta = async (event) => {
     event.preventDefault();
+    setSaving(true);
     try {
       const items = parseItemsJson(ventaForm.items_json);
       await request({
@@ -527,6 +523,8 @@ const Admin = ({ moduleKey = null }) => {
       notifySuccess('Venta creada');
     } catch (err) {
       notifyError(err.message || 'No se pudo crear venta');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -567,6 +565,7 @@ const Admin = ({ moduleKey = null }) => {
   // Pedidos proveedor
   const handleCreatePedidoProveedor = async (event) => {
     event.preventDefault();
+    setSaving(true);
     try {
       await request({
         endpoint: '/api/proveedores/pedidos',
@@ -583,6 +582,8 @@ const Admin = ({ moduleKey = null }) => {
       notifySuccess('Pedido creado');
     } catch (err) {
       notifyError(err.message || 'No se pudo crear pedido');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -622,6 +623,7 @@ const Admin = ({ moduleKey = null }) => {
   // Facturas compra
   const handleCreateFacturaCompra = async (event) => {
     event.preventDefault();
+    setSaving(true);
     try {
       const items = parseItemsJson(facturaCompraForm.items_json);
       await request({
@@ -638,6 +640,8 @@ const Admin = ({ moduleKey = null }) => {
       notifySuccess('Factura creada');
     } catch (err) {
       notifyError(err.message || 'No se pudo crear factura');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -674,10 +678,11 @@ const Admin = ({ moduleKey = null }) => {
   // Gastos
   const handleCreateGasto = async (event) => {
     event.preventDefault();
-    if (Number(gastoForm.monto) < 0) {
+    if (Number(gastoForm.monto) <= 0) {
       notifyError('El monto no puede ser negativo');
       return;
     }
+    setSaving(true);
     try {
       await request({
         endpoint: '/api/gastos',
@@ -694,6 +699,8 @@ const Admin = ({ moduleKey = null }) => {
       notifySuccess('Gasto creado');
     } catch (err) {
       notifyError(err.message || 'No se pudo crear gasto');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -734,6 +741,7 @@ const Admin = ({ moduleKey = null }) => {
   // Abonos cartera
   const handleCreateAbonoCartera = async (event) => {
     event.preventDefault();
+    setSaving(true);
     try {
       await request({
         endpoint: '/api/cartera/abonos',
@@ -751,6 +759,8 @@ const Admin = ({ moduleKey = null }) => {
       notifySuccess('Abono creado');
     } catch (err) {
       notifyError(err.message || 'No se pudo crear abono');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -787,6 +797,7 @@ const Admin = ({ moduleKey = null }) => {
   // Admins
   const handleCreateAdmin = async (event) => {
     event.preventDefault();
+    setSaving(true);
     try {
       await request({
         endpoint: '/api/superadmin/usuarios/admins',
@@ -799,6 +810,8 @@ const Admin = ({ moduleKey = null }) => {
       notifySuccess('Admin creado');
     } catch (err) {
       notifyError(err.message || 'No se pudo crear admin');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -839,6 +852,7 @@ const Admin = ({ moduleKey = null }) => {
   // Vendedores
   const handleCreateVendedor = async (event) => {
     event.preventDefault();
+    setSaving(true);
     try {
       await request({
         endpoint: '/api/superadmin/usuarios/vendedores',
@@ -851,6 +865,8 @@ const Admin = ({ moduleKey = null }) => {
       notifySuccess('Vendedor creado');
     } catch (err) {
       notifyError(err.message || 'No se pudo crear vendedor');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -907,6 +923,7 @@ const Admin = ({ moduleKey = null }) => {
       notifyError('El stock minimo no puede ser negativo');
       return;
     }
+    setSaving(true);
     try {
       await request({
         endpoint: '/api/superadmin/productos',
@@ -927,6 +944,8 @@ const Admin = ({ moduleKey = null }) => {
       notifySuccess('Producto creado');
     } catch (err) {
       notifyError(err.message || 'No se pudo crear producto');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -965,6 +984,7 @@ const Admin = ({ moduleKey = null }) => {
   // Proveedores
   const handleCreateProveedor = async (event) => {
     event.preventDefault();
+    setSaving(true);
     try {
       await request({
         endpoint: '/api/superadmin/proveedores',
@@ -981,6 +1001,8 @@ const Admin = ({ moduleKey = null }) => {
       notifySuccess('Proveedor creado');
     } catch (err) {
       notifyError(err.message || 'No se pudo crear proveedor');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -1018,6 +1040,7 @@ const Admin = ({ moduleKey = null }) => {
   // Auditorias
   const handleCreateAuditoria = async (event) => {
     event.preventDefault();
+    setSaving(true);
     try {
       await request({
         endpoint: '/api/superadmin/auditorias',
@@ -1037,6 +1060,8 @@ const Admin = ({ moduleKey = null }) => {
       notifySuccess('Auditoria creada');
     } catch (err) {
       notifyError(err.message || 'No se pudo crear auditoria');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -1087,19 +1112,19 @@ const Admin = ({ moduleKey = null }) => {
     );
   }
 
-  const sectionShellClass = 'rounded-[28px] border border-[#eebbbb]/70 bg-white/90 shadow-[0_20px_50px_rgba(106,63,67,0.08)] backdrop-blur';
+  const sectionShellClass = 'rounded-[28px] border border-blush-300/70 bg-white/90 shadow-[0_20px_50px_rgba(106,63,67,0.08)] backdrop-blur';
 
   return (
     <div className="space-y-6">
-      <section className="overflow-hidden rounded-[32px] border border-[#eebbbb]/70 bg-[linear-gradient(135deg,#fdf1f1_0%,#fbe3e3_52%,#f9d6d5_100%)] p-5 shadow-[0_24px_70px_rgba(106,63,67,0.08)] sm:p-6">
+      <section className="overflow-hidden rounded-[32px] border border-blush-300/70 bg-[linear-gradient(135deg,#fdf1f1_0%,#fbe3e3_52%,#f9d6d5_100%)] p-5 shadow-[0_24px_70px_rgba(106,63,67,0.08)] sm:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#f6c8c7]/60 bg-white/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-[#6a3f43]">
+            <div className="inline-flex items-center gap-2 rounded-full border border-blush-300/60 bg-white/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-rosewood">
               <Shield className="h-3.5 w-3.5" />
               Panel administrativo
             </div>
-            <h1 className="mt-3 text-3xl font-black tracking-tight text-[#6a3f43] sm:text-4xl">Panel de Administración</h1>
-            <p className="mt-2 max-w-2xl text-sm text-[#6a3f43]/80 sm:text-base">
+            <h1 className="mt-3 text-3xl font-black tracking-tight text-rosewood sm:text-4xl">Panel de Administración</h1>
+            <p className="mt-2 max-w-2xl text-sm text-rosewood/80 sm:text-base">
               Gestiona usuarios, productos, ventas y más desde un solo lugar.
             </p>
           </div>
@@ -1108,7 +1133,7 @@ const Admin = ({ moduleKey = null }) => {
             type="button"
             onClick={handleRefresh}
             disabled={refreshing}
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-[#eebbbb] px-4 py-2.5 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7] disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2.5 text-sm font-semibold text-rosewood transition hover:bg-blush-300 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             Recargar
@@ -1120,7 +1145,7 @@ const Admin = ({ moduleKey = null }) => {
       <SuccessMessage message={success} onDismiss={() => setSuccess('')} />
 
       {!moduleKey && (
-        <div className="rounded-2xl border border-[#eebbbb] bg-white/80 px-4 py-3 text-xs text-[#6a3f43]/80 shadow-sm sm:text-sm">
+        <div className="rounded-2xl border border-blush-300 bg-white/80 px-4 py-3 text-xs text-rosewood/80 shadow-sm sm:text-sm">
           Resumen: Admins {admins.length} · Vendedores {vendedores.length} · Productos {productos.length} · Proveedores {proveedores.length} · Auditorias {auditorias.length} · Facturacion {formatMoney(informes.facturacion_total)}
         </div>
       )}
@@ -1130,23 +1155,23 @@ const Admin = ({ moduleKey = null }) => {
           {ROLE_GROUPS.map((group) => {
             const isExpanded = expandedRole === group.role;
             return (
-              <div key={group.role} className="rounded-[28px] border border-[#eebbbb]/70 bg-white/90 shadow-[0_16px_40px_rgba(106,63,67,0.06)]">
+              <div key={group.role} className="rounded-[28px] border border-blush-300/70 bg-white/90 shadow-[0_16px_40px_rgba(106,63,67,0.06)]">
                 <button
                   type="button"
                   onClick={() => setExpandedRole(isExpanded ? '' : group.role)}
-                  className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition hover:bg-[#fdf1f1]"
+                  className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition hover:bg-blush-50"
                 >
-                  <span className="text-sm font-bold uppercase tracking-[0.08em] text-[#6a3f43]">
+                  <span className="text-sm font-bold uppercase tracking-[0.08em] text-rosewood">
                     {group.role}
                   </span>
                   {isExpanded ? (
-                    <ChevronDown className="h-4 w-4 text-[#6a3f43]" />
+                    <ChevronDown className="h-4 w-4 text-rosewood" />
                   ) : (
-                    <ChevronRight className="h-4 w-4 text-[#6a3f43]" />
+                    <ChevronRight className="h-4 w-4 text-rosewood" />
                   )}
                 </button>
                 {isExpanded && (
-                  <div className="border-t border-[#eebbbb]/50 px-5 py-3">
+                  <div className="border-t border-blush-300/50 px-5 py-3">
                     <div className="flex flex-wrap gap-2">
                       {group.modules.map((mod) => (
                         <button
@@ -1155,8 +1180,8 @@ const Admin = ({ moduleKey = null }) => {
                           onClick={() => setActiveTab(mod.id)}
                           className={`rounded-full px-3 py-2 text-xs font-semibold transition sm:px-4 sm:text-sm ${
                             activeTab === mod.id
-                              ? 'bg-[#6a3f43] text-[#fdf1f1]'
-                              : 'bg-[#fdf1f1] text-[#6a3f43] hover:bg-[#fbe3e3]'
+                              ? 'bg-rosewood text-blush-50'
+                              : 'bg-blush-50 text-rosewood hover:bg-blush-50'
                           }`}
                         >
                           {mod.label}
@@ -1175,13 +1200,13 @@ const Admin = ({ moduleKey = null }) => {
         <section className={`${sectionShellClass} p-4 sm:p-5`}>
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-xl font-bold text-[#6a3f43] sm:text-2xl">Vendedores</h2>
-              <p className="text-sm text-[#6a3f43]/70">Acceso restringido y altas por modal.</p>
+              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Vendedores</h2>
+              <p className="text-sm text-rosewood/70">Acceso restringido y altas por modal.</p>
             </div>
             <button
               type="button"
               onClick={() => openCreateDialog(CREATE_DIALOGS.vendedores)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
             >
               <Plus className="h-4 w-4" />
               Crear
@@ -1191,7 +1216,7 @@ const Admin = ({ moduleKey = null }) => {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[#eebbbb]/70 text-xs uppercase tracking-[0.18em] text-[#6a3f43]/55">
+                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
                   <th className="px-3 py-3">ID</th>
                   <th className="px-3 py-3">Username</th>
                   <th className="px-3 py-3">Rol</th>
@@ -1200,13 +1225,13 @@ const Admin = ({ moduleKey = null }) => {
               </thead>
               <tbody>
                 {vendedores.map((item) => (
-                  <tr key={item.id} className="border-b border-[#fbe3e3] text-[#6a3f43]">
+                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
                     <td className="px-3 py-3 font-semibold">{item.id}</td>
                     <td className="px-3 py-3">{item.username}</td>
                     <td className="px-3 py-3">{item.rol}</td>
                     <td className="px-3 py-3">
                       <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditVendedor(item)} className="inline-flex items-center gap-1 rounded-full border border-[#f6c8c7] px-3 py-1.5 text-xs font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">
+                        <button onClick={() => handleEditVendedor(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
                           <PencilLine className="h-3.5 w-3.5" />
                           Editar
                         </button>
@@ -1220,7 +1245,7 @@ const Admin = ({ moduleKey = null }) => {
                 ))}
                 {vendedores.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-3 py-8 text-center text-sm text-[#6a3f43]/50">
+                    <td colSpan={4} className="px-3 py-8 text-center text-sm text-rosewood/50">
                       No hay registros
                     </td>
                   </tr>
@@ -1235,13 +1260,13 @@ const Admin = ({ moduleKey = null }) => {
         <section className={`${sectionShellClass} p-4 sm:p-5`}>
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-xl font-bold text-[#6a3f43] sm:text-2xl">Administradores</h2>
-              <p className="text-sm text-[#6a3f43]/70">Acceso y control de admins.</p>
+              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Administradores</h2>
+              <p className="text-sm text-rosewood/70">Acceso y control de admins.</p>
             </div>
             <button
               type="button"
               onClick={() => openCreateDialog(CREATE_DIALOGS.admins)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
             >
               <Plus className="h-4 w-4" />
               Crear
@@ -1251,7 +1276,7 @@ const Admin = ({ moduleKey = null }) => {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[#eebbbb]/70 text-xs uppercase tracking-[0.18em] text-[#6a3f43]/55">
+                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
                   <th className="px-3 py-3">ID</th>
                   <th className="px-3 py-3">Username</th>
                   <th className="px-3 py-3">Rol</th>
@@ -1260,13 +1285,13 @@ const Admin = ({ moduleKey = null }) => {
               </thead>
               <tbody>
                 {admins.map((item) => (
-                  <tr key={item.id} className="border-b border-[#fbe3e3] text-[#6a3f43]">
+                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
                     <td className="px-3 py-3 font-semibold">{item.id}</td>
                     <td className="px-3 py-3">{item.username}</td>
                     <td className="px-3 py-3">{item.rol}</td>
                     <td className="px-3 py-3">
                       <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditAdmin(item)} className="inline-flex items-center gap-1 rounded-full border border-[#f6c8c7] px-3 py-1.5 text-xs font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">
+                        <button onClick={() => handleEditAdmin(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
                           <PencilLine className="h-3.5 w-3.5" />
                           Editar
                         </button>
@@ -1280,7 +1305,7 @@ const Admin = ({ moduleKey = null }) => {
                 ))}
                 {admins.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-3 py-8 text-center text-sm text-[#6a3f43]/50">
+                    <td colSpan={4} className="px-3 py-8 text-center text-sm text-rosewood/50">
                       No hay registros
                     </td>
                   </tr>
@@ -1295,13 +1320,13 @@ const Admin = ({ moduleKey = null }) => {
         <section className={`${sectionShellClass} p-4 sm:p-5`}>
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-xl font-bold text-[#6a3f43] sm:text-2xl">Productos</h2>
-              <p className="text-sm text-[#6a3f43]/70">Inventario y precios con control visual.</p>
+              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Productos</h2>
+              <p className="text-sm text-rosewood/70">Inventario y precios con control visual.</p>
             </div>
             <button
               type="button"
               onClick={() => openCreateDialog(CREATE_DIALOGS.productos)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
             >
               <Plus className="h-4 w-4" />
               Crear
@@ -1311,7 +1336,7 @@ const Admin = ({ moduleKey = null }) => {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[#eebbbb]/70 text-xs uppercase tracking-[0.18em] text-[#6a3f43]/55">
+                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
                   <th className="px-3 py-3">Nombre</th>
                   <th className="px-3 py-3 text-right">Costo</th>
                   <th className="px-3 py-3 text-right">Venta</th>
@@ -1322,7 +1347,7 @@ const Admin = ({ moduleKey = null }) => {
               </thead>
               <tbody>
                 {productos.map((item) => (
-                  <tr key={item.id} className="border-b border-[#fbe3e3] text-[#6a3f43]">
+                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
                     <td className="px-3 py-3 font-semibold">{item.nombre}</td>
                     <td className="px-3 py-3 text-right">{formatMoney(item.precio_costo)}</td>
                     <td className="px-3 py-3 text-right">{formatMoney(item.precio_venta)}</td>
@@ -1330,7 +1355,7 @@ const Admin = ({ moduleKey = null }) => {
                     <td className="px-3 py-3 text-right">{item.stock_minimo}</td>
                     <td className="px-3 py-3">
                       <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditProducto(item)} className="inline-flex items-center gap-1 rounded-full border border-[#f6c8c7] px-3 py-1.5 text-xs font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">
+                        <button onClick={() => handleEditProducto(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
                           <PencilLine className="h-3.5 w-3.5" />
                           Editar
                         </button>
@@ -1344,7 +1369,7 @@ const Admin = ({ moduleKey = null }) => {
                 ))}
                 {productos.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-3 py-8 text-center text-sm text-[#6a3f43]/50">
+                    <td colSpan={6} className="px-3 py-8 text-center text-sm text-rosewood/50">
                       No hay registros
                     </td>
                   </tr>
@@ -1359,13 +1384,13 @@ const Admin = ({ moduleKey = null }) => {
         <section className={`${sectionShellClass} p-4 sm:p-5`}>
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-xl font-bold text-[#6a3f43] sm:text-2xl">Proveedores</h2>
-              <p className="text-sm text-[#6a3f43]/70">Catálogo de contactos y pedidos.</p>
+              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Proveedores</h2>
+              <p className="text-sm text-rosewood/70">Catálogo de contactos y pedidos.</p>
             </div>
             <button
               type="button"
               onClick={() => openCreateDialog(CREATE_DIALOGS.proveedores)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
             >
               <Plus className="h-4 w-4" />
               Crear
@@ -1375,7 +1400,7 @@ const Admin = ({ moduleKey = null }) => {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[#eebbbb]/70 text-xs uppercase tracking-[0.18em] text-[#6a3f43]/55">
+                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
                   <th className="px-3 py-3">Nombre</th>
                   <th className="px-3 py-3">Contacto</th>
                   <th className="px-3 py-3">Telefono</th>
@@ -1384,13 +1409,13 @@ const Admin = ({ moduleKey = null }) => {
               </thead>
               <tbody>
                 {proveedores.map((item) => (
-                  <tr key={item.id} className="border-b border-[#fbe3e3] text-[#6a3f43]">
+                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
                     <td className="px-3 py-3 font-semibold">{item.nombre}</td>
                     <td className="px-3 py-3">{item.contacto || '-'}</td>
                     <td className="px-3 py-3">{item.telefono || '-'}</td>
                     <td className="px-3 py-3">
                       <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditProveedor(item)} className="inline-flex items-center gap-1 rounded-full border border-[#f6c8c7] px-3 py-1.5 text-xs font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">
+                        <button onClick={() => handleEditProveedor(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
                           <PencilLine className="h-3.5 w-3.5" />
                           Editar
                         </button>
@@ -1404,7 +1429,7 @@ const Admin = ({ moduleKey = null }) => {
                 ))}
                 {proveedores.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-3 py-8 text-center text-sm text-[#6a3f43]/50">
+                    <td colSpan={4} className="px-3 py-8 text-center text-sm text-rosewood/50">
                       No hay registros
                     </td>
                   </tr>
@@ -1419,13 +1444,13 @@ const Admin = ({ moduleKey = null }) => {
         <section className={`${sectionShellClass} p-4 sm:p-5`}>
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-xl font-bold text-[#6a3f43] sm:text-2xl">Clientes cartera</h2>
-              <p className="text-sm text-[#6a3f43]/70">Clientes con cupo y deuda.</p>
+              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Clientes cartera</h2>
+              <p className="text-sm text-rosewood/70">Clientes con cupo y deuda.</p>
             </div>
             <button
               type="button"
               onClick={() => openCreateDialog(CREATE_DIALOGS.clientes_cartera)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
             >
               <Plus className="h-4 w-4" />
               Crear
@@ -1435,7 +1460,7 @@ const Admin = ({ moduleKey = null }) => {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[860px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[#eebbbb]/70 text-xs uppercase tracking-[0.18em] text-[#6a3f43]/55">
+                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
                   <th className="px-3 py-3">ID</th>
                   <th className="px-3 py-3">Nombre</th>
                   <th className="px-3 py-3">Documento</th>
@@ -1447,7 +1472,7 @@ const Admin = ({ moduleKey = null }) => {
               </thead>
               <tbody>
                 {clientesCartera.map((item) => (
-                  <tr key={item.id} className="border-b border-[#fbe3e3] text-[#6a3f43]">
+                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
                     <td className="px-3 py-3 font-semibold">{item.id}</td>
                     <td className="px-3 py-3">{item.nombre}</td>
                     <td className="px-3 py-3">{item.documento || '-'}</td>
@@ -1456,7 +1481,7 @@ const Admin = ({ moduleKey = null }) => {
                     <td className="px-3 py-3 text-right">{formatMoney(item.deuda_total)}</td>
                     <td className="px-3 py-3">
                       <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditClienteCartera(item)} className="inline-flex items-center gap-1 rounded-full border border-[#f6c8c7] px-3 py-1.5 text-xs font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">
+                        <button onClick={() => handleEditClienteCartera(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
                           <PencilLine className="h-3.5 w-3.5" />
                           Editar
                         </button>
@@ -1470,7 +1495,7 @@ const Admin = ({ moduleKey = null }) => {
                 ))}
                 {clientesCartera.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-3 py-8 text-center text-sm text-[#6a3f43]/50">
+                    <td colSpan={7} className="px-3 py-8 text-center text-sm text-rosewood/50">
                       No hay registros
                     </td>
                   </tr>
@@ -1485,13 +1510,13 @@ const Admin = ({ moduleKey = null }) => {
         <section className={`${sectionShellClass} p-4 sm:p-5`}>
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-xl font-bold text-[#6a3f43] sm:text-2xl">Clientes tienda</h2>
-              <p className="text-sm text-[#6a3f43]/70">Clientes fiados de tienda.</p>
+              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Clientes tienda</h2>
+              <p className="text-sm text-rosewood/70">Clientes fiados de tienda.</p>
             </div>
             <button
               type="button"
               onClick={() => openCreateDialog(CREATE_DIALOGS.clientes_tienda)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
             >
               <Plus className="h-4 w-4" />
               Crear
@@ -1501,7 +1526,7 @@ const Admin = ({ moduleKey = null }) => {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[520px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[#eebbbb]/70 text-xs uppercase tracking-[0.18em] text-[#6a3f43]/55">
+                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
                   <th className="px-3 py-3">ID</th>
                   <th className="px-3 py-3">Nombre</th>
                   <th className="px-3 py-3">Telefono</th>
@@ -1510,13 +1535,13 @@ const Admin = ({ moduleKey = null }) => {
               </thead>
               <tbody>
                 {clientesTienda.map((item) => (
-                  <tr key={item.id} className="border-b border-[#fbe3e3] text-[#6a3f43]">
+                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
                     <td className="px-3 py-3 font-semibold">{item.id}</td>
                     <td className="px-3 py-3">{item.nombre}</td>
                     <td className="px-3 py-3">{item.telefono_whatsapp || '-'}</td>
                     <td className="px-3 py-3">
                       <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditClienteTienda(item)} className="inline-flex items-center gap-1 rounded-full border border-[#f6c8c7] px-3 py-1.5 text-xs font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">
+                        <button onClick={() => handleEditClienteTienda(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
                           <PencilLine className="h-3.5 w-3.5" />
                           Editar
                         </button>
@@ -1530,7 +1555,7 @@ const Admin = ({ moduleKey = null }) => {
                 ))}
                 {clientesTienda.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-3 py-8 text-center text-sm text-[#6a3f43]/50">
+                    <td colSpan={4} className="px-3 py-8 text-center text-sm text-rosewood/50">
                       No hay registros
                     </td>
                   </tr>
@@ -1545,13 +1570,13 @@ const Admin = ({ moduleKey = null }) => {
         <section className={`${sectionShellClass} p-4 sm:p-5`}>
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-xl font-bold text-[#6a3f43] sm:text-2xl">Clientes fidelizacion</h2>
-              <p className="text-sm text-[#6a3f43]/70">Puntos y contacto.</p>
+              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Clientes fidelizacion</h2>
+              <p className="text-sm text-rosewood/70">Puntos y contacto.</p>
             </div>
             <button
               type="button"
               onClick={() => openCreateDialog(CREATE_DIALOGS.clientes_fidelizacion)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
             >
               <Plus className="h-4 w-4" />
               Crear
@@ -1561,7 +1586,7 @@ const Admin = ({ moduleKey = null }) => {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[620px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[#eebbbb]/70 text-xs uppercase tracking-[0.18em] text-[#6a3f43]/55">
+                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
                   <th className="px-3 py-3">ID</th>
                   <th className="px-3 py-3">Nombre</th>
                   <th className="px-3 py-3">Telefono</th>
@@ -1571,14 +1596,14 @@ const Admin = ({ moduleKey = null }) => {
               </thead>
               <tbody>
                 {clientesFidelizacion.map((item) => (
-                  <tr key={item.id} className="border-b border-[#fbe3e3] text-[#6a3f43]">
+                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
                     <td className="px-3 py-3 font-semibold">{item.id}</td>
                     <td className="px-3 py-3">{item.nombre}</td>
                     <td className="px-3 py-3">{item.telefono_whatsapp}</td>
                     <td className="px-3 py-3 text-right">{item.puntos_acumulados}</td>
                     <td className="px-3 py-3">
                       <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditClienteFidelizacion(item)} className="inline-flex items-center gap-1 rounded-full border border-[#f6c8c7] px-3 py-1.5 text-xs font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">
+                        <button onClick={() => handleEditClienteFidelizacion(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
                           <PencilLine className="h-3.5 w-3.5" />
                           Editar
                         </button>
@@ -1592,7 +1617,7 @@ const Admin = ({ moduleKey = null }) => {
                 ))}
                 {clientesFidelizacion.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-3 py-8 text-center text-sm text-[#6a3f43]/50">
+                    <td colSpan={5} className="px-3 py-8 text-center text-sm text-rosewood/50">
                       No hay registros
                     </td>
                   </tr>
@@ -1607,13 +1632,13 @@ const Admin = ({ moduleKey = null }) => {
         <section className={`${sectionShellClass} p-4 sm:p-5`}>
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-xl font-bold text-[#6a3f43] sm:text-2xl">Ventas</h2>
-              <p className="text-sm text-[#6a3f43]/70">Historial completo de ventas.</p>
+              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Ventas</h2>
+              <p className="text-sm text-rosewood/70">Historial completo de ventas.</p>
             </div>
             <button
               type="button"
               onClick={() => openCreateDialog(CREATE_DIALOGS.ventas)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
             >
               <Plus className="h-4 w-4" />
               Crear
@@ -1623,7 +1648,7 @@ const Admin = ({ moduleKey = null }) => {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[920px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[#eebbbb]/70 text-xs uppercase tracking-[0.18em] text-[#6a3f43]/55">
+                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
                   <th className="px-3 py-3">ID</th>
                   <th className="px-3 py-3">Cliente</th>
                   <th className="px-3 py-3">Fiado</th>
@@ -1636,7 +1661,7 @@ const Admin = ({ moduleKey = null }) => {
               </thead>
               <tbody>
                 {ventas.map((item) => (
-                  <tr key={item.venta_id} className="border-b border-[#fbe3e3] text-[#6a3f43]">
+                  <tr key={item.venta_id} className="border-b border-blush-50 text-rosewood">
                     <td className="px-3 py-3 font-semibold">{item.venta_id}</td>
                     <td className="px-3 py-3">{item.cliente_nombre || '-'}</td>
                     <td className="px-3 py-3">{item.es_fiado ? 'Si' : 'No'}</td>
@@ -1646,7 +1671,7 @@ const Admin = ({ moduleKey = null }) => {
                     <td className="px-3 py-3">{formatDateTime(item.fecha)}</td>
                     <td className="px-3 py-3">
                       <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditVenta(item)} className="inline-flex items-center gap-1 rounded-full border border-[#f6c8c7] px-3 py-1.5 text-xs font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">
+                        <button onClick={() => handleEditVenta(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
                           <PencilLine className="h-3.5 w-3.5" />
                           Editar
                         </button>
@@ -1660,7 +1685,7 @@ const Admin = ({ moduleKey = null }) => {
                 ))}
                 {ventas.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-3 py-8 text-center text-sm text-[#6a3f43]/50">
+                    <td colSpan={8} className="px-3 py-8 text-center text-sm text-rosewood/50">
                       No hay registros
                     </td>
                   </tr>
@@ -1675,13 +1700,13 @@ const Admin = ({ moduleKey = null }) => {
         <section className={`${sectionShellClass} p-4 sm:p-5`}>
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-xl font-bold text-[#6a3f43] sm:text-2xl">Pedidos proveedor</h2>
-              <p className="text-sm text-[#6a3f43]/70">Solicitudes enviadas a proveedor.</p>
+              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Pedidos proveedor</h2>
+              <p className="text-sm text-rosewood/70">Solicitudes enviadas a proveedor.</p>
             </div>
             <button
               type="button"
               onClick={() => openCreateDialog(CREATE_DIALOGS.pedidos_proveedor)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
             >
               <Plus className="h-4 w-4" />
               Crear
@@ -1691,7 +1716,7 @@ const Admin = ({ moduleKey = null }) => {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[#eebbbb]/70 text-xs uppercase tracking-[0.18em] text-[#6a3f43]/55">
+                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
                   <th className="px-3 py-3">ID</th>
                   <th className="px-3 py-3">Proveedor</th>
                   <th className="px-3 py-3">Descripcion</th>
@@ -1704,7 +1729,7 @@ const Admin = ({ moduleKey = null }) => {
               </thead>
               <tbody>
                 {pedidosProveedor.map((item) => (
-                  <tr key={item.id} className="border-b border-[#fbe3e3] text-[#6a3f43]">
+                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
                     <td className="px-3 py-3 font-semibold">{item.id}</td>
                     <td className="px-3 py-3">{item.proveedor_nombre}</td>
                     <td className="px-3 py-3">{item.descripcion}</td>
@@ -1714,7 +1739,7 @@ const Admin = ({ moduleKey = null }) => {
                     <td className="px-3 py-3">{formatDateTime(item.fecha_creacion)}</td>
                     <td className="px-3 py-3">
                       <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditPedidoProveedor(item)} className="inline-flex items-center gap-1 rounded-full border border-[#f6c8c7] px-3 py-1.5 text-xs font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">
+                        <button onClick={() => handleEditPedidoProveedor(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
                           <PencilLine className="h-3.5 w-3.5" />
                           Editar
                         </button>
@@ -1728,7 +1753,7 @@ const Admin = ({ moduleKey = null }) => {
                 ))}
                 {pedidosProveedor.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-3 py-8 text-center text-sm text-[#6a3f43]/50">
+                    <td colSpan={8} className="px-3 py-8 text-center text-sm text-rosewood/50">
                       No hay registros
                     </td>
                   </tr>
@@ -1743,13 +1768,13 @@ const Admin = ({ moduleKey = null }) => {
         <section className={`${sectionShellClass} p-4 sm:p-5`}>
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-xl font-bold text-[#6a3f43] sm:text-2xl">Facturas compra</h2>
-              <p className="text-sm text-[#6a3f43]/70">Ingresos de factura con detalle.</p>
+              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Facturas compra</h2>
+              <p className="text-sm text-rosewood/70">Ingresos de factura con detalle.</p>
             </div>
             <button
               type="button"
               onClick={() => openCreateDialog(CREATE_DIALOGS.facturas_compra)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
             >
               <Plus className="h-4 w-4" />
               Crear
@@ -1759,7 +1784,7 @@ const Admin = ({ moduleKey = null }) => {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1000px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[#eebbbb]/70 text-xs uppercase tracking-[0.18em] text-[#6a3f43]/55">
+                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
                   <th className="px-3 py-3">ID</th>
                   <th className="px-3 py-3">Proveedor</th>
                   <th className="px-3 py-3 text-right">Subtotal</th>
@@ -1772,7 +1797,7 @@ const Admin = ({ moduleKey = null }) => {
               </thead>
               <tbody>
                 {facturasCompra.map((item) => (
-                  <tr key={item.id} className="border-b border-[#fbe3e3] text-[#6a3f43]">
+                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
                     <td className="px-3 py-3 font-semibold">{item.id}</td>
                     <td className="px-3 py-3">{item.proveedor_nombre}</td>
                     <td className="px-3 py-3 text-right">{formatMoney(item.subtotal)}</td>
@@ -1782,7 +1807,7 @@ const Admin = ({ moduleKey = null }) => {
                     <td className="px-3 py-3">{formatDateTime(item.fecha_creacion)}</td>
                     <td className="px-3 py-3">
                       <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditFacturaCompra(item)} className="inline-flex items-center gap-1 rounded-full border border-[#f6c8c7] px-3 py-1.5 text-xs font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">
+                        <button onClick={() => handleEditFacturaCompra(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
                           <PencilLine className="h-3.5 w-3.5" />
                           Editar
                         </button>
@@ -1796,7 +1821,7 @@ const Admin = ({ moduleKey = null }) => {
                 ))}
                 {facturasCompra.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-3 py-8 text-center text-sm text-[#6a3f43]/50">
+                    <td colSpan={8} className="px-3 py-8 text-center text-sm text-rosewood/50">
                       No hay registros
                     </td>
                   </tr>
@@ -1811,13 +1836,13 @@ const Admin = ({ moduleKey = null }) => {
         <section className={`${sectionShellClass} p-4 sm:p-5`}>
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-xl font-bold text-[#6a3f43] sm:text-2xl">Gastos</h2>
-              <p className="text-sm text-[#6a3f43]/70">Gastos operativos.</p>
+              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Gastos</h2>
+              <p className="text-sm text-rosewood/70">Gastos operativos.</p>
             </div>
             <button
               type="button"
               onClick={() => openCreateDialog(CREATE_DIALOGS.gastos)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
             >
               <Plus className="h-4 w-4" />
               Crear
@@ -1827,7 +1852,7 @@ const Admin = ({ moduleKey = null }) => {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[880px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[#eebbbb]/70 text-xs uppercase tracking-[0.18em] text-[#6a3f43]/55">
+                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
                   <th className="px-3 py-3">ID</th>
                   <th className="px-3 py-3">Categoria</th>
                   <th className="px-3 py-3">Descripcion</th>
@@ -1839,7 +1864,7 @@ const Admin = ({ moduleKey = null }) => {
               </thead>
               <tbody>
                 {gastos.map((item) => (
-                  <tr key={item.id} className="border-b border-[#fbe3e3] text-[#6a3f43]">
+                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
                     <td className="px-3 py-3 font-semibold">{item.id}</td>
                     <td className="px-3 py-3">{item.categoria}</td>
                     <td className="px-3 py-3">{item.descripcion}</td>
@@ -1848,7 +1873,7 @@ const Admin = ({ moduleKey = null }) => {
                     <td className="px-3 py-3">{item.registrado_por}</td>
                     <td className="px-3 py-3">
                       <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditGasto(item)} className="inline-flex items-center gap-1 rounded-full border border-[#f6c8c7] px-3 py-1.5 text-xs font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">
+                        <button onClick={() => handleEditGasto(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
                           <PencilLine className="h-3.5 w-3.5" />
                           Editar
                         </button>
@@ -1862,7 +1887,7 @@ const Admin = ({ moduleKey = null }) => {
                 ))}
                 {gastos.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-3 py-8 text-center text-sm text-[#6a3f43]/50">
+                    <td colSpan={7} className="px-3 py-8 text-center text-sm text-rosewood/50">
                       No hay registros
                     </td>
                   </tr>
@@ -1877,13 +1902,13 @@ const Admin = ({ moduleKey = null }) => {
         <section className={`${sectionShellClass} p-4 sm:p-5`}>
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-xl font-bold text-[#6a3f43] sm:text-2xl">Abonos cartera</h2>
-              <p className="text-sm text-[#6a3f43]/70">Abonos registrados en cartera.</p>
+              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Abonos cartera</h2>
+              <p className="text-sm text-rosewood/70">Abonos registrados en cartera.</p>
             </div>
             <button
               type="button"
               onClick={() => openCreateDialog(CREATE_DIALOGS.abonos_cartera)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
             >
               <Plus className="h-4 w-4" />
               Crear
@@ -1893,7 +1918,7 @@ const Admin = ({ moduleKey = null }) => {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1000px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[#eebbbb]/70 text-xs uppercase tracking-[0.18em] text-[#6a3f43]/55">
+                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
                   <th className="px-3 py-3">ID</th>
                   <th className="px-3 py-3">Cliente</th>
                   <th className="px-3 py-3 text-right">Monto</th>
@@ -1906,7 +1931,7 @@ const Admin = ({ moduleKey = null }) => {
               </thead>
               <tbody>
                 {abonosCartera.map((item) => (
-                  <tr key={item.id} className="border-b border-[#fbe3e3] text-[#6a3f43]">
+                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
                     <td className="px-3 py-3 font-semibold">{item.id}</td>
                     <td className="px-3 py-3">{clientesCartera.find((c) => c.id === item.cliente_id)?.nombre || item.cliente_id}</td>
                     <td className="px-3 py-3 text-right">{formatMoney(item.monto)}</td>
@@ -1916,7 +1941,7 @@ const Admin = ({ moduleKey = null }) => {
                     <td className="px-3 py-3">{formatDateTime(item.fecha)}</td>
                     <td className="px-3 py-3">
                       <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditAbonoCartera(item)} className="inline-flex items-center gap-1 rounded-full border border-[#f6c8c7] px-3 py-1.5 text-xs font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">
+                        <button onClick={() => handleEditAbonoCartera(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
                           <PencilLine className="h-3.5 w-3.5" />
                           Editar
                         </button>
@@ -1930,7 +1955,7 @@ const Admin = ({ moduleKey = null }) => {
                 ))}
                 {abonosCartera.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-3 py-8 text-center text-sm text-[#6a3f43]/50">
+                    <td colSpan={8} className="px-3 py-8 text-center text-sm text-rosewood/50">
                       No hay registros
                     </td>
                   </tr>
@@ -1945,13 +1970,13 @@ const Admin = ({ moduleKey = null }) => {
         <section className={`${sectionShellClass} p-4 sm:p-5`}>
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-xl font-bold text-[#6a3f43] sm:text-2xl">Auditorias</h2>
-              <p className="text-sm text-[#6a3f43]/70">Registro de cambios y trazabilidad.</p>
+              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Auditorias</h2>
+              <p className="text-sm text-rosewood/70">Registro de cambios y trazabilidad.</p>
             </div>
             <button
               type="button"
               onClick={() => openCreateDialog(CREATE_DIALOGS.auditorias)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
             >
               <Plus className="h-4 w-4" />
               Crear
@@ -1961,7 +1986,7 @@ const Admin = ({ moduleKey = null }) => {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1000px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[#eebbbb]/70 text-xs uppercase tracking-[0.18em] text-[#6a3f43]/55">
+                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
                   <th className="px-3 py-3">Modulo</th>
                   <th className="px-3 py-3">Entidad</th>
                   <th className="px-3 py-3">Accion</th>
@@ -1973,7 +1998,7 @@ const Admin = ({ moduleKey = null }) => {
               </thead>
               <tbody>
                 {auditorias.map((item) => (
-                  <tr key={item.id} className="border-b border-[#fbe3e3] text-[#6a3f43]">
+                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
                     <td className="px-3 py-3 font-semibold">{item.modulo}</td>
                     <td className="px-3 py-3">{item.entidad}</td>
                     <td className="px-3 py-3">{item.accion}</td>
@@ -1982,7 +2007,7 @@ const Admin = ({ moduleKey = null }) => {
                     <td className="px-3 py-3">{formatDateTime(item.fecha)}</td>
                     <td className="px-3 py-3">
                       <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditAuditoria(item)} className="inline-flex items-center gap-1 rounded-full border border-[#f6c8c7] px-3 py-1.5 text-xs font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">
+                        <button onClick={() => handleEditAuditoria(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
                           <PencilLine className="h-3.5 w-3.5" />
                           Editar
                         </button>
@@ -1996,7 +2021,7 @@ const Admin = ({ moduleKey = null }) => {
                 ))}
                 {auditorias.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-3 py-8 text-center text-sm text-[#6a3f43]/50">
+                    <td colSpan={7} className="px-3 py-8 text-center text-sm text-rosewood/50">
                       No hay registros
                     </td>
                   </tr>
@@ -2010,36 +2035,36 @@ const Admin = ({ moduleKey = null }) => {
       {activeTab === 'informes' && (
         <section className={`${sectionShellClass} space-y-4 p-4 sm:p-5`}>
           <div>
-            <h2 className="text-xl font-bold text-[#6a3f43] sm:text-2xl">Informes por categorias</h2>
-            <p className="text-sm text-[#6a3f43]/70">Resumen de desempeño y lectura ejecutiva.</p>
+            <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Informes por categorias</h2>
+            <p className="text-sm text-rosewood/70">Resumen de desempeño y lectura ejecutiva.</p>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-2xl border border-[#eebbbb]/60 bg-[#fdf1f1] p-4">
-              <p className="text-xs uppercase tracking-[0.24em] text-[#6a3f43]/55">Ventas registradas</p>
-              <p className="mt-2 text-2xl font-black text-[#6a3f43]">{informes.ventas_totales}</p>
+            <div className="rounded-2xl border border-blush-300/60 bg-blush-50 p-4">
+              <p className="text-xs uppercase tracking-[0.24em] text-rosewood/55">Ventas registradas</p>
+              <p className="mt-2 text-2xl font-black text-rosewood">{informes.ventas_totales}</p>
             </div>
-            <div className="rounded-2xl border border-[#eebbbb]/60 bg-[#fdf1f1] p-4">
-              <p className="text-xs uppercase tracking-[0.24em] text-[#6a3f43]/55">Facturacion total</p>
-              <p className="mt-2 text-2xl font-black text-[#6a3f43]">{formatMoney(informes.facturacion_total)}</p>
+            <div className="rounded-2xl border border-blush-300/60 bg-blush-50 p-4">
+              <p className="text-xs uppercase tracking-[0.24em] text-rosewood/55">Facturacion total</p>
+              <p className="mt-2 text-2xl font-black text-rosewood">{formatMoney(informes.facturacion_total)}</p>
             </div>
-            <div className="rounded-2xl border border-[#eebbbb]/60 bg-[#fdf1f1] p-4">
-              <p className="text-xs uppercase tracking-[0.24em] text-[#6a3f43]/55">Vendedor top</p>
-              <p className="mt-2 text-xl font-black text-[#6a3f43]">
+            <div className="rounded-2xl border border-blush-300/60 bg-blush-50 p-4">
+              <p className="text-xs uppercase tracking-[0.24em] text-rosewood/55">Vendedor top</p>
+              <p className="mt-2 text-xl font-black text-rosewood">
                 {informes.vendedor_mas_vendedor ? informes.vendedor_mas_vendedor.vendedor : 'Sin datos'}
               </p>
-              <p className="text-sm text-[#6a3f43]/75">
+              <p className="text-sm text-rosewood/75">
                 {informes.vendedor_mas_vendedor
                   ? `${informes.vendedor_mas_vendedor.ventas} ventas · ${formatMoney(informes.vendedor_mas_vendedor.total_vendido)}`
                   : 'Necesita ventas con vendedor asignado'}
               </p>
             </div>
-            <div className="rounded-2xl border border-[#eebbbb]/60 bg-[#fdf1f1] p-4">
-              <p className="text-xs uppercase tracking-[0.24em] text-[#6a3f43]/55">Producto top</p>
-              <p className="mt-2 text-xl font-black text-[#6a3f43]">
+            <div className="rounded-2xl border border-blush-300/60 bg-blush-50 p-4">
+              <p className="text-xs uppercase tracking-[0.24em] text-rosewood/55">Producto top</p>
+              <p className="mt-2 text-xl font-black text-rosewood">
                 {informes.producto_mas_vendido ? informes.producto_mas_vendido.producto : 'Sin datos'}
               </p>
-              <p className="text-sm text-[#6a3f43]/75">
+              <p className="text-sm text-rosewood/75">
                 {informes.producto_mas_vendido
                   ? `${informes.producto_mas_vendido.unidades_vendidas} unidades · ${formatMoney(informes.producto_mas_vendido.total_vendido)}`
                   : 'Sin movimientos'}
@@ -2048,12 +2073,12 @@ const Admin = ({ moduleKey = null }) => {
           </div>
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <div className="rounded-2xl border border-[#eebbbb]/60 bg-white p-4">
-              <h3 className="mb-3 text-base font-bold text-[#6a3f43]">Vendedores con mas ventas</h3>
+            <div className="rounded-2xl border border-blush-300/60 bg-white p-4">
+              <h3 className="mb-3 text-base font-bold text-rosewood">Vendedores con mas ventas</h3>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[520px] text-left text-sm">
                   <thead>
-                    <tr className="border-b border-[#eebbbb]/70 text-xs uppercase tracking-[0.18em] text-[#6a3f43]/55">
+                    <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
                       <th className="px-3 py-2">Vendedor</th>
                       <th className="px-3 py-2 text-right">Ventas</th>
                       <th className="px-3 py-2 text-right">Total</th>
@@ -2061,7 +2086,7 @@ const Admin = ({ moduleKey = null }) => {
                   </thead>
                   <tbody>
                     {informes.vendedores_top.map((item) => (
-                      <tr key={item.vendedor} className="border-b border-[#fbe3e3] text-[#6a3f43]">
+                      <tr key={item.vendedor} className="border-b border-blush-50 text-rosewood">
                         <td className="px-3 py-2">{item.vendedor}</td>
                         <td className="px-3 py-2 text-right">{item.ventas}</td>
                         <td className="px-3 py-2 text-right">{formatMoney(item.total_vendido)}</td>
@@ -2069,7 +2094,7 @@ const Admin = ({ moduleKey = null }) => {
                     ))}
                     {(!informes.vendedores_top || informes.vendedores_top.length === 0) && (
                       <tr>
-                        <td colSpan={3} className="px-3 py-8 text-center text-sm text-[#6a3f43]/50">
+                        <td colSpan={3} className="px-3 py-8 text-center text-sm text-rosewood/50">
                           No hay datos
                         </td>
                       </tr>
@@ -2079,12 +2104,12 @@ const Admin = ({ moduleKey = null }) => {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-[#eebbbb]/60 bg-white p-4">
-              <h3 className="mb-3 text-base font-bold text-[#6a3f43]">Productos menos vendidos</h3>
+            <div className="rounded-2xl border border-blush-300/60 bg-white p-4">
+              <h3 className="mb-3 text-base font-bold text-rosewood">Productos menos vendidos</h3>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[520px] text-left text-sm">
                   <thead>
-                    <tr className="border-b border-[#eebbbb]/70 text-xs uppercase tracking-[0.18em] text-[#6a3f43]/55">
+                    <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
                       <th className="px-3 py-2">Producto</th>
                       <th className="px-3 py-2 text-right">Unidades</th>
                       <th className="px-3 py-2 text-right">Total</th>
@@ -2092,7 +2117,7 @@ const Admin = ({ moduleKey = null }) => {
                   </thead>
                   <tbody>
                     {informes.productos_menos_vendidos.map((item) => (
-                      <tr key={item.producto_id} className="border-b border-[#fbe3e3] text-[#6a3f43]">
+                      <tr key={item.producto_id} className="border-b border-blush-50 text-rosewood">
                         <td className="px-3 py-2">{item.producto}</td>
                         <td className="px-3 py-2 text-right">{item.unidades_vendidas}</td>
                         <td className="px-3 py-2 text-right">{formatMoney(item.total_vendido)}</td>
@@ -2100,7 +2125,7 @@ const Admin = ({ moduleKey = null }) => {
                     ))}
                     {(!informes.productos_menos_vendidos || informes.productos_menos_vendidos.length === 0) && (
                       <tr>
-                        <td colSpan={3} className="px-3 py-8 text-center text-sm text-[#6a3f43]/50">
+                        <td colSpan={3} className="px-3 py-8 text-center text-sm text-rosewood/50">
                           No hay datos
                         </td>
                       </tr>
@@ -2111,7 +2136,7 @@ const Admin = ({ moduleKey = null }) => {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[#eebbbb]/60 bg-[#fdf1f1] p-4 text-sm text-[#6a3f43]/80">
+          <div className="rounded-2xl border border-blush-300/60 bg-blush-50 p-4 text-sm text-rosewood/80">
             El ranking de vendedores solo incluye ventas guardadas con vendedor asignado.
           </div>
         </section>
@@ -2119,336 +2144,193 @@ const Admin = ({ moduleKey = null }) => {
 
 
       {createDialog === CREATE_DIALOGS.vendedores && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="w-full max-w-2xl rounded-[28px] bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold text-[#6a3f43]">Crear vendedor</h3>
-                <p className="text-sm text-[#6a3f43]/70">Alta rápida desde modal.</p>
-              </div>
-              <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] p-2 text-[#6a3f43] transition hover:bg-[#fbe3e3]" aria-label="Cerrar modal">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-2xl" title="Crear vendedor" subtitle="Alta rápida desde modal.">
             <form onSubmit={handleCreateVendedor} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-               <input value={vendedorForm.username} onChange={(e) => setVendedorForm((c) => ({ ...c, username: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Usuario" required />
-               <input type="password" value={vendedorForm.password} onChange={(e) => setVendedorForm((c) => ({ ...c, password: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Contraseña" required />
+               <input value={vendedorForm.username} onChange={(e) => setVendedorForm((c) => ({ ...c, username: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Usuario" required />
+               <input type="password" value={vendedorForm.password} onChange={(e) => setVendedorForm((c) => ({ ...c, password: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Contraseña" required />
               <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
-                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
-                <button type="submit" className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear vendedor</button>
+                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-50">Cancelar</button>
+                <button type="submit" disabled={saving} className="rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300">Crear vendedor</button>
               </div>
             </form>
-          </div>
-        </div>
+      </Modal>
       )}
 
       {createDialog === CREATE_DIALOGS.admins && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="w-full max-w-2xl rounded-[28px] bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold text-[#6a3f43]">Crear admin</h3>
-                <p className="text-sm text-[#6a3f43]/70">Alta rápida desde modal.</p>
-              </div>
-              <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] p-2 text-[#6a3f43] transition hover:bg-[#fbe3e3]" aria-label="Cerrar modal">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-2xl" title="Crear admin" subtitle="Alta rápida desde modal.">
             <form onSubmit={handleCreateAdmin} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-               <input value={adminForm.username} onChange={(e) => setAdminForm((c) => ({ ...c, username: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Usuario" required />
-               <input type="password" value={adminForm.password} onChange={(e) => setAdminForm((c) => ({ ...c, password: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Contraseña" required />
+               <input value={adminForm.username} onChange={(e) => setAdminForm((c) => ({ ...c, username: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Usuario" required />
+               <input type="password" value={adminForm.password} onChange={(e) => setAdminForm((c) => ({ ...c, password: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Contraseña" required />
               <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
-                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
-                <button type="submit" className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear admin</button>
+                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-50">Cancelar</button>
+                <button type="submit" disabled={saving} className="rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300">Crear admin</button>
               </div>
             </form>
-          </div>
-        </div>
+      </Modal>
       )}
 
       {createDialog === CREATE_DIALOGS.productos && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="w-full max-w-4xl rounded-[28px] bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold text-[#6a3f43]">Crear producto</h3>
-                <p className="text-sm text-[#6a3f43]/70">Alta rápida desde modal.</p>
-              </div>
-              <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] p-2 text-[#6a3f43] transition hover:bg-[#fbe3e3]" aria-label="Cerrar modal">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-4xl" title="Crear producto" subtitle="Alta rápida desde modal.">
             <form onSubmit={handleCreateProducto} className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              <input value={productoForm.nombre} onChange={(e) => setProductoForm((c) => ({ ...c, nombre: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Nombre" required />
-              <input value={productoForm.codigo_barras} onChange={(e) => setProductoForm((c) => ({ ...c, codigo_barras: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Código barras" />
-              <select value={productoForm.catalogo} onChange={(e) => setProductoForm((c) => ({ ...c, catalogo: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none">
+              <input value={productoForm.nombre} onChange={(e) => setProductoForm((c) => ({ ...c, nombre: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Nombre" required />
+              <input value={productoForm.codigo_barras} onChange={(e) => setProductoForm((c) => ({ ...c, codigo_barras: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Código barras" />
+              <select value={productoForm.catalogo} onChange={(e) => setProductoForm((c) => ({ ...c, catalogo: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none">
                 <option value="tienda">Tienda</option>
                 <option value="cartera">Cartera</option>
               </select>
-              <input type="number" min="0" step="0.01" value={productoForm.precio_costo} onChange={(e) => setProductoForm((c) => ({ ...c, precio_costo: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Precio costo" />
-              <input type="number" min="0" step="0.01" value={productoForm.precio_venta} onChange={(e) => setProductoForm((c) => ({ ...c, precio_venta: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Precio venta" />
-              <input type="number" min="0" value={productoForm.stock_actual} onChange={(e) => setProductoForm((c) => ({ ...c, stock_actual: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Stock actual" />
-              <input type="number" min="0" value={productoForm.stock_minimo} onChange={(e) => setProductoForm((c) => ({ ...c, stock_minimo: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Stock minimo" />
+              <input type="number" min="0" step="0.01" value={productoForm.precio_costo} onChange={(e) => setProductoForm((c) => ({ ...c, precio_costo: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Precio costo" />
+              <input type="number" min="0" step="0.01" value={productoForm.precio_venta} onChange={(e) => setProductoForm((c) => ({ ...c, precio_venta: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Precio venta" />
+              <input type="number" min="0" value={productoForm.stock_actual} onChange={(e) => setProductoForm((c) => ({ ...c, stock_actual: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Stock actual" />
+              <input type="number" min="0" value={productoForm.stock_minimo} onChange={(e) => setProductoForm((c) => ({ ...c, stock_minimo: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Stock minimo" />
               <div className="md:col-span-3 flex justify-end gap-2 pt-2">
-                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
-                <button type="submit" className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear producto</button>
+                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-50">Cancelar</button>
+                <button type="submit" disabled={saving} className="rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300">Crear producto</button>
               </div>
             </form>
-          </div>
-        </div>
+      </Modal>
       )}
 
       {createDialog === CREATE_DIALOGS.proveedores && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="w-full max-w-2xl rounded-[28px] bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold text-[#6a3f43]">Crear proveedor</h3>
-                <p className="text-sm text-[#6a3f43]/70">Alta rápida desde modal.</p>
-              </div>
-              <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] p-2 text-[#6a3f43] transition hover:bg-[#fbe3e3]" aria-label="Cerrar modal">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-2xl" title="Crear proveedor" subtitle="Alta rápida desde modal.">
             <form onSubmit={handleCreateProveedor} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <input value={proveedorForm.nombre} onChange={(e) => setProveedorForm((c) => ({ ...c, nombre: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Nombre" required />
-              <input value={proveedorForm.contacto} onChange={(e) => setProveedorForm((c) => ({ ...c, contacto: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Contacto" />
-              <input value={proveedorForm.telefono} onChange={(e) => setProveedorForm((c) => ({ ...c, telefono: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Telefono" />
+              <input value={proveedorForm.nombre} onChange={(e) => setProveedorForm((c) => ({ ...c, nombre: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Nombre" required />
+              <input value={proveedorForm.contacto} onChange={(e) => setProveedorForm((c) => ({ ...c, contacto: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Contacto" />
+              <input value={proveedorForm.telefono} onChange={(e) => setProveedorForm((c) => ({ ...c, telefono: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Telefono" />
               <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
-                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
-                <button type="submit" className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear proveedor</button>
+                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-50">Cancelar</button>
+                <button type="submit" disabled={saving} className="rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300">Crear proveedor</button>
               </div>
             </form>
-          </div>
-        </div>
+      </Modal>
       )}
 
       {createDialog === CREATE_DIALOGS.auditorias && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="w-full max-w-3xl rounded-[28px] bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold text-[#6a3f43]">Crear auditoria</h3>
-                <p className="text-sm text-[#6a3f43]/70">Alta rápida desde modal.</p>
-              </div>
-              <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] p-2 text-[#6a3f43] transition hover:bg-[#fbe3e3]" aria-label="Cerrar modal">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-3xl" title="Crear auditoria" subtitle="Alta rápida desde modal.">
             <form onSubmit={handleCreateAuditoria} className="grid grid-cols-1 gap-3 md:grid-cols-2">
-               <input value={auditoriaForm.modulo} onChange={(e) => setAuditoriaForm((c) => ({ ...c, modulo: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Módulo" required />
-               <input value={auditoriaForm.entidad} onChange={(e) => setAuditoriaForm((c) => ({ ...c, entidad: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Entidad" required />
-               <input value={auditoriaForm.entidad_id} onChange={(e) => setAuditoriaForm((c) => ({ ...c, entidad_id: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="ID entidad" />
-               <input value={auditoriaForm.accion} onChange={(e) => setAuditoriaForm((c) => ({ ...c, accion: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Acción" required />
-              <textarea value={auditoriaForm.detalle} onChange={(e) => setAuditoriaForm((c) => ({ ...c, detalle: e.target.value }))} className="min-h-28 rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none md:col-span-2" placeholder="Detalle" />
+               <input value={auditoriaForm.modulo} onChange={(e) => setAuditoriaForm((c) => ({ ...c, modulo: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Módulo" required />
+               <input value={auditoriaForm.entidad} onChange={(e) => setAuditoriaForm((c) => ({ ...c, entidad: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Entidad" required />
+               <input value={auditoriaForm.entidad_id} onChange={(e) => setAuditoriaForm((c) => ({ ...c, entidad_id: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="ID entidad" />
+               <input value={auditoriaForm.accion} onChange={(e) => setAuditoriaForm((c) => ({ ...c, accion: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Acción" required />
+              <textarea value={auditoriaForm.detalle} onChange={(e) => setAuditoriaForm((c) => ({ ...c, detalle: e.target.value }))} className="min-h-28 rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none md:col-span-2" placeholder="Detalle" />
               <div className="md:col-span-2 flex justify-end gap-2 pt-2">
-                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
-                <button type="submit" className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear auditoria</button>
+                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-50">Cancelar</button>
+                <button type="submit" disabled={saving} className="rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300">Crear auditoria</button>
               </div>
             </form>
-          </div>
-        </div>
+      </Modal>
       )}
       {createDialog === CREATE_DIALOGS.clientes_cartera && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="w-full max-w-2xl rounded-[28px] bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold text-[#6a3f43]">Crear cliente cartera</h3>
-                <p className="text-sm text-[#6a3f43]/70">Alta rápida desde modal.</p>
-              </div>
-              <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] p-2 text-[#6a3f43] transition hover:bg-[#fbe3e3]" aria-label="Cerrar modal">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-2xl" title="Crear cliente cartera" subtitle="Alta rápida desde modal.">
             <form onSubmit={handleCreateClienteCartera} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <input value={clienteCarteraForm.nombre} onChange={(e) => setClienteCarteraForm((c) => ({ ...c, nombre: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Nombre" required />
-              <input value={clienteCarteraForm.documento} onChange={(e) => setClienteCarteraForm((c) => ({ ...c, documento: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Documento (opcional)" />
-              <input value={clienteCarteraForm.telefono_whatsapp} onChange={(e) => setClienteCarteraForm((c) => ({ ...c, telefono_whatsapp: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Teléfono (opcional)" />
-              <input type="number" min="0" value={clienteCarteraForm.limite_credito} onChange={(e) => setClienteCarteraForm((c) => ({ ...c, limite_credito: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Límite crédito" />
+              <input value={clienteCarteraForm.nombre} onChange={(e) => setClienteCarteraForm((c) => ({ ...c, nombre: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Nombre" required />
+              <input value={clienteCarteraForm.documento} onChange={(e) => setClienteCarteraForm((c) => ({ ...c, documento: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Documento (opcional)" />
+              <input value={clienteCarteraForm.telefono_whatsapp} onChange={(e) => setClienteCarteraForm((c) => ({ ...c, telefono_whatsapp: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Teléfono (opcional)" />
+              <input type="number" min="0" value={clienteCarteraForm.limite_credito} onChange={(e) => setClienteCarteraForm((c) => ({ ...c, limite_credito: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Límite crédito" />
               <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
-                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
-                <button type="submit" className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear cliente</button>
+                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-50">Cancelar</button>
+                <button type="submit" disabled={saving} className="rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300">Crear cliente</button>
               </div>
             </form>
-          </div>
-        </div>
+      </Modal>
       )}
 
       {createDialog === CREATE_DIALOGS.clientes_tienda && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="w-full max-w-2xl rounded-[28px] bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold text-[#6a3f43]">Crear cliente tienda</h3>
-                <p className="text-sm text-[#6a3f43]/70">Alta rápida desde modal.</p>
-              </div>
-              <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] p-2 text-[#6a3f43] transition hover:bg-[#fbe3e3]" aria-label="Cerrar modal">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-2xl" title="Crear cliente tienda" subtitle="Alta rápida desde modal.">
             <form onSubmit={handleCreateClienteTienda} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <input value={clienteTiendaForm.nombre} onChange={(e) => setClienteTiendaForm((c) => ({ ...c, nombre: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Nombre" required />
-              <input value={clienteTiendaForm.telefono_whatsapp} onChange={(e) => setClienteTiendaForm((c) => ({ ...c, telefono_whatsapp: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Teléfono (opcional)" />
+              <input value={clienteTiendaForm.nombre} onChange={(e) => setClienteTiendaForm((c) => ({ ...c, nombre: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Nombre" required />
+              <input value={clienteTiendaForm.telefono_whatsapp} onChange={(e) => setClienteTiendaForm((c) => ({ ...c, telefono_whatsapp: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Teléfono (opcional)" />
               <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
-                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
-                <button type="submit" className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear cliente</button>
+                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-50">Cancelar</button>
+                <button type="submit" disabled={saving} className="rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300">Crear cliente</button>
               </div>
             </form>
-          </div>
-        </div>
+      </Modal>
       )}
 
       {createDialog === CREATE_DIALOGS.clientes_fidelizacion && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="w-full max-w-2xl rounded-[28px] bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold text-[#6a3f43]">Crear cliente fidelizacion</h3>
-                <p className="text-sm text-[#6a3f43]/70">Alta rápida desde modal.</p>
-              </div>
-              <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] p-2 text-[#6a3f43] transition hover:bg-[#fbe3e3]" aria-label="Cerrar modal">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-2xl" title="Crear cliente fidelizacion" subtitle="Alta rápida desde modal.">
             <form onSubmit={handleCreateClienteFidelizacion} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <input value={clienteFidelizacionForm.nombre} onChange={(e) => setClienteFidelizacionForm((c) => ({ ...c, nombre: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Nombre" required />
-              <input value={clienteFidelizacionForm.telefono_whatsapp} onChange={(e) => setClienteFidelizacionForm((c) => ({ ...c, telefono_whatsapp: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Teléfono" />
-              <input type="number" min="0" value={clienteFidelizacionForm.puntos_acumulados} onChange={(e) => setClienteFidelizacionForm((c) => ({ ...c, puntos_acumulados: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Puntos" />
+              <input value={clienteFidelizacionForm.nombre} onChange={(e) => setClienteFidelizacionForm((c) => ({ ...c, nombre: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Nombre" required />
+              <input value={clienteFidelizacionForm.telefono_whatsapp} onChange={(e) => setClienteFidelizacionForm((c) => ({ ...c, telefono_whatsapp: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Teléfono" />
+              <input type="number" min="0" value={clienteFidelizacionForm.puntos_acumulados} onChange={(e) => setClienteFidelizacionForm((c) => ({ ...c, puntos_acumulados: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Puntos" />
               <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
-                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
-                <button type="submit" className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear cliente</button>
+                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-50">Cancelar</button>
+                <button type="submit" disabled={saving} className="rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300">Crear cliente</button>
               </div>
             </form>
-          </div>
-        </div>
+      </Modal>
       )}
 
       {createDialog === CREATE_DIALOGS.ventas && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="w-full max-w-3xl rounded-[28px] bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold text-[#6a3f43]">Crear venta</h3>
-                <p className="text-sm text-[#6a3f43]/70">Alta rápida desde modal. Use JSON en 'items' similar a: {'[{"producto_id":1,"cantidad":2,"precio":10000}]'}</p>
-              </div>
-              <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] p-2 text-[#6a3f43] transition hover:bg-[#fbe3e3]" aria-label="Cerrar modal">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-3xl" title="Crear venta" subtitle={`Alta rápida desde modal. Use JSON en 'items' similar a: {'[{"producto_id":1,"cantidad":2,"precio":10000}]'}`}>
             <form onSubmit={handleCreateVenta} className="grid grid-cols-1 gap-3">
-               <input value={ventaForm.cliente_id} onChange={(e) => setVentaForm((c) => ({ ...c, cliente_id: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="ID del cliente (opcional)" />
-               <textarea value={ventaForm.items_json} onChange={(e) => setVentaForm((c) => ({ ...c, items_json: e.target.value }))} className="min-h-28 rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder='[{"producto_id":1,"cantidad":2}]' />
+               <input value={ventaForm.cliente_id} onChange={(e) => setVentaForm((c) => ({ ...c, cliente_id: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="ID del cliente (opcional)" />
+               <textarea value={ventaForm.items_json} onChange={(e) => setVentaForm((c) => ({ ...c, items_json: e.target.value }))} className="min-h-28 rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder='[{"producto_id":1,"cantidad":2}]' />
               <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
-                <button type="submit" className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear venta</button>
+                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-50">Cancelar</button>
+                <button type="submit" disabled={saving} className="rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300">Crear venta</button>
               </div>
             </form>
-          </div>
-        </div>
+      </Modal>
       )}
 
       {createDialog === CREATE_DIALOGS.pedidos_proveedor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="w-full max-w-2xl rounded-[28px] bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold text-[#6a3f43]">Crear pedido proveedor</h3>
-                <p className="text-sm text-[#6a3f43]/70">Alta rápida desde modal.</p>
-              </div>
-              <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] p-2 text-[#6a3f43] transition hover:bg-[#fbe3e3]" aria-label="Cerrar modal">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-2xl" title="Crear pedido proveedor" subtitle="Alta rápida desde modal.">
             <form onSubmit={handleCreatePedidoProveedor} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <input value={pedidoProveedorForm.proveedor_id} onChange={(e) => setPedidoProveedorForm((c) => ({ ...c, proveedor_id: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="ID del proveedor" required />
-              <input value={pedidoProveedorForm.descripcion} onChange={(e) => setPedidoProveedorForm((c) => ({ ...c, descripcion: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Descripción" required />
-              <input type="number" min="0" value={pedidoProveedorForm.monto_estimado} onChange={(e) => setPedidoProveedorForm((c) => ({ ...c, monto_estimado: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Monto estimado" />
+              <input value={pedidoProveedorForm.proveedor_id} onChange={(e) => setPedidoProveedorForm((c) => ({ ...c, proveedor_id: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="ID del proveedor" required />
+              <input value={pedidoProveedorForm.descripcion} onChange={(e) => setPedidoProveedorForm((c) => ({ ...c, descripcion: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Descripción" required />
+              <input type="number" min="0" value={pedidoProveedorForm.monto_estimado} onChange={(e) => setPedidoProveedorForm((c) => ({ ...c, monto_estimado: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Monto estimado" />
               <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
-                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
-                <button type="submit" className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear pedido</button>
+                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-50">Cancelar</button>
+                <button type="submit" disabled={saving} className="rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300">Crear pedido</button>
               </div>
             </form>
-          </div>
-        </div>
+      </Modal>
       )}
 
       {createDialog === CREATE_DIALOGS.facturas_compra && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="w-full max-w-3xl rounded-[28px] bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold text-[#6a3f43]">Crear factura compra</h3>
-                <p className="text-sm text-[#6a3f43]/70">Alta rápida desde modal. Items como JSON en 'items'.</p>
-              </div>
-              <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] p-2 text-[#6a3f43] transition hover:bg-[#fbe3e3]" aria-label="Cerrar modal">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-3xl" title="Crear factura compra" subtitle="Alta rápida desde modal. Items como JSON en 'items'.">
             <form onSubmit={handleCreateFacturaCompra} className="grid grid-cols-1 gap-3">
-               <input value={facturaCompraForm.proveedor_id} onChange={(e) => setFacturaCompraForm((c) => ({ ...c, proveedor_id: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="ID del proveedor" required />
-               <textarea value={facturaCompraForm.items_json} onChange={(e) => setFacturaCompraForm((c) => ({ ...c, items_json: e.target.value }))} className="min-h-28 rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder='[{"producto_id":1,"cantidad":2}]' />
+               <input value={facturaCompraForm.proveedor_id} onChange={(e) => setFacturaCompraForm((c) => ({ ...c, proveedor_id: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="ID del proveedor" required />
+               <textarea value={facturaCompraForm.items_json} onChange={(e) => setFacturaCompraForm((c) => ({ ...c, items_json: e.target.value }))} className="min-h-28 rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder='[{"producto_id":1,"cantidad":2}]' />
               <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
-                <button type="submit" className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear factura</button>
+                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-50">Cancelar</button>
+                <button type="submit" disabled={saving} className="rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300">Crear factura</button>
               </div>
             </form>
-          </div>
-        </div>
+      </Modal>
       )}
 
       {createDialog === CREATE_DIALOGS.gastos && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="w-full max-w-2xl rounded-[28px] bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold text-[#6a3f43]">Crear gasto</h3>
-                <p className="text-sm text-[#6a3f43]/70">Alta rápida desde modal.</p>
-              </div>
-              <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] p-2 text-[#6a3f43] transition hover:bg-[#fbe3e3]" aria-label="Cerrar modal">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-2xl" title="Crear gasto" subtitle="Alta rápida desde modal.">
             <form onSubmit={handleCreateGasto} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <input value={gastoForm.categoria} onChange={(e) => setGastoForm((c) => ({ ...c, categoria: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Categoria" required />
-              <input value={gastoForm.descripcion} onChange={(e) => setGastoForm((c) => ({ ...c, descripcion: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Descripcion" />
-              <input type="number" min="0" value={gastoForm.monto} onChange={(e) => setGastoForm((c) => ({ ...c, monto: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Monto" required />
+              <input value={gastoForm.categoria} onChange={(e) => setGastoForm((c) => ({ ...c, categoria: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Categoria" required />
+              <input value={gastoForm.descripcion} onChange={(e) => setGastoForm((c) => ({ ...c, descripcion: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Descripcion" />
+              <input type="number" min="0" value={gastoForm.monto} onChange={(e) => setGastoForm((c) => ({ ...c, monto: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Monto" required />
               <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
-                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
-                <button type="submit" className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear gasto</button>
+                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-50">Cancelar</button>
+                <button type="submit" disabled={saving} className="rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300">Crear gasto</button>
               </div>
             </form>
-          </div>
-        </div>
+      </Modal>
       )}
 
       {createDialog === CREATE_DIALOGS.abonos_cartera && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="w-full max-w-2xl rounded-[28px] bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold text-[#6a3f43]">Crear abono cartera</h3>
-                <p className="text-sm text-[#6a3f43]/70">Alta rápida desde modal.</p>
-              </div>
-              <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] p-2 text-[#6a3f43] transition hover:bg-[#fbe3e3]" aria-label="Cerrar modal">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-2xl" title="Crear abono cartera" subtitle="Alta rápida desde modal.">
             <form onSubmit={handleCreateAbonoCartera} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <input type="number" min="1" value={abonoCarteraForm.cliente_id} onChange={(e) => setAbonoCarteraForm((c) => ({ ...c, cliente_id: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="ID del cliente" required />
-              <input type="number" min="0" step="0.01" value={abonoCarteraForm.monto} onChange={(e) => setAbonoCarteraForm((c) => ({ ...c, monto: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Monto" required />
-              <select value={abonoCarteraForm.metodo_pago} onChange={(e) => setAbonoCarteraForm((c) => ({ ...c, metodo_pago: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none">
+              <input type="number" min="1" value={abonoCarteraForm.cliente_id} onChange={(e) => setAbonoCarteraForm((c) => ({ ...c, cliente_id: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="ID del cliente" required />
+              <input type="number" min="0" step="0.01" value={abonoCarteraForm.monto} onChange={(e) => setAbonoCarteraForm((c) => ({ ...c, monto: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Monto" required />
+              <select value={abonoCarteraForm.metodo_pago} onChange={(e) => setAbonoCarteraForm((c) => ({ ...c, metodo_pago: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none">
                 <option value="efectivo">Efectivo</option>
                 <option value="transferencia">Transferencia</option>
               </select>
-              <input value={abonoCarteraForm.referencia} onChange={(e) => setAbonoCarteraForm((c) => ({ ...c, referencia: e.target.value }))} className="rounded-xl border border-[#eebbbb] px-3 py-2 text-sm focus:border-[#eebbbb] focus:outline-none" placeholder="Referencia (opcional)" />
+              <input value={abonoCarteraForm.referencia} onChange={(e) => setAbonoCarteraForm((c) => ({ ...c, referencia: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Referencia (opcional)" />
               <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
-                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#fbe3e3]">Cancelar</button>
-                <button type="submit" className="rounded-full bg-[#eebbbb] px-4 py-2 text-sm font-semibold text-[#6a3f43] transition hover:bg-[#f6c8c7]">Crear abono</button>
+                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-50">Cancelar</button>
+                <button type="submit" disabled={saving} className="rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300">Crear abono</button>
               </div>
             </form>
-          </div>
-        </div>
+      </Modal>
       )}
       {ConfirmModal}
       <EditFormModal

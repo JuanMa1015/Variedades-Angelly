@@ -2,6 +2,8 @@ const CarteraProductosSection = ({
   productosCartera,
   formatMoney,
   startNewProducto,
+  startEditingProducto,
+  handleDeleteProducto,
 }) => {
   return (
     <section className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
@@ -28,8 +30,7 @@ const CarteraProductosSection = ({
                 <th className="px-4 py-3 font-semibold text-gray-700">Código</th>
                 <th className="px-4 py-3 text-right font-semibold text-gray-700">Costo</th>
                 <th className="px-4 py-3 text-right font-semibold text-gray-700">Venta</th>
-                <th className="px-4 py-3 text-right font-semibold text-gray-700">Stock</th>
-                <th className="px-4 py-3 text-right font-semibold text-gray-700">Mínimo</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-700">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -39,14 +40,30 @@ const CarteraProductosSection = ({
                   <td className="px-4 py-3 text-gray-700">{producto.codigo_barras || '-'}</td>
                   <td className="px-4 py-3 text-right text-gray-700">{formatMoney(producto.precio_costo)}</td>
                   <td className="px-4 py-3 text-right text-gray-700">{formatMoney(producto.precio_venta)}</td>
-                  <td className="px-4 py-3 text-right text-gray-700">{producto.stock_actual}</td>
-                  <td className="px-4 py-3 text-right text-gray-700">{producto.stock_minimo}</td>
+                  <td className="px-4 py-3 text-center">
+                    <div className="inline-flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => startEditingProducto(producto)}
+                        className="rounded-lg px-2 py-1 text-xs font-medium text-amber-600 transition hover:bg-amber-50"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteProducto(producto)}
+                        className="rounded-lg px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
 
               {productosCartera.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500">
+                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-500">
                     No hay productos de cartera registrados.
                   </td>
                 </tr>
@@ -58,16 +75,8 @@ const CarteraProductosSection = ({
         <div className="space-y-3 p-4 md:hidden">
           {productosCartera.map((producto) => (
             <div key={`producto-${producto.id}`} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-base font-semibold text-gray-900">{producto.nombre}</p>
-                  <p className="mt-1 text-xs text-gray-500">Código: {producto.codigo_barras || '-'}</p>
-                </div>
-                <div className="text-right text-xs text-gray-500">
-                  <p>Stock: <span className="font-semibold text-gray-900">{producto.stock_actual}</span></p>
-                  <p>Min: <span className="font-semibold text-gray-900">{producto.stock_minimo}</span></p>
-                </div>
-              </div>
+              <p className="text-base font-semibold text-gray-900">{producto.nombre}</p>
+              <p className="mt-1 text-xs text-gray-500">Código: {producto.codigo_barras || '-'}</p>
 
               <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                 <div className="rounded-lg bg-gray-50 px-3 py-2 text-gray-600">
@@ -78,6 +87,22 @@ const CarteraProductosSection = ({
                   <p className="uppercase tracking-[0.08em]">Venta</p>
                   <p className="mt-1 text-sm font-semibold text-gray-900">{formatMoney(producto.precio_venta)}</p>
                 </div>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => startEditingProducto(producto)}
+                  className="flex-1 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-600 transition hover:bg-amber-100"
+                >
+                  Editar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteProducto(producto)}
+                  className="flex-1 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600 transition hover:bg-red-100"
+                >
+                  Eliminar
+                </button>
               </div>
             </div>
           ))}

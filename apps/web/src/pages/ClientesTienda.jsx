@@ -7,14 +7,14 @@ import ErrorMessage from '../components/ErrorMessage'
 import SuccessMessage from '../components/SuccessMessage'
 import useConfirm from '../components/useConfirm'
 import Skeleton from '../components/Skeleton'
+import Modal from '../components/Modal';
 
 const PAGE_SIZE = 10;
 
-const normalizeWhatsapp = (value) => {
-  const digits = String(value || '').replace(/\D/g, '');
-  if (!digits) return '';
-  if (digits.length === 10) return `57${digits}`;
-  return digits;
+const isValidPhone = (value) => {
+  const raw = String(value || '').replace(/\D/g, '');
+  if (!raw) return true;
+  return raw.length === 7 || raw.length === 10 || (raw.length === 12 && raw.startsWith('57'));
 };
 
 const ClientesTienda = () => {
@@ -110,8 +110,14 @@ const ClientesTienda = () => {
       return;
     }
 
+    const rawPhone = String(whatsapp || '').replace(/\D/g, '');
+    if (rawPhone && !isValidPhone(whatsapp)) {
+      setError('El número WhatsApp debe tener 7 (Bogotá), 10 (nacional) o 12 (con 57) dígitos');
+      return;
+    }
+
     const fullName = `${n} ${a}`.trim();
-    const normalizedPhone = normalizeWhatsapp(whatsapp);
+    const phoneToSave = rawPhone || null;
 
     try {
       setSaving(true);
@@ -119,12 +125,12 @@ const ClientesTienda = () => {
       if (editingId) {
         await apiPatch(`/api/clientes/tienda-fiado/${editingId}`, {
           nombre: fullName,
-          telefono_whatsapp: normalizedPhone || null,
+          telefono_whatsapp: phoneToSave,
         });
       } else {
         await apiPost('/api/clientes/tienda-fiado', {
           nombre: fullName,
-          telefono_whatsapp: normalizedPhone || null,
+          telefono_whatsapp: phoneToSave,
         });
       }
 
@@ -207,20 +213,7 @@ const ClientesTienda = () => {
         </div>
       </section>
 
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6" onClick={() => { if (!editingId) setIsModalOpen(false); }}>
-          <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl sm:p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h3 className="text-xl font-bold text-gray-900">{editingId ? 'Editar cliente' : 'Nuevo cliente'}</h3>
-              <button
-                type="button"
-                onClick={resetForm}
-                className="rounded-full border border-gray-200 p-2 text-gray-500 transition hover:bg-gray-50 hover:text-gray-700"
-                aria-label="Cerrar modal"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+      <Modal isOpen={isModalOpen} onClose={resetForm} title={editingId ? 'Editar cliente' : 'Nuevo cliente'}>
 
             {error && (
               <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
@@ -244,13 +237,22 @@ const ClientesTienda = () => {
                 />
               </div>
 
-              <input
-                type="text"
-                value={whatsapp}
-                onChange={(event) => setWhatsapp(event.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
-                placeholder="WhatsApp (+57 por defecto)"
-              />
+              <div>
+                <input
+                  type="text"
+                  value={whatsapp}
+                  onChange={(event) => setWhatsapp(event.target.value)}
+                  className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none ${
+                    whatsapp && !isValidPhone(whatsapp)
+                      ? 'border-red-400 focus:border-red-500'
+                      : 'border-gray-300 focus:border-rosewood'
+                  }`}
+                  placeholder="WhatsApp — 10 dígitos (57 se agrega automático)"
+                />
+                {whatsapp && !isValidPhone(whatsapp) && (
+                  <p className="mt-1 text-xs text-red-600">Debe tener 7 (Bogotá), 10 (nacional) o 12 (con 57) dígitos</p>
+                )}
+              </div>
 
               <button
                 type="submit"
@@ -261,9 +263,7 @@ const ClientesTienda = () => {
                 {saving ? 'Guardando...' : editingId ? 'Actualizar' : 'Guardar'}
               </button>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">

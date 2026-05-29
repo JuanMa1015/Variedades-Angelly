@@ -11,16 +11,7 @@ import CarteraProductosSection from './cartera/CarteraProductosSection';
 import CarteraVentaSection from './cartera/CarteraVentaSection';
 import { useCarteraData } from './cartera/useCarteraData';
 
-const formatDateTime = (value) => {
-  if (!value) return '-';
-  return new Date(value).toLocaleString('es-CO', {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
+import { formatDateTime } from '../utils/format';
 
 const Cartera = () => {
   const data = useCarteraData();
@@ -60,17 +51,20 @@ const Cartera = () => {
     setProductoForm,
     isClienteModalOpen,
     isProductoModalOpen,
-    setIsProductoModalOpen,
     editingClienteId,
+    editingProductoId,
     savingCliente,
     savingProducto,
     startNewCliente,
     startNewProducto,
     startEditingCliente,
     cancelEditingCliente,
+    startEditingProducto,
+    cancelEditingProducto,
     handleSubmitCliente,
     handleDeleteCliente,
     handleSubmitProducto,
+    handleDeleteProducto,
     handleAbrirWhatsapp,
     handleRegistrarAbono,
     handleConfirmAbono,
@@ -175,6 +169,8 @@ const Cartera = () => {
           productosCartera={productosCartera}
           formatMoney={formatMoney}
           startNewProducto={startNewProducto}
+          startEditingProducto={startEditingProducto}
+          handleDeleteProducto={handleDeleteProducto}
         />
       )}
 
@@ -236,15 +232,6 @@ const Cartera = () => {
                 />
               </div>
 
-              <input
-                type="number"
-                min="0"
-                value={clienteForm.limite_credito}
-                onChange={(event) => setClienteForm((current) => ({ ...current, limite_credito: event.target.value }))}
-                className="w-full rounded-lg border border-gray-300 px-3 py-3 text-sm focus:border-rosewood focus:outline-none"
-                placeholder="Límite de crédito"
-              />
-
               <div className="flex flex-wrap gap-2 pt-2">
                 <button type="submit" disabled={savingCliente} className="inline-flex items-center gap-2 rounded-lg bg-rosewood px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300">{savingCliente ? 'Guardando...' : <><UserPlus className="h-4 w-4" /> {editingClienteId ? 'Actualizar' : 'Guardar cliente'}</>}</button>
                 <button type="button" onClick={cancelEditingCliente} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-100">Cancelar</button>
@@ -259,10 +246,10 @@ const Cartera = () => {
           <div className="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
             <div className="flex items-center justify-between gap-3 border-b border-gray-200 pb-4">
               <div>
-                <h3 className="text-xl font-bold text-gray-900">Registrar producto de cartera</h3>
-                <p className="text-sm text-gray-600">Este producto quedará disponible en venta de cartera.</p>
+                <h3 className="text-xl font-bold text-gray-900">{editingProductoId ? 'Editar producto' : 'Registrar producto de cartera'}</h3>
+                <p className="text-sm text-gray-600">{editingProductoId ? 'Actualiza los datos del producto.' : 'Este producto quedará disponible en venta de cartera.'}</p>
               </div>
-              <button type="button" onClick={() => setIsProductoModalOpen(false)} className="rounded-full border border-gray-200 p-2 text-gray-500 transition hover:bg-gray-50" aria-label="Cerrar modal">×</button>
+              <button type="button" onClick={cancelEditingProducto} className="rounded-full border border-gray-200 p-2 text-gray-500 transition hover:bg-gray-50" aria-label="Cerrar modal">×</button>
             </div>
 
             <form className="mt-5 space-y-3" onSubmit={handleSubmitProducto}>
@@ -301,20 +288,9 @@ const Cartera = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <input
-                  type="number"
-                  min="0"
-                  value={productoForm.stock_actual}
-                  onChange={(event) => setProductoForm((current) => ({ ...current, stock_actual: event.target.value }))}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-3 text-sm focus:border-rosewood focus:outline-none"
-                  placeholder="Stock inicial"
-                />
-              </div>
-
               <div className="flex flex-wrap gap-2 pt-2">
-                <button type="submit" disabled={savingProducto} className="inline-flex items-center gap-2 rounded-lg bg-rosewood px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300">{savingProducto ? 'Guardando...' : <><Package className="h-4 w-4" /> Guardar producto</>}</button>
-                <button type="button" onClick={() => setIsProductoModalOpen(false)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-100">Cancelar</button>
+                <button type="submit" disabled={savingProducto} className="inline-flex items-center gap-2 rounded-lg bg-rosewood px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300">{savingProducto ? 'Guardando...' : <><Package className="h-4 w-4" /> {editingProductoId ? 'Actualizar producto' : 'Guardar producto'}</>}</button>
+                <button type="button" onClick={cancelEditingProducto} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-100">Cancelar</button>
               </div>
             </form>
           </div>

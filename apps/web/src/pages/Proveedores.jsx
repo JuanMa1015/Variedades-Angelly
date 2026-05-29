@@ -1,41 +1,33 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Plus, Truck, X } from 'lucide-react';
+import { CheckCircle2, Plus, Trash2, Truck, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { apiGet, apiPost } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage'
 import SuccessMessage from '../components/SuccessMessage'
 import Skeleton from '../components/Skeleton'
-
-const MONEY_FORMATTER = new Intl.NumberFormat('es-CO', {
-  style: 'currency',
-  currency: 'COP',
-  maximumFractionDigits: 0,
-});
-
-const formatMoney = (value) => MONEY_FORMATTER.format(Number(value || 0));
-
-const formatDateTime = (value) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '-';
-  return date.toLocaleString('es-CO', {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
+import { formatDateTime, formatMoney } from '../utils/format';
+import Modal from '../components/Modal';
 
 const normalizeWhatsappNumber = (rawValue) => {
   const digits = String(rawValue || '').replace(/\D/g, '');
   if (!digits) return '';
 
-  // Si llega numero local colombiano de 10 digitos, anteponer prefijo pais.
+  // Ya tiene código de país + código de área completo (ej: 573001234567)
+  if (digits.length === 12 && digits.startsWith('57')) {
+    return digits;
+  }
+
+  // Número colombiano de 10 dígitos con código de área (ej: 6012345678, 3001234567)
   if (digits.length === 10) {
     return `57${digits}`;
   }
 
-  return digits;
+  // Número bogotano de 7 dígitos sin código de área (ej: 1234567 → 576011234567)
+  if (digits.length === 7) {
+    return `57601${digits}`;
+  }
+
+  return '';
 };
 
 const buildWhatsappPedidoMessage = (pedido, proveedor) => {
@@ -98,6 +90,12 @@ const Proveedores = () => {
     () => new Map(proveedores.map((proveedor) => [Number(proveedor.id), proveedor])),
     [proveedores],
   );
+
+  const productosFiltrados = useMemo(() => {
+    const proveedorId = Number(pedidoForm.proveedor_id);
+    if (!proveedorId) return [];
+    return productos.filter((p) => Number(p.proveedor_id) === proveedorId);
+  }, [productos, pedidoForm.proveedor_id]);
 
   const loadData = useCallback(
     async (signal) => {
@@ -174,26 +172,6 @@ const Proveedores = () => {
     return () => controller.abort();
   }, [loadData, token]);
 
-  const resumen = useMemo(() => {
-    const proveedoresActivos = proveedores.filter((item) => Boolean(item.activo)).length;
-    const pedidosEmitidos = pedidos.length;
-    const montoSolicitado = pedidos.reduce(
-      (acc, item) => acc + Number(item.monto_estimado || 0),
-      0,
-    );
-    const pedidosConWhatsapp = pedidos.filter((item) => {
-      const proveedor = proveedoresById.get(Number(item.proveedor_id));
-      return Boolean(normalizeWhatsappNumber(proveedor?.telefono));
-    }).length;
-
-    return {
-      proveedoresActivos,
-      pedidosEmitidos,
-      montoSolicitado,
-      pedidosConWhatsapp,
-    };
-  }, [pedidos, proveedores, proveedoresById]);
-
   const clearMessages = () => {
     setError('');
     setSuccess('');
@@ -207,10 +185,15 @@ const Proveedores = () => {
   };
 
   const handlePedidoChange = (key, value) => {
-    setPedidoForm((current) => ({
-      ...current,
-      [key]: value,
-    }));
+    setPedidoForm((current) => {
+      if (key === 'proveedor_id' && value !== current.proveedor_id) {
+        return {
+          proveedor_id: value,
+          items: [{ producto_id: '', cantidad: 1 }],
+        };
+      }
+      return { ...current, [key]: value };
+    });
   };
 
   const handlePedidoItemChange = (index, key, value) => {
@@ -369,25 +352,6 @@ const Proveedores = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Activos</p>
-          <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">{resumen.proveedoresActivos}</p>
-        </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Pedidos</p>
-          <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">{resumen.pedidosEmitidos}</p>
-        </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Monto solicitado</p>
-          <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">{formatMoney(resumen.montoSolicitado)}</p>
-        </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">WhatsApp</p>
-          <p className="mt-2 text-2xl font-bold text-emerald-700 sm:text-3xl">{resumen.pedidosConWhatsapp}</p>
-        </div>
-      </div>
-
       <ErrorMessage message={error} onDismiss={() => setError('')} />
       <SuccessMessage message={success} onDismiss={() => setSuccess('')} />
 
@@ -408,25 +372,9 @@ const Proveedores = () => {
         </div>
       </section>
 
-      {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6" onClick={() => setIsCreateModalOpen(false)}>
-          <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl sm:p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h3 className="text-xl font-bold text-gray-900">Nuevo proveedor</h3>
-              <button
-                type="button"
-                onClick={() => setIsCreateModalOpen(false)}
-                className="rounded-full border border-gray-200 p-2 text-gray-500 transition hover:bg-gray-50 hover:text-gray-700"
-                aria-label="Cerrar modal"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+      <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Nuevo proveedor">
 
             <form className="space-y-3" onSubmit={handleCreateProveedor}>
-              {error && (
-                <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
-              )}
               <input
                 type="text"
                 value={proveedorForm.nombre}
@@ -462,9 +410,7 @@ const Proveedores = () => {
                 {savingProveedor ? 'Guardando proveedor...' : 'Guardar proveedor'}
               </button>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
 
         <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
           <h2 className="mb-4 text-xl font-bold text-gray-900">Crear pedido a proveedor</h2>
@@ -484,6 +430,10 @@ const Proveedores = () => {
             </select>
 
               <div className="space-y-2 rounded-xl border border-gray-200 p-3">
+                {!pedidoForm.proveedor_id ? (
+                  <p className="py-4 text-center text-sm text-gray-400">Selecciona un proveedor primero</p>
+                ) : (
+                  <>
                 {pedidoForm.items.map((item, index) => (
                     <div key={`pedido-item-${index}`} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_90px_36px]">
                   <select
@@ -492,11 +442,15 @@ const Proveedores = () => {
                     className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
                   >
                     <option value="">Selecciona producto</option>
-                    {productos.map((producto) => (
+                    {productosFiltrados.length === 0 ? (
+                      <option value="" disabled>No hay productos para este proveedor</option>
+                    ) : (
+                      productosFiltrados.map((producto) => (
                       <option key={producto.id} value={producto.id}>
                         {producto.nombre}
                       </option>
-                    ))}
+                      ))
+                    )}
                   </select>
 
                   <input
@@ -511,9 +465,10 @@ const Proveedores = () => {
                   <button
                     type="button"
                     onClick={() => handleRemovePedidoItem(index)}
-                    className="flex items-center justify-center rounded-lg border border-gray-300 px-2 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    className="flex items-center justify-center rounded-lg border border-red-200 p-2 text-red-600 transition hover:bg-red-50"
+                    title="Eliminar producto"
                   >
-                    -
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
               ))}
@@ -521,10 +476,13 @@ const Proveedores = () => {
               <button
                 type="button"
                 onClick={handleAddPedidoItem}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                className="w-full rounded-lg border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
               >
+                <Plus className="mr-1.5 inline h-4 w-4" />
                 Agregar producto
               </button>
+                  </>
+                )}
             </div>
 
             <button

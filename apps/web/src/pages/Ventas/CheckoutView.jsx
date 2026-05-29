@@ -1,5 +1,3 @@
-import ErrorMessage from '../../components/ErrorMessage';
-import SuccessMessage from '../../components/SuccessMessage';
 import { Receipt } from 'lucide-react';
 
 const CheckoutView = ({
@@ -18,8 +16,6 @@ const CheckoutView = ({
   onConfirmar,
   onGoToTicket,
   formatMoney,
-  success,
-  error,
   submittingVenta,
   cartCount,
 }) => {
@@ -77,8 +73,7 @@ const CheckoutView = ({
         </button>
       </div>
 
-      <ErrorMessage message={error} onDismiss={() => {}} />
-      <SuccessMessage message={success} onDismiss={() => {}} />
+
 
       <button
         type="button"

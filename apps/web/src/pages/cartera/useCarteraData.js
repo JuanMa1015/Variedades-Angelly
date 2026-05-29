@@ -4,6 +4,7 @@ import { useAuth } from '../../auth/AuthContext';
 import useConfirm from '../../components/useConfirm';
 import {
   deleteCarteraCliente,
+  deleteCarteraProducto,
   fetchCarteraInitialData,
   fetchCarteraMovimientos,
   fetchCarteraVentasHistorial,
@@ -11,6 +12,7 @@ import {
   saveCarteraCliente,
   saveCarteraProducto,
   saveCarteraVenta,
+  updateCarteraProducto,
 } from '../../api/carteraApi';
 
 const CLIENTES_PAGE_SIZE = 20;
@@ -33,9 +35,8 @@ const emptyCarteraResumen = {
   clientes_totales: 0,
   clientes_con_deuda: 0,
   deuda_total: 0,
-  limite_total: 0,
-  disponible_total: 0,
   clientes_alto_riesgo: 0,
+  clientes_riesgo_medio: 0,
   saldo_promedio: 0,
 };
 
@@ -43,7 +44,6 @@ const EMPTY_CLIENT_FORM = {
   nombre: '',
   documento: '',
   telefono_whatsapp: '',
-  limite_credito: '',
 };
 
 const EMPTY_ITEM = {
@@ -56,7 +56,6 @@ const EMPTY_PRODUCT_FORM = {
   codigo_barras: '',
   precio_costo: '',
   precio_venta: '',
-  stock_actual: '',
 };
 
 const toDatetimeLocalValue = (value = new Date()) => {
@@ -70,6 +69,7 @@ const toDatetimeLocalValue = (value = new Date()) => {
 
 const normalizeWhatsappNumber = (rawValue) => {
   const digits = String(rawValue || '').replace(/\D/g, '');
+
   if (!digits) return '';
 
   if (digits.length === 12 && digits.startsWith('57')) {
@@ -80,13 +80,17 @@ const normalizeWhatsappNumber = (rawValue) => {
     return `57${digits}`;
   }
 
+  if (digits.length === 7) {
+    return `57601${digits}`;
+  }
+
   return '';
 };
 
 const formatMoney = (value) => MONEY_FORMATTER.format(Number(value || 0));
 const formatMoneyWhatsapp = (value) => {
   const num = Number(value || 0);
-  return `$${Math.round(num).toLocaleString('es-CO', { useGrouping: false, maximumFractionDigits: 0 })}`;
+  return `$${Math.round(num).toLocaleString('es-CO', { maximumFractionDigits: 0 })}`;
 };
 
 export const useCarteraData = () => {
@@ -134,6 +138,7 @@ export const useCarteraData = () => {
   const [expandedCobroClientes, setExpandedCobroClientes] = useState([]);
   const [productoForm, setProductoForm] = useState(EMPTY_PRODUCT_FORM);
   const [savingProducto, setSavingProducto] = useState(false);
+  const [editingProductoId, setEditingProductoId] = useState(null);
   const [isProductoModalOpen, setIsProductoModalOpen] = useState(false);
 
   const activeSection = useMemo(() => {
@@ -251,7 +256,6 @@ export const useCarteraData = () => {
       nombre: cliente.nombre || '',
       documento: cliente.documento || '',
       telefono_whatsapp: cliente.telefono_whatsapp || '',
-      limite_credito: String(cliente.limite_credito || ''),
     });
     setIsClienteModalOpen(true);
   };
@@ -271,8 +275,27 @@ export const useCarteraData = () => {
 
   const startNewProducto = () => {
     cleanMessages();
+    setEditingProductoId(null);
     setProductoForm(EMPTY_PRODUCT_FORM);
     setIsProductoModalOpen(true);
+  };
+
+  const startEditingProducto = (producto) => {
+    cleanMessages();
+    setEditingProductoId(producto.id);
+    setProductoForm({
+      nombre: producto.nombre || '',
+      codigo_barras: producto.codigo_barras || '',
+      precio_costo: String(producto.precio_costo || ''),
+      precio_venta: String(producto.precio_venta || ''),
+    });
+    setIsProductoModalOpen(true);
+  };
+
+  const cancelEditingProducto = () => {
+    setEditingProductoId(null);
+    setProductoForm(EMPTY_PRODUCT_FORM);
+    setIsProductoModalOpen(false);
   };
 
   const handleSubmitCliente = async (event) => {
@@ -280,15 +303,9 @@ export const useCarteraData = () => {
     cleanMessages();
 
     const nombre = clienteForm.nombre.trim();
-    const limiteCredito = Number(clienteForm.limite_credito);
 
     if (!nombre) {
       setError('El nombre del cliente es obligatorio');
-      return;
-    }
-
-    if (!Number.isFinite(limiteCredito) || limiteCredito < 0) {
-      setError('El limite de credito no puede ser negativo');
       return;
     }
 
@@ -306,7 +323,6 @@ export const useCarteraData = () => {
           nombre,
           documento: clienteForm.documento.trim() || null,
           telefono_whatsapp: clienteForm.telefono_whatsapp.trim() || null,
-          limite_credito: limiteCredito,
         },
       });
 
@@ -349,7 +365,6 @@ export const useCarteraData = () => {
       catalogo: 'cartera',
       precio_costo: Number(productoForm.precio_costo || 0),
       precio_venta: Number(productoForm.precio_venta || 0),
-      stock_actual: Number(productoForm.stock_actual || 0),
     };
 
     if (!Number.isFinite(payload.precio_costo) || payload.precio_costo < 0) {
@@ -362,22 +377,36 @@ export const useCarteraData = () => {
       return;
     }
 
-    if (!Number.isInteger(payload.stock_actual) || payload.stock_actual < 0) {
-      setError('El stock inicial no puede ser negativo');
-      return;
-    }
-
     try {
       setSavingProducto(true);
-      await saveCarteraProducto(payload);
-      setSuccess('Producto de cartera registrado correctamente');
-      setIsProductoModalOpen(false);
-      setProductoForm(EMPTY_PRODUCT_FORM);
+
+      if (editingProductoId) {
+        await updateCarteraProducto(editingProductoId, payload);
+        setSuccess('Producto actualizado correctamente');
+      } else {
+        await saveCarteraProducto(payload);
+        setSuccess('Producto de cartera registrado correctamente');
+      }
+
+      cancelEditingProducto();
       refreshPage();
     } catch (err) {
-      setError(err.message || 'No fue posible registrar el producto');
+      setError(err.message || 'No fue posible guardar el producto');
     } finally {
       setSavingProducto(false);
+    }
+  };
+
+  const handleDeleteProducto = async (producto) => {
+    const confirmed = await confirm({ title: 'Eliminar producto', message: `¿Eliminar producto ${producto.nombre}?` });
+    if (!confirmed) return;
+
+    try {
+      await deleteCarteraProducto(producto.id);
+      setSuccess('Producto eliminado correctamente');
+      refreshPage();
+    } catch (err) {
+      setError(err.message || 'No fue posible eliminar el producto');
     }
   };
 
@@ -401,7 +430,7 @@ export const useCarteraData = () => {
         productosRegistrados = ventas
           .filter((v) => v.articulo)
           .slice(0, 5)
-          .map((v) => `- ${v.articulo} ($${Math.round(Number(v.monto)).toLocaleString('es-CO', { useGrouping: false, maximumFractionDigits: 0 })})`)
+          .map((v) => `- ${v.articulo} (${formatMoneyWhatsapp(v.monto)})`)
           .join('\n');
       }
     } catch {
@@ -694,6 +723,7 @@ export const useCarteraData = () => {
     productoForm,
     setProductoForm,
     savingProducto,
+    editingProductoId,
     isProductoModalOpen,
     setIsProductoModalOpen,
     activeSection,
@@ -712,9 +742,12 @@ export const useCarteraData = () => {
     cancelEditingCliente,
     startNewCliente,
     startNewProducto,
+    startEditingProducto,
+    cancelEditingProducto,
     handleSubmitCliente,
     handleDeleteCliente,
     handleSubmitProducto,
+    handleDeleteProducto,
     handleAbrirWhatsapp,
     handleRegistrarAbono,
     handleConfirmAbono,

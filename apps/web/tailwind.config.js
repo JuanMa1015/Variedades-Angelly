@@ -5,10 +5,12 @@ export default {
     extend: {
       colors: {
         shell: '#fffafd',
-        rosewood: '#5f3245',
+        rosewood: '#6a3f43',
         blush: {
+          50: '#fbe3e3',
           100: '#ffe5ec',
           200: '#ffd1dc',
+          300: '#eebbbb',
         },
         gold: {
           50: '#fff5d8',

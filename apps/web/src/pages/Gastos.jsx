@@ -5,26 +5,7 @@ import { apiGet, apiPost } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage'
 import SuccessMessage from '../components/SuccessMessage'
 import Skeleton from '../components/Skeleton'
-
-const MONEY_FORMATTER = new Intl.NumberFormat('es-CO', {
-  style: 'currency',
-  currency: 'COP',
-  maximumFractionDigits: 0,
-});
-
-const formatMoney = (value) => MONEY_FORMATTER.format(Number(value || 0));
-
-const formatDateTime = (value) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '-';
-  return date.toLocaleString('es-CO', {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
+import { formatDateTime, formatMoney } from '../utils/format';
 
 const isCurrentMonth = (value, referenceDate) => {
   const date = new Date(value);
@@ -182,22 +163,30 @@ const Gastos = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Total mes</p>
-          <p className="mt-2 text-3xl font-bold text-gray-900">{formatMoney(resumen.totalMes)}</p>
+      {loading ? (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"><Skeleton lines={2} /></div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"><Skeleton lines={2} /></div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"><Skeleton lines={2} /></div>
         </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Total mes</p>
+            <p className="mt-2 text-3xl font-bold text-gray-900">{formatMoney(resumen.totalMes)}</p>
+          </div>
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Registros mes</p>
-          <p className="mt-2 text-3xl font-bold text-gray-900">{resumen.registrosMes}</p>
-        </div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Registros mes</p>
+            <p className="mt-2 text-3xl font-bold text-gray-900">{resumen.registrosMes}</p>
+          </div>
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Categorías activas</p>
-          <p className="mt-2 text-3xl font-bold text-gray-900">{resumen.categoriasActivas}</p>
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Categorías activas</p>
+            <p className="mt-2 text-3xl font-bold text-gray-900">{resumen.categoriasActivas}</p>
+          </div>
         </div>
-      </div>
+      )}
 
       <ErrorMessage message={error} onDismiss={() => setError('')} />
       <SuccessMessage message={success} onDismiss={() => setSuccess('')} />

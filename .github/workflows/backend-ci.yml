@@ -75,6 +75,9 @@ jobs:
       - name: Run backend tests
         run: python -m pytest -q
 
+      - name: Run BDD tests
+        run: python -m behave features/
+
   frontend-tests:
     runs-on: ubuntu-latest
     defaults:

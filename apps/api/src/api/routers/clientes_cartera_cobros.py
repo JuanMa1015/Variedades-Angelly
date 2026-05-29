@@ -33,34 +33,23 @@ def cartera_resumen(
     db: Session = Depends(get_db),
     _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> CarteraResumenResponse:
-    row = db.execute(
-        select(
-            func.count().label("clientes_totales"),
-            func.coalesce(func.sum(ClienteModel.deuda_total), 0).label("deuda_total"),
-            func.coalesce(func.sum(ClienteModel.limite_credito), 0).label("limite_total"),
-            func.count().filter(ClienteModel.deuda_total > 0).label("clientes_con_deuda"),
-            func.count().filter(
-                ClienteModel.limite_credito > 0,
-                ClienteModel.deuda_total / func.nullif(ClienteModel.limite_credito, 0) >= 0.8,
-            ).label("clientes_alto_riesgo"),
-        ).select_from(ClienteModel),
-    ).one()
+    clientes = db.execute(
+        select(ClienteModel).where(ClienteModel.activo == True),
+    ).scalars().all()
 
-    clientes_totales = int(row.clientes_totales)
-    deuda_total = float(row.deuda_total)
-    limite_total = float(row.limite_total)
-    clientes_con_deuda = int(row.clientes_con_deuda)
-    clientes_alto_riesgo = int(row.clientes_alto_riesgo)
-    disponible_total = max(limite_total - deuda_total, 0.0)
+    clientes_totales = len(clientes)
+    clientes_con_deuda = sum(1 for c in clientes if c.deuda_total > 0)
+    deuda_total = float(sum(c.deuda_total for c in clientes))
+    clientes_alto_riesgo = sum(1 for c in clientes if c.deuda_total > 400000)
+    clientes_riesgo_medio = sum(1 for c in clientes if 200000 < c.deuda_total <= 400000)
     saldo_promedio = deuda_total / clientes_con_deuda if clientes_con_deuda > 0 else 0.0
 
     return CarteraResumenResponse(
         clientes_totales=clientes_totales,
         clientes_con_deuda=clientes_con_deuda,
         deuda_total=deuda_total,
-        limite_total=limite_total,
-        disponible_total=disponible_total,
         clientes_alto_riesgo=clientes_alto_riesgo,
+        clientes_riesgo_medio=clientes_riesgo_medio,
         saldo_promedio=saldo_promedio,
     )
 
