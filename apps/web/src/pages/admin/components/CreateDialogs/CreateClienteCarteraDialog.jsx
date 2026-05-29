@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { apiRequest } from '../../../api/httpClient';
-import Modal from '../../../components/Modal';
+import { apiRequest } from '../../../../api/httpClient';
+import Modal from '../../../../components/Modal';
 
 const CreateClienteCarteraDialog = ({ isOpen, onClose, onCreated }) => {
   const [form, setForm] = useState({ nombre: '', documento: '', telefono_whatsapp: '', limite_credito: '' });

@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { apiRequest } from '../../../api/httpClient';
-import Modal from '../../../components/Modal';
+import { apiRequest } from '../../../../api/httpClient';
+import Modal from '../../../../components/Modal';
 
 const CreateVentaDialog = ({ isOpen, onClose, onCreated }) => {
   const [form, setForm] = useState({ cliente_id: '', cliente_tienda_id: '', items_json: '[]', es_fiado: false, fiado_origen: '', abono_inicial: '0', metodo_pago: '' });

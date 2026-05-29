@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { apiRequest } from '../../../api/httpClient';
-import Modal from '../../../components/Modal';
+import { apiRequest } from '../../../../api/httpClient';
+import Modal from '../../../../components/Modal';
 
 const CreateGastoDialog = ({ isOpen, onClose, onCreated }) => {
   const [form, setForm] = useState({ categoria: '', descripcion: '', monto: '' });

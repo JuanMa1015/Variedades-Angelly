@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { apiRequest } from '../../../api/httpClient';
-import Modal from '../../../components/Modal';
+import { apiRequest } from '../../../../api/httpClient';
+import Modal from '../../../../components/Modal';
 
 const CreateAbonoCarteraDialog = ({ isOpen, onClose, onCreated }) => {
   const [form, setForm] = useState({ cliente_id: '', monto: '', metodo_pago: 'efectivo', referencia: '' });

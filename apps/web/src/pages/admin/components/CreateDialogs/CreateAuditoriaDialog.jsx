@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { apiRequest } from '../../../api/httpClient';
-import Modal from '../../../components/Modal';
+import { apiRequest } from '../../../../api/httpClient';
+import Modal from '../../../../components/Modal';
 
 const CreateAuditoriaDialog = ({ isOpen, onClose, onCreated }) => {
   const [form, setForm] = useState({ modulo: '', entidad: '', entidad_id: '', accion: '', detalle: '' });

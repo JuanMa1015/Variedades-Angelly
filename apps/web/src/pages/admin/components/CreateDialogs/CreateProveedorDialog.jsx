@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { apiRequest } from '../../../api/httpClient';
-import Modal from '../../../components/Modal';
+import { apiRequest } from '../../../../api/httpClient';
+import Modal from '../../../../components/Modal';
 
 const CreateProveedorDialog = ({ isOpen, onClose, onCreated }) => {
   const [form, setForm] = useState({ nombre: '', contacto: '', telefono: '' });
