@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useMemo, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { ChevronDown, ChevronRight, RefreshCw, Shield } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
@@ -142,39 +142,33 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     }
   }, [moduleKey]);
 
-  const notifyError = (message) => {
+  const notifyError = useCallback((message) => {
     setSuccess('');
     setError(message);
-  };
+  }, []);
 
-  const notifySuccess = (message) => {
+  const notifySuccess = useCallback((message) => {
     setError('');
     setSuccess(message);
-  };
+  }, []);
 
-  const openCreateDialog = (dialogKey) => {
+  const openCreateDialog = useCallback((dialogKey) => {
     setError('');
     setSuccess('');
     setCreateDialog(dialogKey);
-  };
+  }, []);
 
-  const closeCreateDialog = () => {
+  const closeCreateDialog = useCallback(() => {
     setCreateDialog(null);
-  };
+  }, []);
 
-  const handleCreated = (message) => {
-    loadAll();
-    notifySuccess(message);
-    closeCreateDialog();
-  };
-
-  const request = async ({ endpoint, method = 'GET', body, signal }) => {
+  const request = useCallback(async ({ endpoint, method = 'GET', body, signal }) => {
     return apiRequest(endpoint, {
       method,
       signal,
       body,
     });
-  };
+  }, []);
 
   const loadAll = useCallback(async (signal) => {
     try {
@@ -237,7 +231,13 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
       if (signal?.aborted) return;
       throw err;
     }
-  }, []);
+  }, [request]);
+
+  const handleCreated = useCallback((message) => {
+    loadAll();
+    notifySuccess(message);
+    closeCreateDialog();
+  }, [loadAll, notifySuccess, closeCreateDialog]);
 
   useEffect(() => {
     if (!token || !isSuperAdmin) {
@@ -267,9 +267,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
       isMounted = false;
       controller.abort();
     };
-  }, [token, isSuperAdmin, loadAll]);
+  }, [token, isSuperAdmin, loadAll, notifyError]);
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
       const controller = new AbortController();
@@ -280,24 +280,24 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     } finally {
       setRefreshing(false);
     }
-  };
+  }, [loadAll, notifySuccess, notifyError]);
 
-  const runDelete = async ({ endpoint, successMessage }) => {
+  const runDelete = useCallback(async ({ endpoint, successMessage }) => {
     await apiDelete(endpoint);
 
     await loadAll();
     notifySuccess(successMessage);
-  };
+  }, [loadAll, notifySuccess]);
 
-  const openEditModal = (title, fields, initialValues, onSave) => {
+  const openEditModal = useCallback((title, fields, initialValues, onSave) => {
     setEditModalTitle(title);
     setEditModalFields(fields);
     setEditModalValues(initialValues);
     editOnSaveRef.current = onSave;
     setEditModalOpen(true);
-  };
+  }, []);
 
-  const handleEditClienteCartera = (item) => {
+  const handleEditClienteCartera = useCallback((item) => {
     openEditModal(
       'Editar cliente cartera',
       [
@@ -322,9 +322,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         notifySuccess('Cliente actualizado');
       },
     );
-  };
+  }, [openEditModal, request, loadAll, notifySuccess]);
 
-  const handleDeleteClienteCartera = async (item) => {
+  const handleDeleteClienteCartera = useCallback(async (item) => {
     const confirmed = await confirm({ title: 'Eliminar cliente', message: `Eliminar cliente ${item.nombre}?` }); if (!confirmed) return;
     try {
       await runDelete({
@@ -334,9 +334,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     } catch (err) {
       notifyError(err.message || 'No se pudo eliminar cliente');
     }
-  };
+  }, [confirm, runDelete, notifyError]);
 
-  const handleEditClienteTienda = (item) => {
+  const handleEditClienteTienda = useCallback((item) => {
     openEditModal(
       'Editar cliente tienda',
       [
@@ -357,9 +357,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         notifySuccess('Cliente tienda actualizado');
       },
     );
-  };
+  }, [openEditModal, request, loadAll, notifySuccess]);
 
-  const handleDeleteClienteTienda = async (item) => {
+  const handleDeleteClienteTienda = useCallback(async (item) => {
     const confirmed = await confirm({ title: 'Eliminar cliente', message: `Eliminar cliente ${item.nombre}?` }); if (!confirmed) return;
     try {
       await runDelete({
@@ -369,9 +369,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     } catch (err) {
       notifyError(err.message || 'No se pudo eliminar cliente tienda');
     }
-  };
+  }, [confirm, runDelete, notifyError]);
 
-  const handleEditClienteFidelizacion = (item) => {
+  const handleEditClienteFidelizacion = useCallback((item) => {
     openEditModal(
       'Editar cliente fidelización',
       [
@@ -398,9 +398,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         notifySuccess('Cliente fidelizacion actualizado');
       },
     );
-  };
+  }, [openEditModal, notifyError, request, loadAll, notifySuccess]);
 
-  const handleDeleteClienteFidelizacion = async (item) => {
+  const handleDeleteClienteFidelizacion = useCallback(async (item) => {
     const confirmed = await confirm({ title: 'Eliminar cliente', message: `Eliminar cliente ${item.nombre}?` }); if (!confirmed) return;
     try {
       await runDelete({
@@ -410,9 +410,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     } catch (err) {
       notifyError(err.message || 'No se pudo eliminar cliente fidelizacion');
     }
-  };
+  }, [confirm, runDelete, notifyError]);
 
-  const handleEditVenta = (item) => {
+  const handleEditVenta = useCallback((item) => {
     openEditModal(
       'Editar venta',
       [
@@ -432,9 +432,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         notifySuccess('Venta actualizada');
       },
     );
-  };
+  }, [openEditModal, notifyError, request, loadAll, notifySuccess]);
 
-  const handleDeleteVenta = async (item) => {
+  const handleDeleteVenta = useCallback(async (item) => {
     const confirmed = await confirm({ title: 'Eliminar venta', message: `Eliminar venta ${item.venta_id}?` }); if (!confirmed) return;
     try {
       await runDelete({
@@ -444,9 +444,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     } catch (err) {
       notifyError(err.message || 'No se pudo eliminar venta');
     }
-  };
+  }, [confirm, runDelete, notifyError]);
 
-  const handleEditPedidoProveedor = (item) => {
+  const handleEditPedidoProveedor = useCallback((item) => {
     openEditModal(
       'Editar pedido proveedor',
       [
@@ -465,9 +465,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         notifySuccess('Pedido actualizado');
       },
     );
-  };
+  }, [openEditModal, notifyError, request, loadAll, notifySuccess]);
 
-  const handleDeletePedidoProveedor = async (item) => {
+  const handleDeletePedidoProveedor = useCallback(async (item) => {
     const confirmed = await confirm({ title: 'Eliminar pedido', message: `Eliminar pedido ${item.id}?` }); if (!confirmed) return;
     try {
       await runDelete({
@@ -477,9 +477,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     } catch (err) {
       notifyError(err.message || 'No se pudo eliminar pedido');
     }
-  };
+  }, [confirm, runDelete, notifyError]);
 
-  const handleEditFacturaCompra = (item) => {
+  const handleEditFacturaCompra = useCallback((item) => {
     openEditModal(
       'Editar factura compra',
       [{ name: 'total_factura', label: 'Total factura', type: 'number', required: true }],
@@ -495,9 +495,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         notifySuccess('Factura actualizada');
       },
     );
-  };
+  }, [openEditModal, notifyError, request, loadAll, notifySuccess]);
 
-  const handleDeleteFacturaCompra = async (item) => {
+  const handleDeleteFacturaCompra = useCallback(async (item) => {
     const confirmed = await confirm({ title: 'Eliminar factura', message: `Eliminar factura ${item.id}?` }); if (!confirmed) return;
     try {
       await runDelete({
@@ -507,9 +507,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     } catch (err) {
       notifyError(err.message || 'No se pudo eliminar factura');
     }
-  };
+  }, [confirm, runDelete, notifyError]);
 
-  const handleEditGasto = (item) => {
+  const handleEditGasto = useCallback((item) => {
     openEditModal(
       'Editar gasto',
       [
@@ -529,9 +529,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         notifySuccess('Gasto actualizado');
       },
     );
-  };
+  }, [openEditModal, notifyError, request, loadAll, notifySuccess]);
 
-  const handleDeleteGasto = async (item) => {
+  const handleDeleteGasto = useCallback(async (item) => {
     const confirmed = await confirm({ title: 'Eliminar gasto', message: `Eliminar gasto ${item.id}?` }); if (!confirmed) return;
     try {
       await runDelete({
@@ -541,9 +541,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     } catch (err) {
       notifyError(err.message || 'No se pudo eliminar gasto');
     }
-  };
+  }, [confirm, runDelete, notifyError]);
 
-  const handleEditAbonoCartera = (item) => {
+  const handleEditAbonoCartera = useCallback((item) => {
     openEditModal(
       'Editar abono cartera',
       [{ name: 'monto', label: 'Monto', type: 'number', required: true }],
@@ -559,9 +559,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         notifySuccess('Abono actualizado');
       },
     );
-  };
+  }, [openEditModal, notifyError, request, loadAll, notifySuccess]);
 
-  const handleDeleteAbonoCartera = async (item) => {
+  const handleDeleteAbonoCartera = useCallback(async (item) => {
     const confirmed = await confirm({ title: 'Eliminar abono', message: `Eliminar abono ${item.id}?` }); if (!confirmed) return;
     try {
       await runDelete({
@@ -571,9 +571,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     } catch (err) {
       notifyError(err.message || 'No se pudo eliminar abono');
     }
-  };
+  }, [confirm, runDelete, notifyError]);
 
-  const handleEditAdmin = (item) => {
+  const handleEditAdmin = useCallback((item) => {
     openEditModal(
       'Editar admin',
       [
@@ -593,9 +593,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         notifySuccess('Admin actualizado');
       },
     );
-  };
+  }, [openEditModal, request, loadAll, notifySuccess]);
 
-  const handleDeleteAdmin = async (item) => {
+  const handleDeleteAdmin = useCallback(async (item) => {
     const confirmed = await confirm({ title: 'Eliminar admin', message: `Eliminar admin ${item.username}?` }); if (!confirmed) return;
     try {
       await runDelete({
@@ -605,9 +605,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     } catch (err) {
       notifyError(err.message || 'No se pudo eliminar admin');
     }
-  };
+  }, [confirm, runDelete, notifyError]);
 
-  const handleEditVendedor = (item) => {
+  const handleEditVendedor = useCallback((item) => {
     openEditModal(
       'Editar vendedor',
       [
@@ -627,9 +627,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         notifySuccess('Vendedor actualizado');
       },
     );
-  };
+  }, [openEditModal, request, loadAll, notifySuccess]);
 
-  const handleDeleteVendedor = async (item) => {
+  const handleDeleteVendedor = useCallback(async (item) => {
     const confirmed = await confirm({ title: 'Eliminar vendedor', message: `Eliminar vendedor ${item.username}?` }); if (!confirmed) return;
     try {
       await runDelete({
@@ -639,9 +639,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     } catch (err) {
       notifyError(err.message || 'No se pudo eliminar vendedor');
     }
-  };
+  }, [confirm, runDelete, notifyError]);
 
-  const handleEditProducto = (item) => {
+  const handleEditProducto = useCallback((item) => {
     openEditModal(
       'Editar producto',
       [
@@ -660,9 +660,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         notifySuccess('Producto actualizado');
       },
     );
-  };
+  }, [openEditModal, notifyError, request, loadAll, notifySuccess]);
 
-  const handleDeleteProducto = async (item) => {
+  const handleDeleteProducto = useCallback(async (item) => {
     const confirmed = await confirm({ title: 'Eliminar producto', message: `Eliminar producto ${item.nombre}?` }); if (!confirmed) return;
     try {
       await apiDelete(`/api/productos/${item.id}`);
@@ -671,9 +671,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     } catch (err) {
       notifyError(err.message || 'No se pudo eliminar producto');
     }
-  };
+  }, [confirm, loadAll, notifySuccess, notifyError]);
 
-  const handleEditProveedor = (item) => {
+  const handleEditProveedor = useCallback((item) => {
     openEditModal(
       'Editar proveedor',
       [
@@ -691,9 +691,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         notifySuccess('Proveedor actualizado');
       },
     );
-  };
+  }, [openEditModal, request, loadAll, notifySuccess]);
 
-  const handleDeleteProveedor = async (item) => {
+  const handleDeleteProveedor = useCallback(async (item) => {
     const confirmed = await confirm({ title: 'Eliminar proveedor', message: `Eliminar proveedor ${item.nombre}?` }); if (!confirmed) return;
     try {
       await apiDelete(`/api/proveedores/${item.id}`);
@@ -702,9 +702,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     } catch (err) {
       notifyError(err.message || 'No se pudo eliminar proveedor');
     }
-  };
+  }, [confirm, loadAll, notifySuccess, notifyError]);
 
-  const handleEditAuditoria = (item) => {
+  const handleEditAuditoria = useCallback((item) => {
     openEditModal(
       'Editar auditoría',
       [
@@ -722,9 +722,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         notifySuccess('Auditoria actualizada');
       },
     );
-  };
+  }, [openEditModal, request, loadAll, notifySuccess]);
 
-  const handleDeleteAuditoria = async (item) => {
+  const handleDeleteAuditoria = useCallback(async (item) => {
     const confirmed = await confirm({ title: 'Eliminar auditoría', message: `Eliminar auditoría ${item.id}?` }); if (!confirmed) return;
     try {
       await apiDelete(`/api/auditorias/${item.id}`);
@@ -733,9 +733,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     } catch (err) {
       notifyError(err.message || 'No se pudo eliminar auditoria');
     }
-  };
+  }, [confirm, loadAll, notifySuccess, notifyError]);
 
-  const tabSections = [
+  const tabSections = useMemo(() => [
     { key: 'vendedores', title: 'Vendedores', desc: 'Acceso restringido y altas por modal.', data: vendedores, createDialog: 'vendedores',
       columns: [
         { key: 'id', label: 'ID', mono: true }, { key: 'username', label: 'Username' }, { key: 'rol', label: 'Rol' },
@@ -820,7 +820,24 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         { key: 'detalle', label: 'Detalle' }, { key: 'usuario', label: 'Usuario' },
         { key: 'fecha', label: 'Fecha', render: (i) => formatDateTime(i.fecha) },
       ], onEdit: handleEditAuditoria, onDelete: handleDeleteAuditoria, minWidth: '1000px' },
-  ];
+  ], [
+    vendedores, admins, productos, proveedores,
+    clientesCartera, clientesTienda, clientesFidelizacion,
+    ventas, pedidosProveedor, facturasCompra, gastos, abonosCartera, auditorias,
+    handleEditVendedor, handleDeleteVendedor,
+    handleEditAdmin, handleDeleteAdmin,
+    handleEditProducto, handleDeleteProducto,
+    handleEditProveedor, handleDeleteProveedor,
+    handleEditClienteCartera, handleDeleteClienteCartera,
+    handleEditClienteTienda, handleDeleteClienteTienda,
+    handleEditClienteFidelizacion, handleDeleteClienteFidelizacion,
+    handleEditVenta, handleDeleteVenta,
+    handleEditPedidoProveedor, handleDeletePedidoProveedor,
+    handleEditFacturaCompra, handleDeleteFacturaCompra,
+    handleEditGasto, handleDeleteGasto,
+    handleEditAbonoCartera, handleDeleteAbonoCartera,
+    handleEditAuditoria, handleDeleteAuditoria,
+  ]);
 
   if (!isSuperAdmin) {
     return (
