@@ -10,6 +10,8 @@ import Skeleton from '../components/Skeleton';
 import Modal from '../components/Modal';
 import EditFormModal from '../components/EditFormModal';
 import { formatDateTime, formatMoney } from '../utils/format';
+import AdminSection from './admin/components/AdminSection';
+import AdminTable from './admin/components/AdminTable';
 
 const ROLE_GROUPS = [
   {
@@ -1096,6 +1098,93 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     }
   };
 
+  const tabSections = [
+    { key: 'vendedores', title: 'Vendedores', desc: 'Acceso restringido y altas por modal.', data: vendedores, createDialog: 'vendedores',
+      columns: [
+        { key: 'id', label: 'ID', mono: true }, { key: 'username', label: 'Username' }, { key: 'rol', label: 'Rol' },
+      ], onEdit: handleEditVendedor, onDelete: handleDeleteVendedor, minWidth: '640px' },
+    { key: 'admins', title: 'Administradores', desc: 'Acceso y control de admins.', data: admins, createDialog: 'admins',
+      columns: [
+        { key: 'id', label: 'ID', mono: true }, { key: 'username', label: 'Username' }, { key: 'rol', label: 'Rol' },
+      ], onEdit: handleEditAdmin, onDelete: handleDeleteAdmin, minWidth: '640px' },
+    { key: 'productos', title: 'Productos', desc: 'Inventario y precios con control visual.', data: productos, createDialog: 'productos',
+      columns: [
+        { key: 'nombre', label: 'Nombre', mono: true },
+        { key: 'precio_costo', label: 'Costo', align: 'right', render: (i) => formatMoney(i.precio_costo) },
+        { key: 'precio_venta', label: 'Venta', align: 'right', render: (i) => formatMoney(i.precio_venta) },
+        { key: 'stock_actual', label: 'Stock', align: 'right' }, { key: 'stock_minimo', label: 'Min', align: 'right' },
+      ], onEdit: handleEditProducto, onDelete: handleDeleteProducto, minWidth: '900px' },
+    { key: 'proveedores', title: 'Proveedores', desc: 'Catálogo de contactos y pedidos.', data: proveedores, createDialog: 'proveedores',
+      columns: [
+        { key: 'nombre', label: 'Nombre', mono: true }, { key: 'contacto', label: 'Contacto' }, { key: 'telefono', label: 'Telefono' },
+      ], onEdit: handleEditProveedor, onDelete: handleDeleteProveedor, minWidth: '760px' },
+    { key: 'clientes_cartera', title: 'Clientes cartera', desc: 'Clientes con cupo y deuda.', data: clientesCartera, createDialog: 'clientes_cartera',
+      columns: [
+        { key: 'id', label: 'ID', mono: true }, { key: 'nombre', label: 'Nombre' }, { key: 'documento', label: 'Documento' },
+        { key: 'telefono_whatsapp', label: 'Telefono' },
+        { key: 'limite_credito', label: 'Limite', align: 'right', render: (i) => formatMoney(i.limite_credito) },
+        { key: 'deuda_total', label: 'Deuda', align: 'right', render: (i) => formatMoney(i.deuda_total) },
+      ], onEdit: handleEditClienteCartera, onDelete: handleDeleteClienteCartera, minWidth: '860px' },
+    { key: 'clientes_tienda', title: 'Clientes tienda', desc: 'Clientes fiados de tienda.', data: clientesTienda, createDialog: 'clientes_tienda',
+      columns: [
+        { key: 'id', label: 'ID', mono: true }, { key: 'nombre', label: 'Nombre' }, { key: 'telefono_whatsapp', label: 'Telefono' },
+      ], onEdit: handleEditClienteTienda, onDelete: handleDeleteClienteTienda, minWidth: '520px' },
+    { key: 'clientes_fidelizacion', title: 'Clientes fidelización', desc: 'Puntos y contacto.', data: clientesFidelizacion, createDialog: 'clientes_fidelizacion',
+      columns: [
+        { key: 'id', label: 'ID', mono: true }, { key: 'nombre', label: 'Nombre' }, { key: 'telefono_whatsapp', label: 'Telefono' },
+        { key: 'puntos_acumulados', label: 'Puntos', align: 'right' },
+      ], onEdit: handleEditClienteFidelizacion, onDelete: handleDeleteClienteFidelizacion, minWidth: '620px' },
+    { key: 'ventas', title: 'Ventas', desc: 'Historial completo de ventas.', data: ventas, createDialog: 'ventas',
+      columns: [
+        { key: 'venta_id', label: 'ID', mono: true },
+        { key: 'cliente_nombre', label: 'Cliente', render: (i) => i.cliente_nombre || '-' },
+        { key: 'es_fiado', label: 'Fiado', render: (i) => i.es_fiado ? 'Sí' : 'No' },
+        { key: 'total', label: 'Total', align: 'right', render: (i) => formatMoney(i.total) },
+        { key: 'saldo_pendiente', label: 'Saldo', align: 'right', render: (i) => formatMoney(i.saldo_pendiente) },
+        { key: 'metodo_pago', label: 'Metodo' },
+        { key: 'fecha', label: 'Fecha', render: (i) => formatDateTime(i.fecha) },
+      ], onEdit: handleEditVenta, onDelete: handleDeleteVenta, minWidth: '920px' },
+    { key: 'pedidos_proveedor', title: 'Pedidos proveedor', desc: 'Solicitudes enviadas a proveedor.', data: pedidosProveedor, createDialog: 'pedidos_proveedor',
+      columns: [
+        { key: 'id', label: 'ID', mono: true }, { key: 'proveedor_nombre', label: 'Proveedor' }, { key: 'descripcion', label: 'Descripcion' },
+        { key: 'monto_estimado', label: 'Monto', align: 'right', render: (i) => formatMoney(i.monto_estimado) },
+        { key: 'estado', label: 'Estado' }, { key: 'creado_por', label: 'Creado por' },
+        { key: 'fecha_creacion', label: 'Fecha', render: (i) => formatDateTime(i.fecha_creacion) },
+      ], onEdit: handleEditPedidoProveedor, onDelete: handleDeletePedidoProveedor, minWidth: '900px' },
+    { key: 'facturas_compra', title: 'Facturas compra', desc: 'Ingresos de factura con detalle.', data: facturasCompra, createDialog: 'facturas_compra',
+      columns: [
+        { key: 'id', label: 'ID', mono: true }, { key: 'proveedor_nombre', label: 'Proveedor' },
+        { key: 'subtotal', label: 'Subtotal', align: 'right', render: (i) => formatMoney(i.subtotal) },
+        { key: 'total_iva', label: 'IVA', align: 'right', render: (i) => formatMoney(i.total_iva) },
+        { key: 'total_factura', label: 'Total', align: 'right', render: (i) => formatMoney(i.total_factura) },
+        { key: 'items', label: 'Items', render: (i) => i.items?.length || 0 },
+        { key: 'fecha_creacion', label: 'Fecha', render: (i) => formatDateTime(i.fecha_creacion) },
+      ], onEdit: handleEditFacturaCompra, onDelete: handleDeleteFacturaCompra, minWidth: '1000px' },
+    { key: 'gastos', title: 'Gastos', desc: 'Gastos operativos.', data: gastos, createDialog: 'gastos',
+      columns: [
+        { key: 'id', label: 'ID', mono: true }, { key: 'categoria', label: 'Categoria' }, { key: 'descripcion', label: 'Descripcion' },
+        { key: 'monto', label: 'Monto', align: 'right', render: (i) => formatMoney(i.monto) },
+        { key: 'fecha', label: 'Fecha', render: (i) => formatDateTime(i.fecha) },
+        { key: 'registrado_por', label: 'Registrado por' },
+      ], onEdit: handleEditGasto, onDelete: handleDeleteGasto, minWidth: '880px' },
+    { key: 'abonos_cartera', title: 'Abonos cartera', desc: 'Abonos registrados en cartera.', data: abonosCartera, createDialog: 'abonos_cartera',
+      columns: [
+        { key: 'id', label: 'ID', mono: true },
+        { key: 'cliente', label: 'Cliente', render: (i) => clientesCartera.find((c) => c.id === i.cliente_id)?.nombre || i.cliente_id },
+        { key: 'monto', label: 'Monto', align: 'right', render: (i) => formatMoney(i.monto) },
+        { key: 'metodo_pago', label: 'Metodo' },
+        { key: 'saldo_cliente', label: 'Saldo', align: 'right', render: (i) => formatMoney(i.saldo_cliente) },
+        { key: 'referencia', label: 'Referencia' },
+        { key: 'fecha', label: 'Fecha', render: (i) => formatDateTime(i.fecha) },
+      ], onEdit: handleEditAbonoCartera, onDelete: handleDeleteAbonoCartera, minWidth: '1000px' },
+    { key: 'auditorias', title: 'Auditorías', desc: 'Registro de cambios y trazabilidad.', data: auditorias, createDialog: 'auditorias',
+      columns: [
+        { key: 'modulo', label: 'Modulo', mono: true }, { key: 'entidad', label: 'Entidad' }, { key: 'accion', label: 'Accion' },
+        { key: 'detalle', label: 'Detalle' }, { key: 'usuario', label: 'Usuario' },
+        { key: 'fecha', label: 'Fecha', render: (i) => formatDateTime(i.fecha) },
+      ], onEdit: handleEditAuditoria, onDelete: handleDeleteAuditoria, minWidth: '1000px' },
+  ];
+
   if (!isSuperAdmin) {
     return (
       <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center text-gray-600">
@@ -1111,8 +1200,6 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
       </div>
     );
   }
-
-  const sectionShellClass = 'rounded-[28px] border border-blush-300/70 bg-white/90 shadow-[0_20px_50px_rgba(106,63,67,0.08)] backdrop-blur';
 
   return (
     <div className="space-y-6">
@@ -1196,844 +1283,27 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         </div>
       )}
 
-      {activeTab === 'vendedores' && (
-        <section className={`${sectionShellClass} p-4 sm:p-5`}>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Vendedores</h2>
-              <p className="text-sm text-rosewood/70">Acceso restringido y altas por modal.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openCreateDialog(CREATE_DIALOGS.vendedores)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
-            >
-              <Plus className="h-4 w-4" />
-              Crear
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
-                  <th className="px-3 py-3">ID</th>
-                  <th className="px-3 py-3">Username</th>
-                  <th className="px-3 py-3">Rol</th>
-                  <th className="px-3 py-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {vendedores.map((item) => (
-                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
-                    <td className="px-3 py-3 font-semibold">{item.id}</td>
-                    <td className="px-3 py-3">{item.username}</td>
-                    <td className="px-3 py-3">{item.rol}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditVendedor(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
-                          <PencilLine className="h-3.5 w-3.5" />
-                          Editar
-                        </button>
-                        <button onClick={() => handleDeleteVendedor(item)} className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Borrar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {vendedores.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-3 py-8 text-center text-sm text-rosewood/50">
-                      No hay registros
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'admins' && (
-        <section className={`${sectionShellClass} p-4 sm:p-5`}>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Administradores</h2>
-              <p className="text-sm text-rosewood/70">Acceso y control de admins.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openCreateDialog(CREATE_DIALOGS.admins)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
-            >
-              <Plus className="h-4 w-4" />
-              Crear
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
-                  <th className="px-3 py-3">ID</th>
-                  <th className="px-3 py-3">Username</th>
-                  <th className="px-3 py-3">Rol</th>
-                  <th className="px-3 py-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {admins.map((item) => (
-                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
-                    <td className="px-3 py-3 font-semibold">{item.id}</td>
-                    <td className="px-3 py-3">{item.username}</td>
-                    <td className="px-3 py-3">{item.rol}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditAdmin(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
-                          <PencilLine className="h-3.5 w-3.5" />
-                          Editar
-                        </button>
-                        <button onClick={() => handleDeleteAdmin(item)} className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Borrar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {admins.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-3 py-8 text-center text-sm text-rosewood/50">
-                      No hay registros
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'productos' && (
-        <section className={`${sectionShellClass} p-4 sm:p-5`}>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Productos</h2>
-              <p className="text-sm text-rosewood/70">Inventario y precios con control visual.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openCreateDialog(CREATE_DIALOGS.productos)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
-            >
-              <Plus className="h-4 w-4" />
-              Crear
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
-                  <th className="px-3 py-3">Nombre</th>
-                  <th className="px-3 py-3 text-right">Costo</th>
-                  <th className="px-3 py-3 text-right">Venta</th>
-                  <th className="px-3 py-3 text-right">Stock</th>
-                  <th className="px-3 py-3 text-right">Min</th>
-                  <th className="px-3 py-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {productos.map((item) => (
-                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
-                    <td className="px-3 py-3 font-semibold">{item.nombre}</td>
-                    <td className="px-3 py-3 text-right">{formatMoney(item.precio_costo)}</td>
-                    <td className="px-3 py-3 text-right">{formatMoney(item.precio_venta)}</td>
-                    <td className="px-3 py-3 text-right">{item.stock_actual}</td>
-                    <td className="px-3 py-3 text-right">{item.stock_minimo}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditProducto(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
-                          <PencilLine className="h-3.5 w-3.5" />
-                          Editar
-                        </button>
-                        <button onClick={() => handleDeleteProducto(item)} className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Borrar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {productos.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="px-3 py-8 text-center text-sm text-rosewood/50">
-                      No hay registros
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'proveedores' && (
-        <section className={`${sectionShellClass} p-4 sm:p-5`}>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Proveedores</h2>
-              <p className="text-sm text-rosewood/70">Catálogo de contactos y pedidos.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openCreateDialog(CREATE_DIALOGS.proveedores)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
-            >
-              <Plus className="h-4 w-4" />
-              Crear
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
-                  <th className="px-3 py-3">Nombre</th>
-                  <th className="px-3 py-3">Contacto</th>
-                  <th className="px-3 py-3">Telefono</th>
-                  <th className="px-3 py-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {proveedores.map((item) => (
-                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
-                    <td className="px-3 py-3 font-semibold">{item.nombre}</td>
-                    <td className="px-3 py-3">{item.contacto || '-'}</td>
-                    <td className="px-3 py-3">{item.telefono || '-'}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditProveedor(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
-                          <PencilLine className="h-3.5 w-3.5" />
-                          Editar
-                        </button>
-                        <button onClick={() => handleDeleteProveedor(item)} className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Borrar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {proveedores.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-3 py-8 text-center text-sm text-rosewood/50">
-                      No hay registros
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'clientes_cartera' && (
-        <section className={`${sectionShellClass} p-4 sm:p-5`}>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Clientes cartera</h2>
-              <p className="text-sm text-rosewood/70">Clientes con cupo y deuda.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openCreateDialog(CREATE_DIALOGS.clientes_cartera)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
-            >
-              <Plus className="h-4 w-4" />
-              Crear
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[860px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
-                  <th className="px-3 py-3">ID</th>
-                  <th className="px-3 py-3">Nombre</th>
-                  <th className="px-3 py-3">Documento</th>
-                  <th className="px-3 py-3">Telefono</th>
-                  <th className="px-3 py-3 text-right">Limite</th>
-                  <th className="px-3 py-3 text-right">Deuda</th>
-                  <th className="px-3 py-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {clientesCartera.map((item) => (
-                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
-                    <td className="px-3 py-3 font-semibold">{item.id}</td>
-                    <td className="px-3 py-3">{item.nombre}</td>
-                    <td className="px-3 py-3">{item.documento || '-'}</td>
-                    <td className="px-3 py-3">{item.telefono_whatsapp || '-'}</td>
-                    <td className="px-3 py-3 text-right">{formatMoney(item.limite_credito)}</td>
-                    <td className="px-3 py-3 text-right">{formatMoney(item.deuda_total)}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditClienteCartera(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
-                          <PencilLine className="h-3.5 w-3.5" />
-                          Editar
-                        </button>
-                        <button onClick={() => handleDeleteClienteCartera(item)} className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Borrar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {clientesCartera.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="px-3 py-8 text-center text-sm text-rosewood/50">
-                      No hay registros
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'clientes_tienda' && (
-        <section className={`${sectionShellClass} p-4 sm:p-5`}>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Clientes tienda</h2>
-              <p className="text-sm text-rosewood/70">Clientes fiados de tienda.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openCreateDialog(CREATE_DIALOGS.clientes_tienda)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
-            >
-              <Plus className="h-4 w-4" />
-              Crear
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[520px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
-                  <th className="px-3 py-3">ID</th>
-                  <th className="px-3 py-3">Nombre</th>
-                  <th className="px-3 py-3">Telefono</th>
-                  <th className="px-3 py-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {clientesTienda.map((item) => (
-                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
-                    <td className="px-3 py-3 font-semibold">{item.id}</td>
-                    <td className="px-3 py-3">{item.nombre}</td>
-                    <td className="px-3 py-3">{item.telefono_whatsapp || '-'}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditClienteTienda(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
-                          <PencilLine className="h-3.5 w-3.5" />
-                          Editar
-                        </button>
-                        <button onClick={() => handleDeleteClienteTienda(item)} className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Borrar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {clientesTienda.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-3 py-8 text-center text-sm text-rosewood/50">
-                      No hay registros
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'clientes_fidelizacion' && (
-        <section className={`${sectionShellClass} p-4 sm:p-5`}>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Clientes fidelizacion</h2>
-              <p className="text-sm text-rosewood/70">Puntos y contacto.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openCreateDialog(CREATE_DIALOGS.clientes_fidelizacion)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
-            >
-              <Plus className="h-4 w-4" />
-              Crear
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[620px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
-                  <th className="px-3 py-3">ID</th>
-                  <th className="px-3 py-3">Nombre</th>
-                  <th className="px-3 py-3">Telefono</th>
-                  <th className="px-3 py-3 text-right">Puntos</th>
-                  <th className="px-3 py-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {clientesFidelizacion.map((item) => (
-                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
-                    <td className="px-3 py-3 font-semibold">{item.id}</td>
-                    <td className="px-3 py-3">{item.nombre}</td>
-                    <td className="px-3 py-3">{item.telefono_whatsapp}</td>
-                    <td className="px-3 py-3 text-right">{item.puntos_acumulados}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditClienteFidelizacion(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
-                          <PencilLine className="h-3.5 w-3.5" />
-                          Editar
-                        </button>
-                        <button onClick={() => handleDeleteClienteFidelizacion(item)} className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Borrar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {clientesFidelizacion.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-3 py-8 text-center text-sm text-rosewood/50">
-                      No hay registros
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'ventas' && (
-        <section className={`${sectionShellClass} p-4 sm:p-5`}>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Ventas</h2>
-              <p className="text-sm text-rosewood/70">Historial completo de ventas.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openCreateDialog(CREATE_DIALOGS.ventas)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
-            >
-              <Plus className="h-4 w-4" />
-              Crear
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[920px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
-                  <th className="px-3 py-3">ID</th>
-                  <th className="px-3 py-3">Cliente</th>
-                  <th className="px-3 py-3">Fiado</th>
-                  <th className="px-3 py-3 text-right">Total</th>
-                  <th className="px-3 py-3 text-right">Saldo</th>
-                  <th className="px-3 py-3">Metodo</th>
-                  <th className="px-3 py-3">Fecha</th>
-                  <th className="px-3 py-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ventas.map((item) => (
-                  <tr key={item.venta_id} className="border-b border-blush-50 text-rosewood">
-                    <td className="px-3 py-3 font-semibold">{item.venta_id}</td>
-                    <td className="px-3 py-3">{item.cliente_nombre || '-'}</td>
-                    <td className="px-3 py-3">{item.es_fiado ? 'Si' : 'No'}</td>
-                    <td className="px-3 py-3 text-right">{formatMoney(item.total)}</td>
-                    <td className="px-3 py-3 text-right">{formatMoney(item.saldo_pendiente)}</td>
-                    <td className="px-3 py-3">{item.metodo_pago || '-'}</td>
-                    <td className="px-3 py-3">{formatDateTime(item.fecha)}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditVenta(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
-                          <PencilLine className="h-3.5 w-3.5" />
-                          Editar
-                        </button>
-                        <button onClick={() => handleDeleteVenta(item)} className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Borrar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {ventas.length === 0 && (
-                  <tr>
-                    <td colSpan={8} className="px-3 py-8 text-center text-sm text-rosewood/50">
-                      No hay registros
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'pedidos_proveedor' && (
-        <section className={`${sectionShellClass} p-4 sm:p-5`}>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Pedidos proveedor</h2>
-              <p className="text-sm text-rosewood/70">Solicitudes enviadas a proveedor.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openCreateDialog(CREATE_DIALOGS.pedidos_proveedor)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
-            >
-              <Plus className="h-4 w-4" />
-              Crear
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
-                  <th className="px-3 py-3">ID</th>
-                  <th className="px-3 py-3">Proveedor</th>
-                  <th className="px-3 py-3">Descripcion</th>
-                  <th className="px-3 py-3 text-right">Monto</th>
-                  <th className="px-3 py-3">Estado</th>
-                  <th className="px-3 py-3">Creado por</th>
-                  <th className="px-3 py-3">Fecha</th>
-                  <th className="px-3 py-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pedidosProveedor.map((item) => (
-                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
-                    <td className="px-3 py-3 font-semibold">{item.id}</td>
-                    <td className="px-3 py-3">{item.proveedor_nombre}</td>
-                    <td className="px-3 py-3">{item.descripcion}</td>
-                    <td className="px-3 py-3 text-right">{formatMoney(item.monto_estimado)}</td>
-                    <td className="px-3 py-3">{item.estado}</td>
-                    <td className="px-3 py-3">{item.creado_por}</td>
-                    <td className="px-3 py-3">{formatDateTime(item.fecha_creacion)}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditPedidoProveedor(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
-                          <PencilLine className="h-3.5 w-3.5" />
-                          Editar
-                        </button>
-                        <button onClick={() => handleDeletePedidoProveedor(item)} className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Borrar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {pedidosProveedor.length === 0 && (
-                  <tr>
-                    <td colSpan={8} className="px-3 py-8 text-center text-sm text-rosewood/50">
-                      No hay registros
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'facturas_compra' && (
-        <section className={`${sectionShellClass} p-4 sm:p-5`}>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Facturas compra</h2>
-              <p className="text-sm text-rosewood/70">Ingresos de factura con detalle.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openCreateDialog(CREATE_DIALOGS.facturas_compra)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
-            >
-              <Plus className="h-4 w-4" />
-              Crear
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
-                  <th className="px-3 py-3">ID</th>
-                  <th className="px-3 py-3">Proveedor</th>
-                  <th className="px-3 py-3 text-right">Subtotal</th>
-                  <th className="px-3 py-3 text-right">IVA</th>
-                  <th className="px-3 py-3 text-right">Total</th>
-                  <th className="px-3 py-3">Items</th>
-                  <th className="px-3 py-3">Fecha</th>
-                  <th className="px-3 py-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {facturasCompra.map((item) => (
-                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
-                    <td className="px-3 py-3 font-semibold">{item.id}</td>
-                    <td className="px-3 py-3">{item.proveedor_nombre}</td>
-                    <td className="px-3 py-3 text-right">{formatMoney(item.subtotal)}</td>
-                    <td className="px-3 py-3 text-right">{formatMoney(item.total_iva)}</td>
-                    <td className="px-3 py-3 text-right">{formatMoney(item.total_factura)}</td>
-                    <td className="px-3 py-3">{item.items?.length || 0}</td>
-                    <td className="px-3 py-3">{formatDateTime(item.fecha_creacion)}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditFacturaCompra(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
-                          <PencilLine className="h-3.5 w-3.5" />
-                          Editar
-                        </button>
-                        <button onClick={() => handleDeleteFacturaCompra(item)} className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Borrar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {facturasCompra.length === 0 && (
-                  <tr>
-                    <td colSpan={8} className="px-3 py-8 text-center text-sm text-rosewood/50">
-                      No hay registros
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'gastos' && (
-        <section className={`${sectionShellClass} p-4 sm:p-5`}>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Gastos</h2>
-              <p className="text-sm text-rosewood/70">Gastos operativos.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openCreateDialog(CREATE_DIALOGS.gastos)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
-            >
-              <Plus className="h-4 w-4" />
-              Crear
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[880px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
-                  <th className="px-3 py-3">ID</th>
-                  <th className="px-3 py-3">Categoria</th>
-                  <th className="px-3 py-3">Descripcion</th>
-                  <th className="px-3 py-3 text-right">Monto</th>
-                  <th className="px-3 py-3">Fecha</th>
-                  <th className="px-3 py-3">Registrado por</th>
-                  <th className="px-3 py-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {gastos.map((item) => (
-                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
-                    <td className="px-3 py-3 font-semibold">{item.id}</td>
-                    <td className="px-3 py-3">{item.categoria}</td>
-                    <td className="px-3 py-3">{item.descripcion}</td>
-                    <td className="px-3 py-3 text-right">{formatMoney(item.monto)}</td>
-                    <td className="px-3 py-3">{formatDateTime(item.fecha)}</td>
-                    <td className="px-3 py-3">{item.registrado_por}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditGasto(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
-                          <PencilLine className="h-3.5 w-3.5" />
-                          Editar
-                        </button>
-                        <button onClick={() => handleDeleteGasto(item)} className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Borrar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {gastos.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="px-3 py-8 text-center text-sm text-rosewood/50">
-                      No hay registros
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'abonos_cartera' && (
-        <section className={`${sectionShellClass} p-4 sm:p-5`}>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Abonos cartera</h2>
-              <p className="text-sm text-rosewood/70">Abonos registrados en cartera.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openCreateDialog(CREATE_DIALOGS.abonos_cartera)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
-            >
-              <Plus className="h-4 w-4" />
-              Crear
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
-                  <th className="px-3 py-3">ID</th>
-                  <th className="px-3 py-3">Cliente</th>
-                  <th className="px-3 py-3 text-right">Monto</th>
-                  <th className="px-3 py-3">Metodo</th>
-                  <th className="px-3 py-3 text-right">Saldo</th>
-                  <th className="px-3 py-3">Referencia</th>
-                  <th className="px-3 py-3">Fecha</th>
-                  <th className="px-3 py-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {abonosCartera.map((item) => (
-                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
-                    <td className="px-3 py-3 font-semibold">{item.id}</td>
-                    <td className="px-3 py-3">{clientesCartera.find((c) => c.id === item.cliente_id)?.nombre || item.cliente_id}</td>
-                    <td className="px-3 py-3 text-right">{formatMoney(item.monto)}</td>
-                    <td className="px-3 py-3">{item.metodo_pago || '-'}</td>
-                    <td className="px-3 py-3 text-right">{formatMoney(item.saldo_cliente)}</td>
-                    <td className="px-3 py-3">{item.referencia || '-'}</td>
-                    <td className="px-3 py-3">{formatDateTime(item.fecha)}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditAbonoCartera(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
-                          <PencilLine className="h-3.5 w-3.5" />
-                          Editar
-                        </button>
-                        <button onClick={() => handleDeleteAbonoCartera(item)} className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Borrar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {abonosCartera.length === 0 && (
-                  <tr>
-                    <td colSpan={8} className="px-3 py-8 text-center text-sm text-rosewood/50">
-                      No hay registros
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'auditorias' && (
-        <section className={`${sectionShellClass} p-4 sm:p-5`}>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Auditorias</h2>
-              <p className="text-sm text-rosewood/70">Registro de cambios y trazabilidad.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openCreateDialog(CREATE_DIALOGS.auditorias)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
-            >
-              <Plus className="h-4 w-4" />
-              Crear
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
-                  <th className="px-3 py-3">Modulo</th>
-                  <th className="px-3 py-3">Entidad</th>
-                  <th className="px-3 py-3">Accion</th>
-                  <th className="px-3 py-3">Detalle</th>
-                  <th className="px-3 py-3">Usuario</th>
-                  <th className="px-3 py-3">Fecha</th>
-                  <th className="px-3 py-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {auditorias.map((item) => (
-                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
-                    <td className="px-3 py-3 font-semibold">{item.modulo}</td>
-                    <td className="px-3 py-3">{item.entidad}</td>
-                    <td className="px-3 py-3">{item.accion}</td>
-                    <td className="px-3 py-3 text-xs">{item.detalle || '-'}</td>
-                    <td className="px-3 py-3">{item.usuario}</td>
-                    <td className="px-3 py-3">{formatDateTime(item.fecha)}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditAuditoria(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
-                          <PencilLine className="h-3.5 w-3.5" />
-                          Editar
-                        </button>
-                        <button onClick={() => handleDeleteAuditoria(item)} className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Borrar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {auditorias.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="px-3 py-8 text-center text-sm text-rosewood/50">
-                      No hay registros
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
+      {tabSections.map((section) => (
+        activeTab === section.key && (
+          <AdminSection
+            key={section.key}
+            title={section.title}
+            description={section.desc}
+            onCreate={() => openCreateDialog(section.createDialog)}
+          >
+            <AdminTable
+              columns={section.columns}
+              data={section.data}
+              onEdit={section.onEdit}
+              onDelete={section.onDelete}
+              minWidth={section.minWidth}
+            />
+          </AdminSection>
+        )
+      ))}
 
       {activeTab === 'informes' && (
-        <section className={`${sectionShellClass} space-y-4 p-4 sm:p-5`}>
+        <section className={`rounded-[28px] border border-blush-300/70 bg-white/90 p-4 shadow-[0_20px_50px_rgba(106,63,67,0.08)] backdrop-blur sm:p-5 space-y-4`}>
           <div>
             <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Informes por categorias</h2>
             <p className="text-sm text-rosewood/70">Resumen de desempeño y lectura ejecutiva.</p>
