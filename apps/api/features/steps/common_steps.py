@@ -218,3 +218,55 @@ def step_saldo_pendiente(context, saldo):
 def step_venta_origen(context, origen):
     payload = context.response.json()
     assert payload["fiado_origen"] == origen, f"Expected origen '{origen}', got '{payload['fiado_origen']}'"
+
+
+@given('el cliente "{nombre}" tiene una deuda de {deuda:d}')
+def step_cliente_tiene_deuda(context, nombre, deuda):
+    with context.db_session() as session:
+        cliente = session.execute(
+            select(ClienteModel).where(ClienteModel.nombre == nombre),
+        ).scalar_one_or_none()
+        assert cliente is not None, f"Cliente '{nombre}' no encontrado"
+        cliente.deuda_total = float(deuda)
+        session.commit()
+
+
+def _cliente_id(context, nombre):
+    with context.db_session() as session:
+        cliente = session.execute(
+            select(ClienteModel).where(ClienteModel.nombre == nombre),
+        ).scalar_one_or_none()
+        assert cliente is not None, f"Cliente '{nombre}' no encontrado"
+        return cliente.id
+
+
+@when('registro un abono de {monto:d} para "{nombre}"')
+def step_registrar_abono(context, monto, nombre):
+    cliente_id = _cliente_id(context, nombre)
+    context.response = context.client.post(
+        f"/api/cartera/clientes/{cliente_id}/abonos",
+        headers={"Authorization": f"Bearer {context.token}"},
+        json={"monto": monto, "metodo_pago": "efectivo"},
+    )
+
+
+@when('intento registrar un abono de {monto:d} para "{nombre}"')
+def step_intentar_abono(context, monto, nombre):
+    cliente_id = _cliente_id(context, nombre)
+    context.response = context.client.post(
+        f"/api/cartera/clientes/{cliente_id}/abonos",
+        headers={"Authorization": f"Bearer {context.token}"},
+        json={"monto": monto, "metodo_pago": "efectivo"},
+    )
+
+
+@then('el saldo del cliente "{nombre}" es {saldo:d}')
+def step_saldo_cliente(context, nombre, saldo):
+    with context.db_session() as session:
+        cliente = session.execute(
+            select(ClienteModel).where(ClienteModel.nombre == nombre),
+        ).scalar_one_or_none()
+        assert cliente is not None, f"Cliente '{nombre}' no encontrado"
+        assert cliente.deuda_total == float(saldo), (
+            f"Expected saldo {saldo}, got {cliente.deuda_total}"
+        )
