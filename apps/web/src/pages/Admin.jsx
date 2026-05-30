@@ -1,15 +1,29 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useMemo, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { ChevronDown, ChevronRight, Database, PencilLine, Plus, RefreshCw, Shield, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, RefreshCw, Shield } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { apiDelete, apiRequest } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage';
 import SuccessMessage from '../components/SuccessMessage';
 import useConfirm from '../components/useConfirm';
 import Skeleton from '../components/Skeleton';
-import Modal from '../components/Modal';
 import EditFormModal from '../components/EditFormModal';
 import { formatDateTime, formatMoney } from '../utils/format';
+import AdminSection from './admin/components/AdminSection';
+import AdminTable from './admin/components/AdminTable';
+import CreateVendedorDialog from './admin/components/CreateDialogs/CreateVendedorDialog';
+import CreateAdminDialog from './admin/components/CreateDialogs/CreateAdminDialog';
+import CreateProductoDialog from './admin/components/CreateDialogs/CreateProductoDialog';
+import CreateProveedorDialog from './admin/components/CreateDialogs/CreateProveedorDialog';
+import CreateAuditoriaDialog from './admin/components/CreateDialogs/CreateAuditoriaDialog';
+import CreateClienteCarteraDialog from './admin/components/CreateDialogs/CreateClienteCarteraDialog';
+import CreateClienteTiendaDialog from './admin/components/CreateDialogs/CreateClienteTiendaDialog';
+import CreateClienteFidelizacionDialog from './admin/components/CreateDialogs/CreateClienteFidelizacionDialog';
+import CreateVentaDialog from './admin/components/CreateDialogs/CreateVentaDialog';
+import CreatePedidoProveedorDialog from './admin/components/CreateDialogs/CreatePedidoProveedorDialog';
+import CreateFacturaCompraDialog from './admin/components/CreateDialogs/CreateFacturaCompraDialog';
+import CreateGastoDialog from './admin/components/CreateDialogs/CreateGastoDialog';
+import CreateAbonoCarteraDialog from './admin/components/CreateDialogs/CreateAbonoCarteraDialog';
 
 const ROLE_GROUPS = [
   {
@@ -85,7 +99,6 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
   const [expandedRole, setExpandedRole] = useState('Vendedor');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -121,19 +134,6 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     productos_menos_vendidos: [],
   });
 
-  const [vendedorForm, setVendedorForm] = useState({ username: '', password: '' });
-  const [adminForm, setAdminForm] = useState({ username: '', password: '' });
-  const [proveedorForm, setProveedorForm] = useState({ nombre: '', contacto: '', telefono: '' });
-  const [productoForm, setProductoForm] = useState({ nombre: '', codigo_barras: '', precio_costo: '', precio_venta: '', stock_actual: '', stock_minimo: '', catalogo: 'tienda' });
-  const [clienteCarteraForm, setClienteCarteraForm] = useState({ nombre: '', documento: '', telefono_whatsapp: '', limite_credito: '' });
-  const [clienteTiendaForm, setClienteTiendaForm] = useState({ nombre: '', telefono_whatsapp: '' });
-  const [clienteFidelizacionForm, setClienteFidelizacionForm] = useState({ nombre: '', telefono_whatsapp: '', puntos_acumulados: '' });
-  const [ventaForm, setVentaForm] = useState({ cliente_id: '', cliente_tienda_id: '', items_json: '[]', es_fiado: false, fiado_origen: '', abono_inicial: '0', metodo_pago: '' });
-  const [pedidoProveedorForm, setPedidoProveedorForm] = useState({ proveedor_id: '', descripcion: '', monto_estimado: '' });
-  const [facturaCompraForm, setFacturaCompraForm] = useState({ proveedor_id: '', items_json: '[]' });
-  const [gastoForm, setGastoForm] = useState({ categoria: '', descripcion: '', monto: '' });
-  const [auditoriaForm, setAuditoriaForm] = useState({ modulo: '', entidad: '', entidad_id: '', accion: '', detalle: '' });
-  const [abonoCarteraForm, setAbonoCarteraForm] = useState({ cliente_id: '', monto: '', metodo_pago: 'efectivo', referencia: '' });
   const [createDialog, setCreateDialog] = useState(null);
 
   useEffect(() => {
@@ -142,33 +142,33 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     }
   }, [moduleKey]);
 
-  const notifyError = (message) => {
+  const notifyError = useCallback((message) => {
     setSuccess('');
     setError(message);
-  };
+  }, []);
 
-  const notifySuccess = (message) => {
+  const notifySuccess = useCallback((message) => {
     setError('');
     setSuccess(message);
-  };
+  }, []);
 
-  const openCreateDialog = (dialogKey) => {
+  const openCreateDialog = useCallback((dialogKey) => {
     setError('');
     setSuccess('');
     setCreateDialog(dialogKey);
-  };
+  }, []);
 
-  const closeCreateDialog = () => {
+  const closeCreateDialog = useCallback(() => {
     setCreateDialog(null);
-  };
+  }, []);
 
-  const request = async ({ endpoint, method = 'GET', body, signal }) => {
+  const request = useCallback(async ({ endpoint, method = 'GET', body, signal }) => {
     return apiRequest(endpoint, {
       method,
       signal,
       body,
     });
-  };
+  }, []);
 
   const loadAll = useCallback(async (signal) => {
     try {
@@ -231,7 +231,13 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
       if (signal?.aborted) return;
       throw err;
     }
-  }, []);
+  }, [request]);
+
+  const handleCreated = useCallback((message) => {
+    loadAll();
+    notifySuccess(message);
+    closeCreateDialog();
+  }, [loadAll, notifySuccess, closeCreateDialog]);
 
   useEffect(() => {
     if (!token || !isSuperAdmin) {
@@ -261,9 +267,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
       isMounted = false;
       controller.abort();
     };
-  }, [token, isSuperAdmin, loadAll]);
+  }, [token, isSuperAdmin, loadAll, notifyError]);
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
       const controller = new AbortController();
@@ -274,63 +280,24 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     } finally {
       setRefreshing(false);
     }
-  };
+  }, [loadAll, notifySuccess, notifyError]);
 
-  const runDelete = async ({ endpoint, successMessage }) => {
+  const runDelete = useCallback(async ({ endpoint, successMessage }) => {
     await apiDelete(endpoint);
 
     await loadAll();
     notifySuccess(successMessage);
-  };
+  }, [loadAll, notifySuccess]);
 
-  const openEditModal = (title, fields, initialValues, onSave) => {
+  const openEditModal = useCallback((title, fields, initialValues, onSave) => {
     setEditModalTitle(title);
     setEditModalFields(fields);
     setEditModalValues(initialValues);
     editOnSaveRef.current = onSave;
     setEditModalOpen(true);
-  };
+  }, []);
 
-  const parseItemsJson = (value) => {
-    const raw = String(value || '').trim() || '[]';
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      throw new Error('items debe ser un arreglo JSON');
-    }
-    return parsed;
-  };
-
-  // Clientes cartera
-  const handleCreateClienteCartera = async (event) => {
-    event.preventDefault();
-    if (Number(clienteCarteraForm.limite_credito) < 0) {
-      notifyError('El limite de credito no puede ser negativo');
-      return;
-    }
-    setSaving(true);
-    try {
-      await request({
-        endpoint: '/api/cartera/clientes',
-        method: 'POST',
-        body: {
-          nombre: clienteCarteraForm.nombre.trim(),
-          documento: clienteCarteraForm.documento.trim() || null,
-          telefono_whatsapp: clienteCarteraForm.telefono_whatsapp.trim() || null,
-          limite_credito: Number(clienteCarteraForm.limite_credito || 0),
-        },
-      });
-      await loadAll();
-      setClienteCarteraForm({ nombre: '', documento: '', telefono_whatsapp: '', limite_credito: '' });
-      closeCreateDialog();
-      notifySuccess('Cliente creado');
-    } catch (err) {
-      notifyError(err.message || 'No se pudo crear cliente');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleEditClienteCartera = (item) => {
+  const handleEditClienteCartera = useCallback((item) => {
     openEditModal(
       'Editar cliente cartera',
       [
@@ -355,9 +322,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         notifySuccess('Cliente actualizado');
       },
     );
-  };
+  }, [openEditModal, request, loadAll, notifySuccess]);
 
-  const handleDeleteClienteCartera = async (item) => {
+  const handleDeleteClienteCartera = useCallback(async (item) => {
     const confirmed = await confirm({ title: 'Eliminar cliente', message: `Eliminar cliente ${item.nombre}?` }); if (!confirmed) return;
     try {
       await runDelete({
@@ -367,33 +334,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     } catch (err) {
       notifyError(err.message || 'No se pudo eliminar cliente');
     }
-  };
+  }, [confirm, runDelete, notifyError]);
 
-  // Clientes tienda fiado
-  const handleCreateClienteTienda = async (event) => {
-    event.preventDefault();
-    setSaving(true);
-    try {
-      await request({
-        endpoint: '/api/clientes/tienda-fiado',
-        method: 'POST',
-        body: {
-          nombre: clienteTiendaForm.nombre.trim(),
-          telefono_whatsapp: clienteTiendaForm.telefono_whatsapp.trim() || null,
-        },
-      });
-      await loadAll();
-      setClienteTiendaForm({ nombre: '', telefono_whatsapp: '' });
-      closeCreateDialog();
-      notifySuccess('Cliente tienda creado');
-    } catch (err) {
-      notifyError(err.message || 'No se pudo crear cliente tienda');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleEditClienteTienda = (item) => {
+  const handleEditClienteTienda = useCallback((item) => {
     openEditModal(
       'Editar cliente tienda',
       [
@@ -414,9 +357,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         notifySuccess('Cliente tienda actualizado');
       },
     );
-  };
+  }, [openEditModal, request, loadAll, notifySuccess]);
 
-  const handleDeleteClienteTienda = async (item) => {
+  const handleDeleteClienteTienda = useCallback(async (item) => {
     const confirmed = await confirm({ title: 'Eliminar cliente', message: `Eliminar cliente ${item.nombre}?` }); if (!confirmed) return;
     try {
       await runDelete({
@@ -426,38 +369,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     } catch (err) {
       notifyError(err.message || 'No se pudo eliminar cliente tienda');
     }
-  };
+  }, [confirm, runDelete, notifyError]);
 
-  // Clientes fidelizacion
-  const handleCreateClienteFidelizacion = async (event) => {
-    event.preventDefault();
-    if (Number(clienteFidelizacionForm.puntos_acumulados) < 0) {
-      notifyError('Los puntos acumulados no pueden ser negativos');
-      return;
-    }
-    setSaving(true);
-    try {
-      await request({
-        endpoint: '/api/fidelizacion/clientes',
-        method: 'POST',
-        body: {
-          nombre: clienteFidelizacionForm.nombre.trim(),
-          telefono_whatsapp: clienteFidelizacionForm.telefono_whatsapp.trim(),
-          puntos_acumulados: Number(clienteFidelizacionForm.puntos_acumulados || 0),
-        },
-      });
-      await loadAll();
-      setClienteFidelizacionForm({ nombre: '', telefono_whatsapp: '', puntos_acumulados: '' });
-      closeCreateDialog();
-      notifySuccess('Cliente fidelizacion creado');
-    } catch (err) {
-      notifyError(err.message || 'No se pudo crear cliente fidelizacion');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleEditClienteFidelizacion = (item) => {
+  const handleEditClienteFidelizacion = useCallback((item) => {
     openEditModal(
       'Editar cliente fidelización',
       [
@@ -484,9 +398,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         notifySuccess('Cliente fidelizacion actualizado');
       },
     );
-  };
+  }, [openEditModal, notifyError, request, loadAll, notifySuccess]);
 
-  const handleDeleteClienteFidelizacion = async (item) => {
+  const handleDeleteClienteFidelizacion = useCallback(async (item) => {
     const confirmed = await confirm({ title: 'Eliminar cliente', message: `Eliminar cliente ${item.nombre}?` }); if (!confirmed) return;
     try {
       await runDelete({
@@ -496,39 +410,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     } catch (err) {
       notifyError(err.message || 'No se pudo eliminar cliente fidelizacion');
     }
-  };
+  }, [confirm, runDelete, notifyError]);
 
-  // Ventas
-  const handleCreateVenta = async (event) => {
-    event.preventDefault();
-    setSaving(true);
-    try {
-      const items = parseItemsJson(ventaForm.items_json);
-      await request({
-        endpoint: '/api/ventas',
-        method: 'POST',
-        body: {
-          cliente_id: ventaForm.cliente_id ? Number(ventaForm.cliente_id) : null,
-          cliente_tienda_id: ventaForm.cliente_tienda_id ? Number(ventaForm.cliente_tienda_id) : null,
-          items,
-          es_fiado: Boolean(ventaForm.es_fiado),
-          fiado_origen: ventaForm.fiado_origen.trim() || null,
-          abono_inicial: Number(ventaForm.abono_inicial || 0),
-          metodo_pago: ventaForm.metodo_pago.trim() || null,
-        },
-      });
-      await loadAll();
-      setVentaForm({ cliente_id: '', cliente_tienda_id: '', items_json: '[]', es_fiado: false, fiado_origen: '', abono_inicial: '0', metodo_pago: '' });
-      closeCreateDialog();
-      notifySuccess('Venta creada');
-    } catch (err) {
-      notifyError(err.message || 'No se pudo crear venta');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleEditVenta = (item) => {
+  const handleEditVenta = useCallback((item) => {
     openEditModal(
       'Editar venta',
       [
@@ -548,9 +432,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         notifySuccess('Venta actualizada');
       },
     );
-  };
+  }, [openEditModal, notifyError, request, loadAll, notifySuccess]);
 
-  const handleDeleteVenta = async (item) => {
+  const handleDeleteVenta = useCallback(async (item) => {
     const confirmed = await confirm({ title: 'Eliminar venta', message: `Eliminar venta ${item.venta_id}?` }); if (!confirmed) return;
     try {
       await runDelete({
@@ -560,34 +444,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     } catch (err) {
       notifyError(err.message || 'No se pudo eliminar venta');
     }
-  };
+  }, [confirm, runDelete, notifyError]);
 
-  // Pedidos proveedor
-  const handleCreatePedidoProveedor = async (event) => {
-    event.preventDefault();
-    setSaving(true);
-    try {
-      await request({
-        endpoint: '/api/proveedores/pedidos',
-        method: 'POST',
-        body: {
-          proveedor_id: Number(pedidoProveedorForm.proveedor_id),
-          descripcion: pedidoProveedorForm.descripcion.trim(),
-          monto_estimado: Number(pedidoProveedorForm.monto_estimado || 0),
-        },
-      });
-      await loadAll();
-      setPedidoProveedorForm({ proveedor_id: '', descripcion: '', monto_estimado: '' });
-      closeCreateDialog();
-      notifySuccess('Pedido creado');
-    } catch (err) {
-      notifyError(err.message || 'No se pudo crear pedido');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleEditPedidoProveedor = (item) => {
+  const handleEditPedidoProveedor = useCallback((item) => {
     openEditModal(
       'Editar pedido proveedor',
       [
@@ -606,9 +465,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         notifySuccess('Pedido actualizado');
       },
     );
-  };
+  }, [openEditModal, notifyError, request, loadAll, notifySuccess]);
 
-  const handleDeletePedidoProveedor = async (item) => {
+  const handleDeletePedidoProveedor = useCallback(async (item) => {
     const confirmed = await confirm({ title: 'Eliminar pedido', message: `Eliminar pedido ${item.id}?` }); if (!confirmed) return;
     try {
       await runDelete({
@@ -618,34 +477,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     } catch (err) {
       notifyError(err.message || 'No se pudo eliminar pedido');
     }
-  };
+  }, [confirm, runDelete, notifyError]);
 
-  // Facturas compra
-  const handleCreateFacturaCompra = async (event) => {
-    event.preventDefault();
-    setSaving(true);
-    try {
-      const items = parseItemsJson(facturaCompraForm.items_json);
-      await request({
-        endpoint: '/api/facturas-compra',
-        method: 'POST',
-        body: {
-          proveedor_id: Number(facturaCompraForm.proveedor_id),
-          items,
-        },
-      });
-      await loadAll();
-      setFacturaCompraForm({ proveedor_id: '', items_json: '[]' });
-      closeCreateDialog();
-      notifySuccess('Factura creada');
-    } catch (err) {
-      notifyError(err.message || 'No se pudo crear factura');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleEditFacturaCompra = (item) => {
+  const handleEditFacturaCompra = useCallback((item) => {
     openEditModal(
       'Editar factura compra',
       [{ name: 'total_factura', label: 'Total factura', type: 'number', required: true }],
@@ -661,9 +495,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         notifySuccess('Factura actualizada');
       },
     );
-  };
+  }, [openEditModal, notifyError, request, loadAll, notifySuccess]);
 
-  const handleDeleteFacturaCompra = async (item) => {
+  const handleDeleteFacturaCompra = useCallback(async (item) => {
     const confirmed = await confirm({ title: 'Eliminar factura', message: `Eliminar factura ${item.id}?` }); if (!confirmed) return;
     try {
       await runDelete({
@@ -673,38 +507,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     } catch (err) {
       notifyError(err.message || 'No se pudo eliminar factura');
     }
-  };
+  }, [confirm, runDelete, notifyError]);
 
-  // Gastos
-  const handleCreateGasto = async (event) => {
-    event.preventDefault();
-    if (Number(gastoForm.monto) <= 0) {
-      notifyError('El monto no puede ser negativo');
-      return;
-    }
-    setSaving(true);
-    try {
-      await request({
-        endpoint: '/api/gastos',
-        method: 'POST',
-        body: {
-          categoria: gastoForm.categoria.trim(),
-          descripcion: gastoForm.descripcion.trim(),
-          monto: Number(gastoForm.monto || 0),
-        },
-      });
-      await loadAll();
-      setGastoForm({ categoria: '', descripcion: '', monto: '' });
-      closeCreateDialog();
-      notifySuccess('Gasto creado');
-    } catch (err) {
-      notifyError(err.message || 'No se pudo crear gasto');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleEditGasto = (item) => {
+  const handleEditGasto = useCallback((item) => {
     openEditModal(
       'Editar gasto',
       [
@@ -724,9 +529,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         notifySuccess('Gasto actualizado');
       },
     );
-  };
+  }, [openEditModal, notifyError, request, loadAll, notifySuccess]);
 
-  const handleDeleteGasto = async (item) => {
+  const handleDeleteGasto = useCallback(async (item) => {
     const confirmed = await confirm({ title: 'Eliminar gasto', message: `Eliminar gasto ${item.id}?` }); if (!confirmed) return;
     try {
       await runDelete({
@@ -736,35 +541,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     } catch (err) {
       notifyError(err.message || 'No se pudo eliminar gasto');
     }
-  };
+  }, [confirm, runDelete, notifyError]);
 
-  // Abonos cartera
-  const handleCreateAbonoCartera = async (event) => {
-    event.preventDefault();
-    setSaving(true);
-    try {
-      await request({
-        endpoint: '/api/cartera/abonos',
-        method: 'POST',
-        body: {
-          cliente_id: Number(abonoCarteraForm.cliente_id),
-          monto: Number(abonoCarteraForm.monto),
-          metodo_pago: abonoCarteraForm.metodo_pago,
-          referencia: abonoCarteraForm.referencia.trim() || null,
-        },
-      });
-      await loadAll();
-      setAbonoCarteraForm({ cliente_id: '', monto: '', metodo_pago: 'efectivo', referencia: '' });
-      closeCreateDialog();
-      notifySuccess('Abono creado');
-    } catch (err) {
-      notifyError(err.message || 'No se pudo crear abono');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleEditAbonoCartera = (item) => {
+  const handleEditAbonoCartera = useCallback((item) => {
     openEditModal(
       'Editar abono cartera',
       [{ name: 'monto', label: 'Monto', type: 'number', required: true }],
@@ -780,9 +559,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         notifySuccess('Abono actualizado');
       },
     );
-  };
+  }, [openEditModal, notifyError, request, loadAll, notifySuccess]);
 
-  const handleDeleteAbonoCartera = async (item) => {
+  const handleDeleteAbonoCartera = useCallback(async (item) => {
     const confirmed = await confirm({ title: 'Eliminar abono', message: `Eliminar abono ${item.id}?` }); if (!confirmed) return;
     try {
       await runDelete({
@@ -792,30 +571,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     } catch (err) {
       notifyError(err.message || 'No se pudo eliminar abono');
     }
-  };
+  }, [confirm, runDelete, notifyError]);
 
-  // Admins
-  const handleCreateAdmin = async (event) => {
-    event.preventDefault();
-    setSaving(true);
-    try {
-      await request({
-        endpoint: '/api/superadmin/usuarios/admins',
-        method: 'POST',
-        body: { username: adminForm.username.trim(), password: adminForm.password },
-      });
-      await loadAll();
-      setAdminForm({ username: '', password: '' });
-      closeCreateDialog();
-      notifySuccess('Admin creado');
-    } catch (err) {
-      notifyError(err.message || 'No se pudo crear admin');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleEditAdmin = (item) => {
+  const handleEditAdmin = useCallback((item) => {
     openEditModal(
       'Editar admin',
       [
@@ -835,9 +593,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         notifySuccess('Admin actualizado');
       },
     );
-  };
+  }, [openEditModal, request, loadAll, notifySuccess]);
 
-  const handleDeleteAdmin = async (item) => {
+  const handleDeleteAdmin = useCallback(async (item) => {
     const confirmed = await confirm({ title: 'Eliminar admin', message: `Eliminar admin ${item.username}?` }); if (!confirmed) return;
     try {
       await runDelete({
@@ -847,30 +605,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     } catch (err) {
       notifyError(err.message || 'No se pudo eliminar admin');
     }
-  };
+  }, [confirm, runDelete, notifyError]);
 
-  // Vendedores
-  const handleCreateVendedor = async (event) => {
-    event.preventDefault();
-    setSaving(true);
-    try {
-      await request({
-        endpoint: '/api/superadmin/usuarios/vendedores',
-        method: 'POST',
-        body: { username: vendedorForm.username.trim(), password: vendedorForm.password },
-      });
-      await loadAll();
-      setVendedorForm({ username: '', password: '' });
-      closeCreateDialog();
-      notifySuccess('Vendedor creado');
-    } catch (err) {
-      notifyError(err.message || 'No se pudo crear vendedor');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleEditVendedor = (item) => {
+  const handleEditVendedor = useCallback((item) => {
     openEditModal(
       'Editar vendedor',
       [
@@ -890,9 +627,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         notifySuccess('Vendedor actualizado');
       },
     );
-  };
+  }, [openEditModal, request, loadAll, notifySuccess]);
 
-  const handleDeleteVendedor = async (item) => {
+  const handleDeleteVendedor = useCallback(async (item) => {
     const confirmed = await confirm({ title: 'Eliminar vendedor', message: `Eliminar vendedor ${item.username}?` }); if (!confirmed) return;
     try {
       await runDelete({
@@ -902,54 +639,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     } catch (err) {
       notifyError(err.message || 'No se pudo eliminar vendedor');
     }
-  };
+  }, [confirm, runDelete, notifyError]);
 
-  // Productos
-  const handleCreateProducto = async (event) => {
-    event.preventDefault();
-    if (Number(productoForm.precio_costo) < 0) {
-      notifyError('El precio de costo no puede ser negativo');
-      return;
-    }
-    if (Number(productoForm.precio_venta) < 0) {
-      notifyError('El precio de venta no puede ser negativo');
-      return;
-    }
-    if (Number(productoForm.stock_actual) < 0) {
-      notifyError('El stock actual no puede ser negativo');
-      return;
-    }
-    if (Number(productoForm.stock_minimo) < 0) {
-      notifyError('El stock minimo no puede ser negativo');
-      return;
-    }
-    setSaving(true);
-    try {
-      await request({
-        endpoint: '/api/superadmin/productos',
-        method: 'POST',
-        body: {
-          nombre: productoForm.nombre.trim(),
-          codigo_barras: productoForm.codigo_barras.trim() || null,
-          precio_costo: Number(productoForm.precio_costo || 0),
-          precio_venta: Number(productoForm.precio_venta || 0),
-          stock_actual: Number(productoForm.stock_actual || 0),
-          stock_minimo: Number(productoForm.stock_minimo || 0),
-          catalogo: productoForm.catalogo,
-        },
-      });
-      await loadAll();
-      setProductoForm({ nombre: '', codigo_barras: '', precio_costo: '', precio_venta: '', stock_actual: '', stock_minimo: '', catalogo: 'tienda' });
-      closeCreateDialog();
-      notifySuccess('Producto creado');
-    } catch (err) {
-      notifyError(err.message || 'No se pudo crear producto');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleEditProducto = (item) => {
+  const handleEditProducto = useCallback((item) => {
     openEditModal(
       'Editar producto',
       [
@@ -968,9 +660,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         notifySuccess('Producto actualizado');
       },
     );
-  };
+  }, [openEditModal, notifyError, request, loadAll, notifySuccess]);
 
-  const handleDeleteProducto = async (item) => {
+  const handleDeleteProducto = useCallback(async (item) => {
     const confirmed = await confirm({ title: 'Eliminar producto', message: `Eliminar producto ${item.nombre}?` }); if (!confirmed) return;
     try {
       await apiDelete(`/api/productos/${item.id}`);
@@ -979,34 +671,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     } catch (err) {
       notifyError(err.message || 'No se pudo eliminar producto');
     }
-  };
+  }, [confirm, loadAll, notifySuccess, notifyError]);
 
-  // Proveedores
-  const handleCreateProveedor = async (event) => {
-    event.preventDefault();
-    setSaving(true);
-    try {
-      await request({
-        endpoint: '/api/superadmin/proveedores',
-        method: 'POST',
-        body: {
-          nombre: proveedorForm.nombre.trim(),
-          contacto: proveedorForm.contacto.trim() || null,
-          telefono: proveedorForm.telefono.trim() || null,
-        },
-      });
-      await loadAll();
-      setProveedorForm({ nombre: '', contacto: '', telefono: '' });
-      closeCreateDialog();
-      notifySuccess('Proveedor creado');
-    } catch (err) {
-      notifyError(err.message || 'No se pudo crear proveedor');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleEditProveedor = (item) => {
+  const handleEditProveedor = useCallback((item) => {
     openEditModal(
       'Editar proveedor',
       [
@@ -1024,9 +691,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         notifySuccess('Proveedor actualizado');
       },
     );
-  };
+  }, [openEditModal, request, loadAll, notifySuccess]);
 
-  const handleDeleteProveedor = async (item) => {
+  const handleDeleteProveedor = useCallback(async (item) => {
     const confirmed = await confirm({ title: 'Eliminar proveedor', message: `Eliminar proveedor ${item.nombre}?` }); if (!confirmed) return;
     try {
       await apiDelete(`/api/proveedores/${item.id}`);
@@ -1035,37 +702,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     } catch (err) {
       notifyError(err.message || 'No se pudo eliminar proveedor');
     }
-  };
+  }, [confirm, loadAll, notifySuccess, notifyError]);
 
-  // Auditorias
-  const handleCreateAuditoria = async (event) => {
-    event.preventDefault();
-    setSaving(true);
-    try {
-      await request({
-        endpoint: '/api/superadmin/auditorias',
-        method: 'POST',
-        body: {
-          modulo: auditoriaForm.modulo.trim(),
-          entidad: auditoriaForm.entidad.trim(),
-          entidad_id: auditoriaForm.entidad_id ? Number(auditoriaForm.entidad_id) : null,
-          accion: auditoriaForm.accion.trim(),
-          detalle: auditoriaForm.detalle.trim() || null,
-          usuario: 'superadmin',
-        },
-      });
-      await loadAll();
-      setAuditoriaForm({ modulo: '', entidad: '', entidad_id: '', accion: '', detalle: '' });
-      closeCreateDialog();
-      notifySuccess('Auditoria creada');
-    } catch (err) {
-      notifyError(err.message || 'No se pudo crear auditoria');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleEditAuditoria = (item) => {
+  const handleEditAuditoria = useCallback((item) => {
     openEditModal(
       'Editar auditoría',
       [
@@ -1083,9 +722,9 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         notifySuccess('Auditoria actualizada');
       },
     );
-  };
+  }, [openEditModal, request, loadAll, notifySuccess]);
 
-  const handleDeleteAuditoria = async (item) => {
+  const handleDeleteAuditoria = useCallback(async (item) => {
     const confirmed = await confirm({ title: 'Eliminar auditoría', message: `Eliminar auditoría ${item.id}?` }); if (!confirmed) return;
     try {
       await apiDelete(`/api/auditorias/${item.id}`);
@@ -1094,7 +733,111 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     } catch (err) {
       notifyError(err.message || 'No se pudo eliminar auditoria');
     }
-  };
+  }, [confirm, loadAll, notifySuccess, notifyError]);
+
+  const tabSections = useMemo(() => [
+    { key: 'vendedores', title: 'Vendedores', desc: 'Acceso restringido y altas por modal.', data: vendedores, createDialog: 'vendedores',
+      columns: [
+        { key: 'id', label: 'ID', mono: true }, { key: 'username', label: 'Username' }, { key: 'rol', label: 'Rol' },
+      ], onEdit: handleEditVendedor, onDelete: handleDeleteVendedor, minWidth: '640px' },
+    { key: 'admins', title: 'Administradores', desc: 'Acceso y control de admins.', data: admins, createDialog: 'admins',
+      columns: [
+        { key: 'id', label: 'ID', mono: true }, { key: 'username', label: 'Username' }, { key: 'rol', label: 'Rol' },
+      ], onEdit: handleEditAdmin, onDelete: handleDeleteAdmin, minWidth: '640px' },
+    { key: 'productos', title: 'Productos', desc: 'Inventario y precios con control visual.', data: productos, createDialog: 'productos',
+      columns: [
+        { key: 'nombre', label: 'Nombre', mono: true },
+        { key: 'precio_costo', label: 'Costo', align: 'right', render: (i) => formatMoney(i.precio_costo) },
+        { key: 'precio_venta', label: 'Venta', align: 'right', render: (i) => formatMoney(i.precio_venta) },
+        { key: 'stock_actual', label: 'Stock', align: 'right' }, { key: 'stock_minimo', label: 'Min', align: 'right' },
+      ], onEdit: handleEditProducto, onDelete: handleDeleteProducto, minWidth: '900px' },
+    { key: 'proveedores', title: 'Proveedores', desc: 'Catálogo de contactos y pedidos.', data: proveedores, createDialog: 'proveedores',
+      columns: [
+        { key: 'nombre', label: 'Nombre', mono: true }, { key: 'contacto', label: 'Contacto' }, { key: 'telefono', label: 'Telefono' },
+      ], onEdit: handleEditProveedor, onDelete: handleDeleteProveedor, minWidth: '760px' },
+    { key: 'clientes_cartera', title: 'Clientes cartera', desc: 'Clientes con cupo y deuda.', data: clientesCartera, createDialog: 'clientes_cartera',
+      columns: [
+        { key: 'id', label: 'ID', mono: true }, { key: 'nombre', label: 'Nombre' }, { key: 'documento', label: 'Documento' },
+        { key: 'telefono_whatsapp', label: 'Telefono' },
+        { key: 'limite_credito', label: 'Limite', align: 'right', render: (i) => formatMoney(i.limite_credito) },
+        { key: 'deuda_total', label: 'Deuda', align: 'right', render: (i) => formatMoney(i.deuda_total) },
+      ], onEdit: handleEditClienteCartera, onDelete: handleDeleteClienteCartera, minWidth: '860px' },
+    { key: 'clientes_tienda', title: 'Clientes tienda', desc: 'Clientes fiados de tienda.', data: clientesTienda, createDialog: 'clientes_tienda',
+      columns: [
+        { key: 'id', label: 'ID', mono: true }, { key: 'nombre', label: 'Nombre' }, { key: 'telefono_whatsapp', label: 'Telefono' },
+      ], onEdit: handleEditClienteTienda, onDelete: handleDeleteClienteTienda, minWidth: '520px' },
+    { key: 'clientes_fidelizacion', title: 'Clientes fidelización', desc: 'Puntos y contacto.', data: clientesFidelizacion, createDialog: 'clientes_fidelizacion',
+      columns: [
+        { key: 'id', label: 'ID', mono: true }, { key: 'nombre', label: 'Nombre' }, { key: 'telefono_whatsapp', label: 'Telefono' },
+        { key: 'puntos_acumulados', label: 'Puntos', align: 'right' },
+      ], onEdit: handleEditClienteFidelizacion, onDelete: handleDeleteClienteFidelizacion, minWidth: '620px' },
+    { key: 'ventas', title: 'Ventas', desc: 'Historial completo de ventas.', data: ventas, createDialog: 'ventas',
+      columns: [
+        { key: 'venta_id', label: 'ID', mono: true },
+        { key: 'cliente_nombre', label: 'Cliente', render: (i) => i.cliente_nombre || '-' },
+        { key: 'es_fiado', label: 'Fiado', render: (i) => i.es_fiado ? 'Sí' : 'No' },
+        { key: 'total', label: 'Total', align: 'right', render: (i) => formatMoney(i.total) },
+        { key: 'saldo_pendiente', label: 'Saldo', align: 'right', render: (i) => formatMoney(i.saldo_pendiente) },
+        { key: 'metodo_pago', label: 'Metodo' },
+        { key: 'fecha', label: 'Fecha', render: (i) => formatDateTime(i.fecha) },
+      ], onEdit: handleEditVenta, onDelete: handleDeleteVenta, minWidth: '920px' },
+    { key: 'pedidos_proveedor', title: 'Pedidos proveedor', desc: 'Solicitudes enviadas a proveedor.', data: pedidosProveedor, createDialog: 'pedidos_proveedor',
+      columns: [
+        { key: 'id', label: 'ID', mono: true }, { key: 'proveedor_nombre', label: 'Proveedor' }, { key: 'descripcion', label: 'Descripcion' },
+        { key: 'monto_estimado', label: 'Monto', align: 'right', render: (i) => formatMoney(i.monto_estimado) },
+        { key: 'estado', label: 'Estado' }, { key: 'creado_por', label: 'Creado por' },
+        { key: 'fecha_creacion', label: 'Fecha', render: (i) => formatDateTime(i.fecha_creacion) },
+      ], onEdit: handleEditPedidoProveedor, onDelete: handleDeletePedidoProveedor, minWidth: '900px' },
+    { key: 'facturas_compra', title: 'Facturas compra', desc: 'Ingresos de factura con detalle.', data: facturasCompra, createDialog: 'facturas_compra',
+      columns: [
+        { key: 'id', label: 'ID', mono: true }, { key: 'proveedor_nombre', label: 'Proveedor' },
+        { key: 'subtotal', label: 'Subtotal', align: 'right', render: (i) => formatMoney(i.subtotal) },
+        { key: 'total_iva', label: 'IVA', align: 'right', render: (i) => formatMoney(i.total_iva) },
+        { key: 'total_factura', label: 'Total', align: 'right', render: (i) => formatMoney(i.total_factura) },
+        { key: 'items', label: 'Items', render: (i) => i.items?.length || 0 },
+        { key: 'fecha_creacion', label: 'Fecha', render: (i) => formatDateTime(i.fecha_creacion) },
+      ], onEdit: handleEditFacturaCompra, onDelete: handleDeleteFacturaCompra, minWidth: '1000px' },
+    { key: 'gastos', title: 'Gastos', desc: 'Gastos operativos.', data: gastos, createDialog: 'gastos',
+      columns: [
+        { key: 'id', label: 'ID', mono: true }, { key: 'categoria', label: 'Categoria' }, { key: 'descripcion', label: 'Descripcion' },
+        { key: 'monto', label: 'Monto', align: 'right', render: (i) => formatMoney(i.monto) },
+        { key: 'fecha', label: 'Fecha', render: (i) => formatDateTime(i.fecha) },
+        { key: 'registrado_por', label: 'Registrado por' },
+      ], onEdit: handleEditGasto, onDelete: handleDeleteGasto, minWidth: '880px' },
+    { key: 'abonos_cartera', title: 'Abonos cartera', desc: 'Abonos registrados en cartera.', data: abonosCartera, createDialog: 'abonos_cartera',
+      columns: [
+        { key: 'id', label: 'ID', mono: true },
+        { key: 'cliente', label: 'Cliente', render: (i) => clientesCartera.find((c) => c.id === i.cliente_id)?.nombre || i.cliente_id },
+        { key: 'monto', label: 'Monto', align: 'right', render: (i) => formatMoney(i.monto) },
+        { key: 'metodo_pago', label: 'Metodo' },
+        { key: 'saldo_cliente', label: 'Saldo', align: 'right', render: (i) => formatMoney(i.saldo_cliente) },
+        { key: 'referencia', label: 'Referencia' },
+        { key: 'fecha', label: 'Fecha', render: (i) => formatDateTime(i.fecha) },
+      ], onEdit: handleEditAbonoCartera, onDelete: handleDeleteAbonoCartera, minWidth: '1000px' },
+    { key: 'auditorias', title: 'Auditorías', desc: 'Registro de cambios y trazabilidad.', data: auditorias, createDialog: 'auditorias',
+      columns: [
+        { key: 'modulo', label: 'Modulo', mono: true }, { key: 'entidad', label: 'Entidad' }, { key: 'accion', label: 'Accion' },
+        { key: 'detalle', label: 'Detalle' }, { key: 'usuario', label: 'Usuario' },
+        { key: 'fecha', label: 'Fecha', render: (i) => formatDateTime(i.fecha) },
+      ], onEdit: handleEditAuditoria, onDelete: handleDeleteAuditoria, minWidth: '1000px' },
+  ], [
+    vendedores, admins, productos, proveedores,
+    clientesCartera, clientesTienda, clientesFidelizacion,
+    ventas, pedidosProveedor, facturasCompra, gastos, abonosCartera, auditorias,
+    handleEditVendedor, handleDeleteVendedor,
+    handleEditAdmin, handleDeleteAdmin,
+    handleEditProducto, handleDeleteProducto,
+    handleEditProveedor, handleDeleteProveedor,
+    handleEditClienteCartera, handleDeleteClienteCartera,
+    handleEditClienteTienda, handleDeleteClienteTienda,
+    handleEditClienteFidelizacion, handleDeleteClienteFidelizacion,
+    handleEditVenta, handleDeleteVenta,
+    handleEditPedidoProveedor, handleDeletePedidoProveedor,
+    handleEditFacturaCompra, handleDeleteFacturaCompra,
+    handleEditGasto, handleDeleteGasto,
+    handleEditAbonoCartera, handleDeleteAbonoCartera,
+    handleEditAuditoria, handleDeleteAuditoria,
+  ]);
 
   if (!isSuperAdmin) {
     return (
@@ -1111,8 +854,6 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
       </div>
     );
   }
-
-  const sectionShellClass = 'rounded-[28px] border border-blush-300/70 bg-white/90 shadow-[0_20px_50px_rgba(106,63,67,0.08)] backdrop-blur';
 
   return (
     <div className="space-y-6">
@@ -1196,844 +937,27 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         </div>
       )}
 
-      {activeTab === 'vendedores' && (
-        <section className={`${sectionShellClass} p-4 sm:p-5`}>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Vendedores</h2>
-              <p className="text-sm text-rosewood/70">Acceso restringido y altas por modal.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openCreateDialog(CREATE_DIALOGS.vendedores)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
-            >
-              <Plus className="h-4 w-4" />
-              Crear
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
-                  <th className="px-3 py-3">ID</th>
-                  <th className="px-3 py-3">Username</th>
-                  <th className="px-3 py-3">Rol</th>
-                  <th className="px-3 py-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {vendedores.map((item) => (
-                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
-                    <td className="px-3 py-3 font-semibold">{item.id}</td>
-                    <td className="px-3 py-3">{item.username}</td>
-                    <td className="px-3 py-3">{item.rol}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditVendedor(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
-                          <PencilLine className="h-3.5 w-3.5" />
-                          Editar
-                        </button>
-                        <button onClick={() => handleDeleteVendedor(item)} className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Borrar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {vendedores.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-3 py-8 text-center text-sm text-rosewood/50">
-                      No hay registros
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'admins' && (
-        <section className={`${sectionShellClass} p-4 sm:p-5`}>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Administradores</h2>
-              <p className="text-sm text-rosewood/70">Acceso y control de admins.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openCreateDialog(CREATE_DIALOGS.admins)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
-            >
-              <Plus className="h-4 w-4" />
-              Crear
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
-                  <th className="px-3 py-3">ID</th>
-                  <th className="px-3 py-3">Username</th>
-                  <th className="px-3 py-3">Rol</th>
-                  <th className="px-3 py-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {admins.map((item) => (
-                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
-                    <td className="px-3 py-3 font-semibold">{item.id}</td>
-                    <td className="px-3 py-3">{item.username}</td>
-                    <td className="px-3 py-3">{item.rol}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditAdmin(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
-                          <PencilLine className="h-3.5 w-3.5" />
-                          Editar
-                        </button>
-                        <button onClick={() => handleDeleteAdmin(item)} className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Borrar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {admins.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-3 py-8 text-center text-sm text-rosewood/50">
-                      No hay registros
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'productos' && (
-        <section className={`${sectionShellClass} p-4 sm:p-5`}>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Productos</h2>
-              <p className="text-sm text-rosewood/70">Inventario y precios con control visual.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openCreateDialog(CREATE_DIALOGS.productos)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
-            >
-              <Plus className="h-4 w-4" />
-              Crear
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
-                  <th className="px-3 py-3">Nombre</th>
-                  <th className="px-3 py-3 text-right">Costo</th>
-                  <th className="px-3 py-3 text-right">Venta</th>
-                  <th className="px-3 py-3 text-right">Stock</th>
-                  <th className="px-3 py-3 text-right">Min</th>
-                  <th className="px-3 py-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {productos.map((item) => (
-                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
-                    <td className="px-3 py-3 font-semibold">{item.nombre}</td>
-                    <td className="px-3 py-3 text-right">{formatMoney(item.precio_costo)}</td>
-                    <td className="px-3 py-3 text-right">{formatMoney(item.precio_venta)}</td>
-                    <td className="px-3 py-3 text-right">{item.stock_actual}</td>
-                    <td className="px-3 py-3 text-right">{item.stock_minimo}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditProducto(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
-                          <PencilLine className="h-3.5 w-3.5" />
-                          Editar
-                        </button>
-                        <button onClick={() => handleDeleteProducto(item)} className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Borrar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {productos.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="px-3 py-8 text-center text-sm text-rosewood/50">
-                      No hay registros
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'proveedores' && (
-        <section className={`${sectionShellClass} p-4 sm:p-5`}>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Proveedores</h2>
-              <p className="text-sm text-rosewood/70">Catálogo de contactos y pedidos.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openCreateDialog(CREATE_DIALOGS.proveedores)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
-            >
-              <Plus className="h-4 w-4" />
-              Crear
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
-                  <th className="px-3 py-3">Nombre</th>
-                  <th className="px-3 py-3">Contacto</th>
-                  <th className="px-3 py-3">Telefono</th>
-                  <th className="px-3 py-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {proveedores.map((item) => (
-                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
-                    <td className="px-3 py-3 font-semibold">{item.nombre}</td>
-                    <td className="px-3 py-3">{item.contacto || '-'}</td>
-                    <td className="px-3 py-3">{item.telefono || '-'}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditProveedor(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
-                          <PencilLine className="h-3.5 w-3.5" />
-                          Editar
-                        </button>
-                        <button onClick={() => handleDeleteProveedor(item)} className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Borrar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {proveedores.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-3 py-8 text-center text-sm text-rosewood/50">
-                      No hay registros
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'clientes_cartera' && (
-        <section className={`${sectionShellClass} p-4 sm:p-5`}>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Clientes cartera</h2>
-              <p className="text-sm text-rosewood/70">Clientes con cupo y deuda.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openCreateDialog(CREATE_DIALOGS.clientes_cartera)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
-            >
-              <Plus className="h-4 w-4" />
-              Crear
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[860px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
-                  <th className="px-3 py-3">ID</th>
-                  <th className="px-3 py-3">Nombre</th>
-                  <th className="px-3 py-3">Documento</th>
-                  <th className="px-3 py-3">Telefono</th>
-                  <th className="px-3 py-3 text-right">Limite</th>
-                  <th className="px-3 py-3 text-right">Deuda</th>
-                  <th className="px-3 py-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {clientesCartera.map((item) => (
-                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
-                    <td className="px-3 py-3 font-semibold">{item.id}</td>
-                    <td className="px-3 py-3">{item.nombre}</td>
-                    <td className="px-3 py-3">{item.documento || '-'}</td>
-                    <td className="px-3 py-3">{item.telefono_whatsapp || '-'}</td>
-                    <td className="px-3 py-3 text-right">{formatMoney(item.limite_credito)}</td>
-                    <td className="px-3 py-3 text-right">{formatMoney(item.deuda_total)}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditClienteCartera(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
-                          <PencilLine className="h-3.5 w-3.5" />
-                          Editar
-                        </button>
-                        <button onClick={() => handleDeleteClienteCartera(item)} className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Borrar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {clientesCartera.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="px-3 py-8 text-center text-sm text-rosewood/50">
-                      No hay registros
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'clientes_tienda' && (
-        <section className={`${sectionShellClass} p-4 sm:p-5`}>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Clientes tienda</h2>
-              <p className="text-sm text-rosewood/70">Clientes fiados de tienda.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openCreateDialog(CREATE_DIALOGS.clientes_tienda)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
-            >
-              <Plus className="h-4 w-4" />
-              Crear
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[520px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
-                  <th className="px-3 py-3">ID</th>
-                  <th className="px-3 py-3">Nombre</th>
-                  <th className="px-3 py-3">Telefono</th>
-                  <th className="px-3 py-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {clientesTienda.map((item) => (
-                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
-                    <td className="px-3 py-3 font-semibold">{item.id}</td>
-                    <td className="px-3 py-3">{item.nombre}</td>
-                    <td className="px-3 py-3">{item.telefono_whatsapp || '-'}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditClienteTienda(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
-                          <PencilLine className="h-3.5 w-3.5" />
-                          Editar
-                        </button>
-                        <button onClick={() => handleDeleteClienteTienda(item)} className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Borrar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {clientesTienda.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-3 py-8 text-center text-sm text-rosewood/50">
-                      No hay registros
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'clientes_fidelizacion' && (
-        <section className={`${sectionShellClass} p-4 sm:p-5`}>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Clientes fidelizacion</h2>
-              <p className="text-sm text-rosewood/70">Puntos y contacto.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openCreateDialog(CREATE_DIALOGS.clientes_fidelizacion)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
-            >
-              <Plus className="h-4 w-4" />
-              Crear
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[620px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
-                  <th className="px-3 py-3">ID</th>
-                  <th className="px-3 py-3">Nombre</th>
-                  <th className="px-3 py-3">Telefono</th>
-                  <th className="px-3 py-3 text-right">Puntos</th>
-                  <th className="px-3 py-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {clientesFidelizacion.map((item) => (
-                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
-                    <td className="px-3 py-3 font-semibold">{item.id}</td>
-                    <td className="px-3 py-3">{item.nombre}</td>
-                    <td className="px-3 py-3">{item.telefono_whatsapp}</td>
-                    <td className="px-3 py-3 text-right">{item.puntos_acumulados}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditClienteFidelizacion(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
-                          <PencilLine className="h-3.5 w-3.5" />
-                          Editar
-                        </button>
-                        <button onClick={() => handleDeleteClienteFidelizacion(item)} className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Borrar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {clientesFidelizacion.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-3 py-8 text-center text-sm text-rosewood/50">
-                      No hay registros
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'ventas' && (
-        <section className={`${sectionShellClass} p-4 sm:p-5`}>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Ventas</h2>
-              <p className="text-sm text-rosewood/70">Historial completo de ventas.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openCreateDialog(CREATE_DIALOGS.ventas)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
-            >
-              <Plus className="h-4 w-4" />
-              Crear
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[920px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
-                  <th className="px-3 py-3">ID</th>
-                  <th className="px-3 py-3">Cliente</th>
-                  <th className="px-3 py-3">Fiado</th>
-                  <th className="px-3 py-3 text-right">Total</th>
-                  <th className="px-3 py-3 text-right">Saldo</th>
-                  <th className="px-3 py-3">Metodo</th>
-                  <th className="px-3 py-3">Fecha</th>
-                  <th className="px-3 py-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ventas.map((item) => (
-                  <tr key={item.venta_id} className="border-b border-blush-50 text-rosewood">
-                    <td className="px-3 py-3 font-semibold">{item.venta_id}</td>
-                    <td className="px-3 py-3">{item.cliente_nombre || '-'}</td>
-                    <td className="px-3 py-3">{item.es_fiado ? 'Si' : 'No'}</td>
-                    <td className="px-3 py-3 text-right">{formatMoney(item.total)}</td>
-                    <td className="px-3 py-3 text-right">{formatMoney(item.saldo_pendiente)}</td>
-                    <td className="px-3 py-3">{item.metodo_pago || '-'}</td>
-                    <td className="px-3 py-3">{formatDateTime(item.fecha)}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditVenta(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
-                          <PencilLine className="h-3.5 w-3.5" />
-                          Editar
-                        </button>
-                        <button onClick={() => handleDeleteVenta(item)} className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Borrar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {ventas.length === 0 && (
-                  <tr>
-                    <td colSpan={8} className="px-3 py-8 text-center text-sm text-rosewood/50">
-                      No hay registros
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'pedidos_proveedor' && (
-        <section className={`${sectionShellClass} p-4 sm:p-5`}>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Pedidos proveedor</h2>
-              <p className="text-sm text-rosewood/70">Solicitudes enviadas a proveedor.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openCreateDialog(CREATE_DIALOGS.pedidos_proveedor)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
-            >
-              <Plus className="h-4 w-4" />
-              Crear
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
-                  <th className="px-3 py-3">ID</th>
-                  <th className="px-3 py-3">Proveedor</th>
-                  <th className="px-3 py-3">Descripcion</th>
-                  <th className="px-3 py-3 text-right">Monto</th>
-                  <th className="px-3 py-3">Estado</th>
-                  <th className="px-3 py-3">Creado por</th>
-                  <th className="px-3 py-3">Fecha</th>
-                  <th className="px-3 py-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pedidosProveedor.map((item) => (
-                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
-                    <td className="px-3 py-3 font-semibold">{item.id}</td>
-                    <td className="px-3 py-3">{item.proveedor_nombre}</td>
-                    <td className="px-3 py-3">{item.descripcion}</td>
-                    <td className="px-3 py-3 text-right">{formatMoney(item.monto_estimado)}</td>
-                    <td className="px-3 py-3">{item.estado}</td>
-                    <td className="px-3 py-3">{item.creado_por}</td>
-                    <td className="px-3 py-3">{formatDateTime(item.fecha_creacion)}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditPedidoProveedor(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
-                          <PencilLine className="h-3.5 w-3.5" />
-                          Editar
-                        </button>
-                        <button onClick={() => handleDeletePedidoProveedor(item)} className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Borrar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {pedidosProveedor.length === 0 && (
-                  <tr>
-                    <td colSpan={8} className="px-3 py-8 text-center text-sm text-rosewood/50">
-                      No hay registros
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'facturas_compra' && (
-        <section className={`${sectionShellClass} p-4 sm:p-5`}>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Facturas compra</h2>
-              <p className="text-sm text-rosewood/70">Ingresos de factura con detalle.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openCreateDialog(CREATE_DIALOGS.facturas_compra)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
-            >
-              <Plus className="h-4 w-4" />
-              Crear
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
-                  <th className="px-3 py-3">ID</th>
-                  <th className="px-3 py-3">Proveedor</th>
-                  <th className="px-3 py-3 text-right">Subtotal</th>
-                  <th className="px-3 py-3 text-right">IVA</th>
-                  <th className="px-3 py-3 text-right">Total</th>
-                  <th className="px-3 py-3">Items</th>
-                  <th className="px-3 py-3">Fecha</th>
-                  <th className="px-3 py-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {facturasCompra.map((item) => (
-                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
-                    <td className="px-3 py-3 font-semibold">{item.id}</td>
-                    <td className="px-3 py-3">{item.proveedor_nombre}</td>
-                    <td className="px-3 py-3 text-right">{formatMoney(item.subtotal)}</td>
-                    <td className="px-3 py-3 text-right">{formatMoney(item.total_iva)}</td>
-                    <td className="px-3 py-3 text-right">{formatMoney(item.total_factura)}</td>
-                    <td className="px-3 py-3">{item.items?.length || 0}</td>
-                    <td className="px-3 py-3">{formatDateTime(item.fecha_creacion)}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditFacturaCompra(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
-                          <PencilLine className="h-3.5 w-3.5" />
-                          Editar
-                        </button>
-                        <button onClick={() => handleDeleteFacturaCompra(item)} className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Borrar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {facturasCompra.length === 0 && (
-                  <tr>
-                    <td colSpan={8} className="px-3 py-8 text-center text-sm text-rosewood/50">
-                      No hay registros
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'gastos' && (
-        <section className={`${sectionShellClass} p-4 sm:p-5`}>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Gastos</h2>
-              <p className="text-sm text-rosewood/70">Gastos operativos.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openCreateDialog(CREATE_DIALOGS.gastos)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
-            >
-              <Plus className="h-4 w-4" />
-              Crear
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[880px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
-                  <th className="px-3 py-3">ID</th>
-                  <th className="px-3 py-3">Categoria</th>
-                  <th className="px-3 py-3">Descripcion</th>
-                  <th className="px-3 py-3 text-right">Monto</th>
-                  <th className="px-3 py-3">Fecha</th>
-                  <th className="px-3 py-3">Registrado por</th>
-                  <th className="px-3 py-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {gastos.map((item) => (
-                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
-                    <td className="px-3 py-3 font-semibold">{item.id}</td>
-                    <td className="px-3 py-3">{item.categoria}</td>
-                    <td className="px-3 py-3">{item.descripcion}</td>
-                    <td className="px-3 py-3 text-right">{formatMoney(item.monto)}</td>
-                    <td className="px-3 py-3">{formatDateTime(item.fecha)}</td>
-                    <td className="px-3 py-3">{item.registrado_por}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditGasto(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
-                          <PencilLine className="h-3.5 w-3.5" />
-                          Editar
-                        </button>
-                        <button onClick={() => handleDeleteGasto(item)} className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Borrar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {gastos.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="px-3 py-8 text-center text-sm text-rosewood/50">
-                      No hay registros
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'abonos_cartera' && (
-        <section className={`${sectionShellClass} p-4 sm:p-5`}>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Abonos cartera</h2>
-              <p className="text-sm text-rosewood/70">Abonos registrados en cartera.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openCreateDialog(CREATE_DIALOGS.abonos_cartera)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
-            >
-              <Plus className="h-4 w-4" />
-              Crear
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
-                  <th className="px-3 py-3">ID</th>
-                  <th className="px-3 py-3">Cliente</th>
-                  <th className="px-3 py-3 text-right">Monto</th>
-                  <th className="px-3 py-3">Metodo</th>
-                  <th className="px-3 py-3 text-right">Saldo</th>
-                  <th className="px-3 py-3">Referencia</th>
-                  <th className="px-3 py-3">Fecha</th>
-                  <th className="px-3 py-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {abonosCartera.map((item) => (
-                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
-                    <td className="px-3 py-3 font-semibold">{item.id}</td>
-                    <td className="px-3 py-3">{clientesCartera.find((c) => c.id === item.cliente_id)?.nombre || item.cliente_id}</td>
-                    <td className="px-3 py-3 text-right">{formatMoney(item.monto)}</td>
-                    <td className="px-3 py-3">{item.metodo_pago || '-'}</td>
-                    <td className="px-3 py-3 text-right">{formatMoney(item.saldo_cliente)}</td>
-                    <td className="px-3 py-3">{item.referencia || '-'}</td>
-                    <td className="px-3 py-3">{formatDateTime(item.fecha)}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditAbonoCartera(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
-                          <PencilLine className="h-3.5 w-3.5" />
-                          Editar
-                        </button>
-                        <button onClick={() => handleDeleteAbonoCartera(item)} className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Borrar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {abonosCartera.length === 0 && (
-                  <tr>
-                    <td colSpan={8} className="px-3 py-8 text-center text-sm text-rosewood/50">
-                      No hay registros
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'auditorias' && (
-        <section className={`${sectionShellClass} p-4 sm:p-5`}>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Auditorias</h2>
-              <p className="text-sm text-rosewood/70">Registro de cambios y trazabilidad.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openCreateDialog(CREATE_DIALOGS.auditorias)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300"
-            >
-              <Plus className="h-4 w-4" />
-              Crear
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-blush-300/70 text-xs uppercase tracking-[0.18em] text-rosewood/55">
-                  <th className="px-3 py-3">Modulo</th>
-                  <th className="px-3 py-3">Entidad</th>
-                  <th className="px-3 py-3">Accion</th>
-                  <th className="px-3 py-3">Detalle</th>
-                  <th className="px-3 py-3">Usuario</th>
-                  <th className="px-3 py-3">Fecha</th>
-                  <th className="px-3 py-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {auditorias.map((item) => (
-                  <tr key={item.id} className="border-b border-blush-50 text-rosewood">
-                    <td className="px-3 py-3 font-semibold">{item.modulo}</td>
-                    <td className="px-3 py-3">{item.entidad}</td>
-                    <td className="px-3 py-3">{item.accion}</td>
-                    <td className="px-3 py-3 text-xs">{item.detalle || '-'}</td>
-                    <td className="px-3 py-3">{item.usuario}</td>
-                    <td className="px-3 py-3">{formatDateTime(item.fecha)}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleEditAuditoria(item)} className="inline-flex items-center gap-1 rounded-full border border-blush-300 px-3 py-1.5 text-xs font-semibold text-rosewood transition hover:bg-blush-50">
-                          <PencilLine className="h-3.5 w-3.5" />
-                          Editar
-                        </button>
-                        <button onClick={() => handleDeleteAuditoria(item)} className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Borrar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {auditorias.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="px-3 py-8 text-center text-sm text-rosewood/50">
-                      No hay registros
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
+      {tabSections.map((section) => (
+        activeTab === section.key && (
+          <AdminSection
+            key={section.key}
+            title={section.title}
+            description={section.desc}
+            onCreate={() => openCreateDialog(section.createDialog)}
+          >
+            <AdminTable
+              columns={section.columns}
+              data={section.data}
+              onEdit={section.onEdit}
+              onDelete={section.onDelete}
+              minWidth={section.minWidth}
+            />
+          </AdminSection>
+        )
+      ))}
 
       {activeTab === 'informes' && (
-        <section className={`${sectionShellClass} space-y-4 p-4 sm:p-5`}>
+        <section className={`rounded-[28px] border border-blush-300/70 bg-white/90 p-4 shadow-[0_20px_50px_rgba(106,63,67,0.08)] backdrop-blur sm:p-5 space-y-4`}>
           <div>
             <h2 className="text-xl font-bold text-rosewood sm:text-2xl">Informes por categorias</h2>
             <p className="text-sm text-rosewood/70">Resumen de desempeño y lectura ejecutiva.</p>
@@ -2143,195 +1067,19 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
       )}
 
 
-      {createDialog === CREATE_DIALOGS.vendedores && (
-        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-2xl" title="Crear vendedor" subtitle="Alta rápida desde modal.">
-            <form onSubmit={handleCreateVendedor} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-               <input value={vendedorForm.username} onChange={(e) => setVendedorForm((c) => ({ ...c, username: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Usuario" required />
-               <input type="password" value={vendedorForm.password} onChange={(e) => setVendedorForm((c) => ({ ...c, password: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Contraseña" required />
-              <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
-                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-50">Cancelar</button>
-                <button type="submit" disabled={saving} className="rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300">Crear vendedor</button>
-              </div>
-            </form>
-      </Modal>
-      )}
-
-      {createDialog === CREATE_DIALOGS.admins && (
-        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-2xl" title="Crear admin" subtitle="Alta rápida desde modal.">
-            <form onSubmit={handleCreateAdmin} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-               <input value={adminForm.username} onChange={(e) => setAdminForm((c) => ({ ...c, username: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Usuario" required />
-               <input type="password" value={adminForm.password} onChange={(e) => setAdminForm((c) => ({ ...c, password: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Contraseña" required />
-              <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
-                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-50">Cancelar</button>
-                <button type="submit" disabled={saving} className="rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300">Crear admin</button>
-              </div>
-            </form>
-      </Modal>
-      )}
-
-      {createDialog === CREATE_DIALOGS.productos && (
-        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-4xl" title="Crear producto" subtitle="Alta rápida desde modal.">
-            <form onSubmit={handleCreateProducto} className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              <input value={productoForm.nombre} onChange={(e) => setProductoForm((c) => ({ ...c, nombre: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Nombre" required />
-              <input value={productoForm.codigo_barras} onChange={(e) => setProductoForm((c) => ({ ...c, codigo_barras: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Código barras" />
-              <select value={productoForm.catalogo} onChange={(e) => setProductoForm((c) => ({ ...c, catalogo: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none">
-                <option value="tienda">Tienda</option>
-                <option value="cartera">Cartera</option>
-              </select>
-              <input type="number" min="0" step="0.01" value={productoForm.precio_costo} onChange={(e) => setProductoForm((c) => ({ ...c, precio_costo: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Precio costo" />
-              <input type="number" min="0" step="0.01" value={productoForm.precio_venta} onChange={(e) => setProductoForm((c) => ({ ...c, precio_venta: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Precio venta" />
-              <input type="number" min="0" value={productoForm.stock_actual} onChange={(e) => setProductoForm((c) => ({ ...c, stock_actual: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Stock actual" />
-              <input type="number" min="0" value={productoForm.stock_minimo} onChange={(e) => setProductoForm((c) => ({ ...c, stock_minimo: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Stock minimo" />
-              <div className="md:col-span-3 flex justify-end gap-2 pt-2">
-                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-50">Cancelar</button>
-                <button type="submit" disabled={saving} className="rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300">Crear producto</button>
-              </div>
-            </form>
-      </Modal>
-      )}
-
-      {createDialog === CREATE_DIALOGS.proveedores && (
-        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-2xl" title="Crear proveedor" subtitle="Alta rápida desde modal.">
-            <form onSubmit={handleCreateProveedor} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <input value={proveedorForm.nombre} onChange={(e) => setProveedorForm((c) => ({ ...c, nombre: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Nombre" required />
-              <input value={proveedorForm.contacto} onChange={(e) => setProveedorForm((c) => ({ ...c, contacto: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Contacto" />
-              <input value={proveedorForm.telefono} onChange={(e) => setProveedorForm((c) => ({ ...c, telefono: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Telefono" />
-              <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
-                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-50">Cancelar</button>
-                <button type="submit" disabled={saving} className="rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300">Crear proveedor</button>
-              </div>
-            </form>
-      </Modal>
-      )}
-
-      {createDialog === CREATE_DIALOGS.auditorias && (
-        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-3xl" title="Crear auditoria" subtitle="Alta rápida desde modal.">
-            <form onSubmit={handleCreateAuditoria} className="grid grid-cols-1 gap-3 md:grid-cols-2">
-               <input value={auditoriaForm.modulo} onChange={(e) => setAuditoriaForm((c) => ({ ...c, modulo: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Módulo" required />
-               <input value={auditoriaForm.entidad} onChange={(e) => setAuditoriaForm((c) => ({ ...c, entidad: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Entidad" required />
-               <input value={auditoriaForm.entidad_id} onChange={(e) => setAuditoriaForm((c) => ({ ...c, entidad_id: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="ID entidad" />
-               <input value={auditoriaForm.accion} onChange={(e) => setAuditoriaForm((c) => ({ ...c, accion: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Acción" required />
-              <textarea value={auditoriaForm.detalle} onChange={(e) => setAuditoriaForm((c) => ({ ...c, detalle: e.target.value }))} className="min-h-28 rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none md:col-span-2" placeholder="Detalle" />
-              <div className="md:col-span-2 flex justify-end gap-2 pt-2">
-                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-50">Cancelar</button>
-                <button type="submit" disabled={saving} className="rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300">Crear auditoria</button>
-              </div>
-            </form>
-      </Modal>
-      )}
-      {createDialog === CREATE_DIALOGS.clientes_cartera && (
-        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-2xl" title="Crear cliente cartera" subtitle="Alta rápida desde modal.">
-            <form onSubmit={handleCreateClienteCartera} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <input value={clienteCarteraForm.nombre} onChange={(e) => setClienteCarteraForm((c) => ({ ...c, nombre: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Nombre" required />
-              <input value={clienteCarteraForm.documento} onChange={(e) => setClienteCarteraForm((c) => ({ ...c, documento: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Documento (opcional)" />
-              <input value={clienteCarteraForm.telefono_whatsapp} onChange={(e) => setClienteCarteraForm((c) => ({ ...c, telefono_whatsapp: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Teléfono (opcional)" />
-              <input type="number" min="0" value={clienteCarteraForm.limite_credito} onChange={(e) => setClienteCarteraForm((c) => ({ ...c, limite_credito: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Límite crédito" />
-              <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
-                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-50">Cancelar</button>
-                <button type="submit" disabled={saving} className="rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300">Crear cliente</button>
-              </div>
-            </form>
-      </Modal>
-      )}
-
-      {createDialog === CREATE_DIALOGS.clientes_tienda && (
-        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-2xl" title="Crear cliente tienda" subtitle="Alta rápida desde modal.">
-            <form onSubmit={handleCreateClienteTienda} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <input value={clienteTiendaForm.nombre} onChange={(e) => setClienteTiendaForm((c) => ({ ...c, nombre: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Nombre" required />
-              <input value={clienteTiendaForm.telefono_whatsapp} onChange={(e) => setClienteTiendaForm((c) => ({ ...c, telefono_whatsapp: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Teléfono (opcional)" />
-              <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
-                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-50">Cancelar</button>
-                <button type="submit" disabled={saving} className="rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300">Crear cliente</button>
-              </div>
-            </form>
-      </Modal>
-      )}
-
-      {createDialog === CREATE_DIALOGS.clientes_fidelizacion && (
-        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-2xl" title="Crear cliente fidelizacion" subtitle="Alta rápida desde modal.">
-            <form onSubmit={handleCreateClienteFidelizacion} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <input value={clienteFidelizacionForm.nombre} onChange={(e) => setClienteFidelizacionForm((c) => ({ ...c, nombre: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Nombre" required />
-              <input value={clienteFidelizacionForm.telefono_whatsapp} onChange={(e) => setClienteFidelizacionForm((c) => ({ ...c, telefono_whatsapp: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Teléfono" />
-              <input type="number" min="0" value={clienteFidelizacionForm.puntos_acumulados} onChange={(e) => setClienteFidelizacionForm((c) => ({ ...c, puntos_acumulados: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Puntos" />
-              <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
-                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-50">Cancelar</button>
-                <button type="submit" disabled={saving} className="rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300">Crear cliente</button>
-              </div>
-            </form>
-      </Modal>
-      )}
-
-      {createDialog === CREATE_DIALOGS.ventas && (
-        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-3xl" title="Crear venta" subtitle={`Alta rápida desde modal. Use JSON en 'items' similar a: {'[{"producto_id":1,"cantidad":2,"precio":10000}]'}`}>
-            <form onSubmit={handleCreateVenta} className="grid grid-cols-1 gap-3">
-               <input value={ventaForm.cliente_id} onChange={(e) => setVentaForm((c) => ({ ...c, cliente_id: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="ID del cliente (opcional)" />
-               <textarea value={ventaForm.items_json} onChange={(e) => setVentaForm((c) => ({ ...c, items_json: e.target.value }))} className="min-h-28 rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder='[{"producto_id":1,"cantidad":2}]' />
-              <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-50">Cancelar</button>
-                <button type="submit" disabled={saving} className="rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300">Crear venta</button>
-              </div>
-            </form>
-      </Modal>
-      )}
-
-      {createDialog === CREATE_DIALOGS.pedidos_proveedor && (
-        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-2xl" title="Crear pedido proveedor" subtitle="Alta rápida desde modal.">
-            <form onSubmit={handleCreatePedidoProveedor} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <input value={pedidoProveedorForm.proveedor_id} onChange={(e) => setPedidoProveedorForm((c) => ({ ...c, proveedor_id: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="ID del proveedor" required />
-              <input value={pedidoProveedorForm.descripcion} onChange={(e) => setPedidoProveedorForm((c) => ({ ...c, descripcion: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Descripción" required />
-              <input type="number" min="0" value={pedidoProveedorForm.monto_estimado} onChange={(e) => setPedidoProveedorForm((c) => ({ ...c, monto_estimado: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Monto estimado" />
-              <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
-                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-50">Cancelar</button>
-                <button type="submit" disabled={saving} className="rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300">Crear pedido</button>
-              </div>
-            </form>
-      </Modal>
-      )}
-
-      {createDialog === CREATE_DIALOGS.facturas_compra && (
-        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-3xl" title="Crear factura compra" subtitle="Alta rápida desde modal. Items como JSON en 'items'.">
-            <form onSubmit={handleCreateFacturaCompra} className="grid grid-cols-1 gap-3">
-               <input value={facturaCompraForm.proveedor_id} onChange={(e) => setFacturaCompraForm((c) => ({ ...c, proveedor_id: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="ID del proveedor" required />
-               <textarea value={facturaCompraForm.items_json} onChange={(e) => setFacturaCompraForm((c) => ({ ...c, items_json: e.target.value }))} className="min-h-28 rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder='[{"producto_id":1,"cantidad":2}]' />
-              <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-50">Cancelar</button>
-                <button type="submit" disabled={saving} className="rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300">Crear factura</button>
-              </div>
-            </form>
-      </Modal>
-      )}
-
-      {createDialog === CREATE_DIALOGS.gastos && (
-        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-2xl" title="Crear gasto" subtitle="Alta rápida desde modal.">
-            <form onSubmit={handleCreateGasto} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <input value={gastoForm.categoria} onChange={(e) => setGastoForm((c) => ({ ...c, categoria: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Categoria" required />
-              <input value={gastoForm.descripcion} onChange={(e) => setGastoForm((c) => ({ ...c, descripcion: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Descripcion" />
-              <input type="number" min="0" value={gastoForm.monto} onChange={(e) => setGastoForm((c) => ({ ...c, monto: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Monto" required />
-              <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
-                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-50">Cancelar</button>
-                <button type="submit" disabled={saving} className="rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300">Crear gasto</button>
-              </div>
-            </form>
-      </Modal>
-      )}
-
-      {createDialog === CREATE_DIALOGS.abonos_cartera && (
-        <Modal isOpen onClose={closeCreateDialog} variant="admin" maxWidth="max-w-2xl" title="Crear abono cartera" subtitle="Alta rápida desde modal.">
-            <form onSubmit={handleCreateAbonoCartera} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <input type="number" min="1" value={abonoCarteraForm.cliente_id} onChange={(e) => setAbonoCarteraForm((c) => ({ ...c, cliente_id: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="ID del cliente" required />
-              <input type="number" min="0" step="0.01" value={abonoCarteraForm.monto} onChange={(e) => setAbonoCarteraForm((c) => ({ ...c, monto: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Monto" required />
-              <select value={abonoCarteraForm.metodo_pago} onChange={(e) => setAbonoCarteraForm((c) => ({ ...c, metodo_pago: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none">
-                <option value="efectivo">Efectivo</option>
-                <option value="transferencia">Transferencia</option>
-              </select>
-              <input value={abonoCarteraForm.referencia} onChange={(e) => setAbonoCarteraForm((c) => ({ ...c, referencia: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Referencia (opcional)" />
-              <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
-                <button type="button" onClick={closeCreateDialog} className="rounded-full border border-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-50">Cancelar</button>
-                <button type="submit" disabled={saving} className="rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300">Crear abono</button>
-              </div>
-            </form>
-      </Modal>
-      )}
+      <CreateVendedorDialog isOpen={createDialog === CREATE_DIALOGS.vendedores} onClose={closeCreateDialog} onCreated={handleCreated} />
+      <CreateAdminDialog isOpen={createDialog === CREATE_DIALOGS.admins} onClose={closeCreateDialog} onCreated={handleCreated} />
+      <CreateProductoDialog isOpen={createDialog === CREATE_DIALOGS.productos} onClose={closeCreateDialog} onCreated={handleCreated} />
+      <CreateProveedorDialog isOpen={createDialog === CREATE_DIALOGS.proveedores} onClose={closeCreateDialog} onCreated={handleCreated} />
+      <CreateAuditoriaDialog isOpen={createDialog === CREATE_DIALOGS.auditorias} onClose={closeCreateDialog} onCreated={handleCreated} />
+      <CreateClienteCarteraDialog isOpen={createDialog === CREATE_DIALOGS.clientes_cartera} onClose={closeCreateDialog} onCreated={handleCreated} />
+      <CreateClienteTiendaDialog isOpen={createDialog === CREATE_DIALOGS.clientes_tienda} onClose={closeCreateDialog} onCreated={handleCreated} />
+      <CreateClienteFidelizacionDialog isOpen={createDialog === CREATE_DIALOGS.clientes_fidelizacion} onClose={closeCreateDialog} onCreated={handleCreated} />
+      <CreateVentaDialog isOpen={createDialog === CREATE_DIALOGS.ventas} onClose={closeCreateDialog} onCreated={handleCreated} />
+      <CreatePedidoProveedorDialog isOpen={createDialog === CREATE_DIALOGS.pedidos_proveedor} onClose={closeCreateDialog} onCreated={handleCreated} />
+      <CreateFacturaCompraDialog isOpen={createDialog === CREATE_DIALOGS.facturas_compra} onClose={closeCreateDialog} onCreated={handleCreated} />
+      <CreateGastoDialog isOpen={createDialog === CREATE_DIALOGS.gastos} onClose={closeCreateDialog} onCreated={handleCreated} />
+      <CreateAbonoCarteraDialog isOpen={createDialog === CREATE_DIALOGS.abonos_cartera} onClose={closeCreateDialog} onCreated={handleCreated} />
       {ConfirmModal}
       <EditFormModal
         isOpen={editModalOpen}

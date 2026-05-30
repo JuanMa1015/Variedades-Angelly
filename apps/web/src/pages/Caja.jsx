@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, Edit, History, Lock, Trash2, Unlock, Wallet } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { abrirCaja, cerrarCaja, deleteCaja, fetchCajaEstado, fetchCajaHistorial, fetchVentasPorRango, updateCaja } from '../api/cajaApi';
@@ -81,10 +81,12 @@ const Caja = () => {
 
   const cajaActual = estado?.caja_actual ?? null;
   const abierta = estado?.abierta ?? false;
+  const ventasLoadedRef = useRef({});
 
   useEffect(() => {
     if (!abierta || !cajaActual) return;
-    if (ventasPorCaja[cajaActual.id]) return;
+    if (ventasLoadedRef.current[cajaActual.id]) return;
+    ventasLoadedRef.current[cajaActual.id] = true;
 
     const load = async () => {
       setLoadingVentas((prev) => ({ ...prev, [cajaActual.id]: true }));
