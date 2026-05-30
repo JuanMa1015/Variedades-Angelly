@@ -12,6 +12,9 @@ def _get_client_ip(request: Request) -> str:
 
 
 def login_rate_limit() -> str:
+    env = os.getenv("APP_ENV", "development").strip().lower()
+    if env == "test":
+        return "1000/minute"
     return os.getenv("LOGIN_RATE_LIMIT", "10/minute")
 
 
