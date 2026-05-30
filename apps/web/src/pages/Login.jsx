@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Lock, UserRound } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
@@ -14,11 +14,13 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const pendingPathRef = useRef(null);
 
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    const redirectPath = getDefaultRouteForRole(user?.role);
+    const redirectPath = pendingPathRef.current || getDefaultRouteForRole(user?.role);
+    pendingPathRef.current = null;
     navigate(redirectPath, { replace: true });
   }, [isAuthenticated, navigate, user?.role]);
 
@@ -40,8 +42,7 @@ const Login = () => {
       });
 
       const fallbackPath = getDefaultRouteForRole(nextUser?.role);
-      const targetPath = typeof location.state?.from === 'string' ? location.state.from : fallbackPath;
-      navigate(targetPath, { replace: true });
+      pendingPathRef.current = typeof location.state?.from === 'string' ? location.state.from : fallbackPath;
     } catch (err) {
       setError(err.message || 'Credenciales inválidas');
     } finally {

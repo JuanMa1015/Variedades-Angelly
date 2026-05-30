@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout';
 import PrivateRoute from './auth/PrivateRoute';
 import { useAuth } from './auth/AuthContext';
@@ -26,7 +26,14 @@ const LandingRedirect = () => {
   const { isAuthenticated, user, bootstrapped } = useAuth();
 
   if (!bootstrapped) {
-    return null;
+    return (
+      <div className="flex h-screen items-center justify-center bg-blush-50">
+        <div className="text-center">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-blush-300 border-t-rosewood" />
+          <p className="mt-4 text-sm text-rosewood/70">Inicializando...</p>
+        </div>
+      </div>
+    );
   }
 
   if (!isAuthenticated) {
@@ -37,65 +44,72 @@ const LandingRedirect = () => {
   return <Navigate to={target} replace />;
 };
 
+const ErrorBoundaryWithReset = ({ children }) => {
+  const location = useLocation();
+  return <ErrorBoundary resetKey={location.pathname}>{children}</ErrorBoundary>;
+};
+
 const ToastContainerWrapper = () => {
   const { toasts, removeToast } = useToast();
   return <ToastContainer toasts={toasts} onRemove={removeToast} />;
 };
 
+const spinner = (
+  <div className="flex h-screen items-center justify-center bg-blush-50">
+    <div className="text-center">
+      <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-blush-300 border-t-rosewood" />
+      <p className="mt-4 text-sm text-rosewood/70">Cargando...</p>
+    </div>
+  </div>
+);
+
 function App() {
   return (
-    <ErrorBoundary>
-      <ToastProvider>
-        <BrowserRouter>
-          <Suspense fallback={
-            <div className="flex h-screen items-center justify-center bg-blush-50">
-              <div className="text-center">
-                <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-blush-300 border-t-rosewood" />
-                <p className="mt-4 text-sm text-rosewood/70">Cargando...</p>
-              </div>
-            </div>
-          }>
-          <Routes>
-            <Route path="/" element={<LandingRedirect />} />
-            <Route path="/login" element={<Login />} />
+    <ToastProvider>
+      <BrowserRouter>
+        <ErrorBoundaryWithReset>
+          <Suspense fallback={spinner}>
+            <Routes>
+              <Route path="/" element={<LandingRedirect />} />
+              <Route path="/login" element={<Login />} />
 
-        <Route element={<PrivateRoute />}>
-          <Route element={<MainLayout />}>
-            <Route element={<PrivateRoute allowedRoles={['superadmin']} />}>
-              <Route path="/admin" element={<Navigate to="/admin/vendedores" replace />} />
-              <Route path="/admin/:moduleKey" element={<Admin />} />
-            </Route>
+              <Route element={<PrivateRoute />}>
+                <Route element={<MainLayout />}>
+                  <Route element={<PrivateRoute allowedRoles={['superadmin']} />}>
+                    <Route path="/admin" element={<Navigate to="/admin/vendedores" replace />} />
+                    <Route path="/admin/:moduleKey" element={<Admin />} />
+                  </Route>
 
-            <Route element={<PrivateRoute allowedRoles={['admin', 'superadmin']} />}>
-              <Route path="/cartera" element={<Navigate to="/cartera/venta" replace />} />
-              <Route path="/cartera/dashboard" element={<Cartera />} />
-              <Route path="/cartera/clientes" element={<Cartera />} />
-              <Route path="/cartera/venta" element={<Cartera />} />
-              <Route path="/cartera/productos" element={<Cartera />} />
-              <Route path="/cartera/cobrar" element={<Cartera />} />
-            </Route>
+                  <Route element={<PrivateRoute allowedRoles={['admin', 'superadmin']} />}>
+                    <Route path="/cartera" element={<Navigate to="/cartera/venta" replace />} />
+                    <Route path="/cartera/dashboard" element={<Cartera />} />
+                    <Route path="/cartera/clientes" element={<Cartera />} />
+                    <Route path="/cartera/venta" element={<Cartera />} />
+                    <Route path="/cartera/productos" element={<Cartera />} />
+                    <Route path="/cartera/cobrar" element={<Cartera />} />
+                  </Route>
 
-            <Route element={<PrivateRoute allowedRoles={['vendedor', 'superadmin']} />}>
-              <Route path="/caja" element={<Caja />} />
-              <Route path="/proveedores" element={<Proveedores />} />
-              <Route path="/inventario" element={<Inventario />} />
-              <Route path="/fidelizacion" element={<Fidelizacion />} />
-              <Route path="/ventas" element={<Ventas />} />
-              <Route path="/clientes" element={<ClientesTienda />} />
-              <Route path="/facturas" element={<Facturas />} />
-              <Route path="/gastos" element={<Gastos />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-            </Route>
-          </Route>
-        </Route>
+                  <Route element={<PrivateRoute allowedRoles={['vendedor', 'superadmin']} />}>
+                    <Route path="/caja" element={<Caja />} />
+                    <Route path="/proveedores" element={<Proveedores />} />
+                    <Route path="/inventario" element={<Inventario />} />
+                    <Route path="/fidelizacion" element={<Fidelizacion />} />
+                    <Route path="/ventas" element={<Ventas />} />
+                    <Route path="/clientes" element={<ClientesTienda />} />
+                    <Route path="/facturas" element={<Facturas />} />
+                    <Route path="/gastos" element={<Gastos />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
+                  </Route>
+                </Route>
+              </Route>
 
-        <Route path="*" element={<LandingRedirect />} />
-      </Routes>
-      </Suspense>
-    </BrowserRouter>
-    <ToastContainerWrapper />
-      </ToastProvider>
-    </ErrorBoundary>
+              <Route path="*" element={<LandingRedirect />} />
+            </Routes>
+          </Suspense>
+          <ToastContainerWrapper />
+        </ErrorBoundaryWithReset>
+      </BrowserRouter>
+    </ToastProvider>
   );
 }
 
