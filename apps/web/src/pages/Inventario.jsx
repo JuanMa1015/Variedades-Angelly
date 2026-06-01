@@ -700,7 +700,7 @@ const Inventario = () => {
         </div>
       </section>
 
-      <ConfirmModal />
+      {ConfirmModal}
     </div>
   );
 };
