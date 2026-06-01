@@ -4,6 +4,7 @@ import { apiPost } from '../api/httpClient';
 
 const TOKEN_STORAGE_KEY = 'angelly.auth.token';
 const USER_STORAGE_KEY = 'angelly.auth.user';
+const REMEMBER_KEY = 'angelly.auth.remember';
 const AuthContext = createContext(null);
 
 const parseTokenPayload = (token) => {
@@ -43,6 +44,8 @@ const normalizeUser = (rawUser) => {
   };
 };
 
+const getStorage = () => (localStorage.getItem(REMEMBER_KEY) === 'true' ? localStorage : sessionStorage);
+
 export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
@@ -50,22 +53,32 @@ export const AuthProvider = ({ children }) => {
   const refreshTimerRef = useRef(null);
 
   const clearAuth = useCallback(() => {
-    sessionStorage.removeItem(TOKEN_STORAGE_KEY);
-    sessionStorage.removeItem(USER_STORAGE_KEY);
+    [localStorage, sessionStorage].forEach((s) => {
+      s.removeItem(TOKEN_STORAGE_KEY);
+      s.removeItem(USER_STORAGE_KEY);
+      s.removeItem(REMEMBER_KEY);
+    });
     setToken(null);
     setUser(null);
   }, []);
 
-  const persistAuth = useCallback((nextToken, nextUser) => {
-    sessionStorage.setItem(TOKEN_STORAGE_KEY, nextToken);
-    sessionStorage.setItem(USER_STORAGE_KEY, JSON.stringify(nextUser));
+  const persistAuth = useCallback((nextToken, nextUser, rememberMe) => {
+    const storage = rememberMe ? localStorage : sessionStorage;
+    storage.setItem(TOKEN_STORAGE_KEY, nextToken);
+    storage.setItem(USER_STORAGE_KEY, JSON.stringify(nextUser));
+    if (rememberMe) {
+      localStorage.setItem(REMEMBER_KEY, 'true');
+    } else {
+      localStorage.removeItem(REMEMBER_KEY);
+    }
     setToken(nextToken);
     setUser(nextUser);
   }, []);
 
   useEffect(() => {
-    const storedToken = sessionStorage.getItem(TOKEN_STORAGE_KEY);
-    const storedUserRaw = sessionStorage.getItem(USER_STORAGE_KEY);
+    const storage = getStorage();
+    const storedToken = storage.getItem(TOKEN_STORAGE_KEY);
+    const storedUserRaw = storage.getItem(USER_STORAGE_KEY);
 
     if (!storedToken || !storedUserRaw || isTokenExpired(storedToken)) {
       clearAuth();
@@ -99,7 +112,7 @@ export const AuthProvider = ({ children }) => {
     return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
   }, [clearAuth]);
 
-  const login = useCallback(async ({ username, password }) => {
+  const login = useCallback(async ({ username, password, rememberMe }) => {
     const payload = await apiPost('/api/auth/login', { username, password }, { includeAuth: false });
 
     const nextUser = normalizeUser({
@@ -111,7 +124,7 @@ export const AuthProvider = ({ children }) => {
       throw new Error('Respuesta de autenticación inválida');
     }
 
-    persistAuth(payload.access_token, nextUser);
+    persistAuth(payload.access_token, nextUser, rememberMe);
     return nextUser;
   }, [persistAuth]);
 

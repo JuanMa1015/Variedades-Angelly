@@ -12,6 +12,7 @@ const Login = () => {
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const pendingPathRef = useRef(null);
@@ -39,6 +40,7 @@ const Login = () => {
       const nextUser = await login({
         username: username.trim(),
         password,
+        rememberMe,
       });
 
       const fallbackPath = getDefaultRouteForRole(nextUser?.role);
@@ -95,6 +97,16 @@ const Login = () => {
               />
             </div>
           </div>
+
+          <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-rosewood focus:ring-rosewood"
+            />
+            Recuérdame
+          </label>
 
           <ErrorMessage message={error} onDismiss={() => setError('')} />
 
