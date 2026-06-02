@@ -56,7 +56,6 @@ export const AuthProvider = ({ children }) => {
     [localStorage, sessionStorage].forEach((s) => {
       s.removeItem(TOKEN_STORAGE_KEY);
       s.removeItem(USER_STORAGE_KEY);
-      s.removeItem(REMEMBER_KEY);
     });
     setToken(null);
     setUser(null);

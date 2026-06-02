@@ -1,9 +1,12 @@
 const TOKEN_STORAGE_KEY = 'angelly.auth.token';
 const USER_STORAGE_KEY = 'angelly.auth.user';
+const REMEMBER_KEY = 'angelly.auth.remember';
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
 
 let isRefreshing = false;
 let refreshPromise = null;
+
+const getStorage = () => (localStorage.getItem(REMEMBER_KEY) === 'true' ? localStorage : sessionStorage);
 
 export class ApiError extends Error {
   constructor(message, status, payload) {
@@ -40,7 +43,7 @@ const tryRefreshToken = async () => {
     if (!response.ok) return null;
 
     const data = await response.json();
-    sessionStorage.setItem(TOKEN_STORAGE_KEY, data.access_token);
+    getStorage().setItem(TOKEN_STORAGE_KEY, data.access_token);
     return data.access_token;
   } catch {
     return null;
@@ -62,7 +65,7 @@ const performRequest = async (endpoint, options) => {
   const nextHeaders = { ...headers };
 
   if (includeAuth) {
-    const token = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+    const token = getStorage().getItem(TOKEN_STORAGE_KEY);
     if (token && !nextHeaders.Authorization) {
       nextHeaders.Authorization = `Bearer ${token}`;
     }
@@ -130,6 +133,8 @@ export const apiRequest = async (endpoint, options = {}) => {
     }
 
     if (!newToken || result.response.status === 401) {
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      localStorage.removeItem(USER_STORAGE_KEY);
       sessionStorage.removeItem(TOKEN_STORAGE_KEY);
       sessionStorage.removeItem(USER_STORAGE_KEY);
       notifyUnauthorized();

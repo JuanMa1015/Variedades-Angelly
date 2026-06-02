@@ -12,7 +12,17 @@ const Login = () => {
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => localStorage.getItem('angelly.auth.remember') === 'true');
+
+  const handleRememberChange = (e) => {
+    const checked = e.target.checked;
+    setRememberMe(checked);
+    if (checked) {
+      localStorage.setItem('angelly.auth.remember', 'true');
+    } else {
+      localStorage.removeItem('angelly.auth.remember');
+    }
+  };
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const pendingPathRef = useRef(null);
@@ -102,7 +112,7 @@ const Login = () => {
             <input
               type="checkbox"
               checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
+              onChange={handleRememberChange}
               className="h-4 w-4 rounded border-gray-300 text-rosewood focus:ring-rosewood"
             />
             Recuérdame
