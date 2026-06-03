@@ -56,6 +56,7 @@ const EMPTY_PRODUCT_FORM = {
   codigo_barras: '',
   precio_costo: '',
   precio_venta: '',
+  imagen_url: null,
 };
 
 const toDatetimeLocalValue = (value = new Date()) => {
@@ -288,6 +289,7 @@ export const useCarteraData = () => {
       codigo_barras: producto.codigo_barras || '',
       precio_costo: String(producto.precio_costo || ''),
       precio_venta: String(producto.precio_venta || ''),
+      imagen_url: producto.imagen_url || null,
     });
     setIsProductoModalOpen(true);
   };
@@ -365,6 +367,7 @@ export const useCarteraData = () => {
       catalogo: 'cartera',
       precio_costo: Number(productoForm.precio_costo || 0),
       precio_venta: Number(productoForm.precio_venta || 0),
+      imagen_url: productoForm.imagen_url || null,
     };
 
     if (!Number.isFinite(payload.precio_costo) || payload.precio_costo < 0) {

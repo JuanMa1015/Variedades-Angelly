@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Barcode, Package, Pencil, Plus, RotateCcw, Search, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Barcode, ImageUp, Link, Package, Pencil, Plus, RotateCcw, Search, Trash2, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
-import { apiDelete, apiGet, apiPatch, apiPost } from '../api/httpClient';
+import { apiDelete, apiGet, apiPatch, apiPost, apiUpload } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage';
 import SuccessMessage from '../components/SuccessMessage';
 import Skeleton, { SkeletonCard } from '../components/Skeleton';
@@ -34,6 +34,19 @@ const Inventario = () => {
   });
 
   const [editForm, setEditForm] = useState({ ...EMPTY_MANUAL_FORM });
+
+  const [manualImageMode, setManualImageMode] = useState('upload');
+  const [manualImageFile, setManualImageFile] = useState(null);
+  const [manualImagePreview, setManualImagePreview] = useState(null);
+  const [manualImageUrl, setManualImageUrl] = useState('');
+  const [barcodeImageMode, setBarcodeImageMode] = useState('upload');
+  const [barcodeImageFile, setBarcodeImageFile] = useState(null);
+  const [barcodeImagePreview, setBarcodeImagePreview] = useState(null);
+  const [barcodeImageUrl, setBarcodeImageUrl] = useState('');
+  const [editImageMode, setEditImageMode] = useState('upload');
+  const [editImageFile, setEditImageFile] = useState(null);
+  const [editImagePreview, setEditImagePreview] = useState(null);
+  const [editImageUrl, setEditImageUrl] = useState('');
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -90,6 +103,31 @@ const Inventario = () => {
     return () => controller.abort();
   }, [token, loadProductos, loadProveedores]);
 
+  function dataUrlToFile(dataUrl) {
+    const parts = dataUrl.split(',', 2);
+    if (parts.length !== 2) return null;
+    const mime = (parts[0].match(/:(.*?);/) || [])[1] || 'image/jpeg';
+    const raw = parts[1].replace(/\s/g, '');
+    const bin = atob(raw);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new File([arr], 'imagen.jpg', { type: mime });
+  }
+
+  const uploadImageAndGetUrl = async (file) => {
+    const result = await apiUpload('/api/upload-imagen', file);
+    return result.url;
+  };
+
+  const resolveImageUrl = async (url, file) => {
+    if (file) return uploadImageAndGetUrl(file);
+    if (url && url.startsWith('data:')) {
+      const f = dataUrlToFile(url);
+      if (f) return uploadImageAndGetUrl(f);
+    }
+    return url || null;
+  };
+
   const createProducto = async (payload) => {
     return apiPost('/api/productos', payload);
   };
@@ -114,6 +152,7 @@ const Inventario = () => {
 
     try {
       setSaving(true);
+      const imagen_url = await resolveImageUrl(manualImageUrl.trim(), manualImageFile);
       await createProducto({
         nombre: manualForm.nombre.trim(),
         codigo_barras: manualForm.codigo_barras.trim() || null,
@@ -123,8 +162,12 @@ const Inventario = () => {
         stock_minimo: Number(manualForm.stock_minimo || 0),
         catalogo: 'tienda',
         proveedor_id: manualForm.proveedor_id ? Number(manualForm.proveedor_id) : null,
+        imagen_url,
       });
       setManualForm({ ...EMPTY_MANUAL_FORM });
+      setManualImageFile(null);
+      setManualImagePreview(null);
+      setManualImageUrl('');
       await loadProductos();
       setSuccess('Producto agregado correctamente');
       setIsCreateModalOpen(false);
@@ -175,6 +218,7 @@ const Inventario = () => {
           setError('Para un código nuevo, ingresa el nombre del producto');
           return;
         }
+        const imagen_url = await resolveImageUrl(barcodeImageUrl.trim(), barcodeImageFile);
         await createProducto({
           nombre: barcodeForm.nombre.trim(),
           codigo_barras: code,
@@ -183,6 +227,7 @@ const Inventario = () => {
           stock_actual: Number(barcodeForm.stock_actual || 1),
           catalogo: 'tienda',
           proveedor_id: barcodeForm.proveedor_id ? Number(barcodeForm.proveedor_id) : null,
+          imagen_url,
         });
         await loadProductos();
         setSuccess('Producto creado por código de barras');
@@ -197,6 +242,9 @@ const Inventario = () => {
         stock_actual: '',
         proveedor_id: '',
       });
+      setBarcodeImageFile(null);
+      setBarcodeImagePreview(null);
+      setBarcodeImageUrl('');
     } catch (err) {
       setError(err.message || 'No se pudo procesar el código de barras');
     } finally {
@@ -214,6 +262,10 @@ const Inventario = () => {
       stock_minimo: String(producto.stock_minimo || ''),
       proveedor_id: producto.proveedor_id ? String(producto.proveedor_id) : '',
     });
+    setEditImageFile(null);
+    setEditImagePreview(null);
+    setEditImageUrl('');
+    setEditImageMode('upload');
     setEditingProducto(producto);
   };
 
@@ -237,6 +289,14 @@ const Inventario = () => {
 
     try {
       setSaving(true);
+      let imagen_url;
+      if (editImageUrl === '__remove__') {
+        imagen_url = null;
+      } else if (editImageUrl.trim() || editImageFile) {
+        imagen_url = await resolveImageUrl(editImageUrl.trim(), editImageFile);
+      } else {
+        imagen_url = producto.imagen_url;
+      }
       await apiPatch(`/api/productos/${producto.id}`, {
         nombre: editForm.nombre.trim(),
         codigo_barras: editForm.codigo_barras.trim() || null,
@@ -245,6 +305,7 @@ const Inventario = () => {
         stock_actual: Number(editForm.stock_actual || 0),
         stock_minimo: Number(editForm.stock_minimo || 0),
         proveedor_id: editForm.proveedor_id ? Number(editForm.proveedor_id) : null,
+        imagen_url,
       });
       await loadProductos();
       setSuccess(`Producto "${editForm.nombre.trim()}" actualizado`);
@@ -325,7 +386,7 @@ const Inventario = () => {
         </div>
       </section>
 
-      <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Agregar producto al inventario" maxWidth="max-w-4xl">
+      <Modal isOpen={isCreateModalOpen} onClose={() => { setIsCreateModalOpen(false); setManualForm({ ...EMPTY_MANUAL_FORM }); setManualImageFile(null); setManualImagePreview(null); setManualImageUrl(''); setBarcodeForm({ codigo_barras: '', nombre: '', precio_costo: '', precio_venta: '', stock_actual: '', proveedor_id: '' }); setBarcodeImageFile(null); setBarcodeImagePreview(null); setBarcodeImageUrl(''); }} title="Agregar producto al inventario" maxWidth="max-w-4xl">
 
             <div className="mb-4 flex flex-wrap gap-2">
               <button
@@ -411,6 +472,42 @@ const Inventario = () => {
                     <option key={prov.id} value={prov.id}>{prov.nombre}</option>
                   ))}
                 </select>
+                <div className="md:col-span-3">
+                  <div className="flex gap-1 rounded-lg border border-gray-300 p-0.5 bg-gray-50 mb-2">
+                    {['upload', 'url'].map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setManualImageMode(m)}
+                        className={`flex-1 flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition ${manualImageMode === m ? 'bg-white text-rosewood shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                      >
+                        {m === 'upload' ? <><ImageUp className="h-3.5 w-3.5" /> Subir archivo</> : <><Link className="h-3.5 w-3.5" /> Pegar URL</>}
+                      </button>
+                    ))}
+                  </div>
+                  {manualImageMode === 'upload' ? (
+                    manualImagePreview ? (
+                      <div className="relative inline-block">
+                        <img src={manualImagePreview} alt="" className="h-20 w-20 rounded-lg border border-gray-300 object-cover" />
+                        <button type="button" onClick={() => { setManualImageFile(null); setManualImagePreview(null); setManualImageUrl(''); }} className="absolute -right-2 -top-2 rounded-full border border-gray-300 bg-white p-0.5 text-gray-500 hover:text-red-600"><X className="h-4 w-4" /></button>
+                      </div>
+                    ) : (
+                      <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-gray-300 px-3 py-2.5 text-sm text-gray-500 hover:border-rosewood hover:text-rosewood">
+                        <ImageUp className="h-4 w-4" />
+                        <span>Seleccionar archivo</span>
+                        <input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; setManualImageFile(f); setManualImageUrl(''); const r = new FileReader(); r.onload = () => setManualImagePreview(r.result); r.readAsDataURL(f); }} className="hidden" />
+                      </label>
+                    )
+                  ) : (
+                    <input
+                      type="text"
+                      value={manualImageUrl}
+                      onChange={(e) => { setManualImageUrl(e.target.value); setManualImageFile(null); setManualImagePreview(null); }}
+                      placeholder="https://ejemplo.com/imagen.jpg"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+                    />
+                  )}
+                </div>
                 <button
                   type="submit"
                   disabled={saving}
@@ -472,6 +569,42 @@ const Inventario = () => {
                     <option key={prov.id} value={prov.id}>{prov.nombre}</option>
                   ))}
                 </select>
+                <div className="md:col-span-3">
+                  <div className="flex gap-1 rounded-lg border border-gray-300 p-0.5 bg-gray-50 mb-2">
+                    {['upload', 'url'].map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setBarcodeImageMode(m)}
+                        className={`flex-1 flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition ${barcodeImageMode === m ? 'bg-white text-rosewood shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                      >
+                        {m === 'upload' ? <><ImageUp className="h-3.5 w-3.5" /> Subir archivo</> : <><Link className="h-3.5 w-3.5" /> Pegar URL</>}
+                      </button>
+                    ))}
+                  </div>
+                  {barcodeImageMode === 'upload' ? (
+                    barcodeImagePreview ? (
+                      <div className="relative inline-block">
+                        <img src={barcodeImagePreview} alt="" className="h-20 w-20 rounded-lg border border-gray-300 object-cover" />
+                        <button type="button" onClick={() => { setBarcodeImageFile(null); setBarcodeImagePreview(null); setBarcodeImageUrl(''); }} className="absolute -right-2 -top-2 rounded-full border border-gray-300 bg-white p-0.5 text-gray-500 hover:text-red-600"><X className="h-4 w-4" /></button>
+                      </div>
+                    ) : (
+                      <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-gray-300 px-3 py-2.5 text-sm text-gray-500 hover:border-rosewood hover:text-rosewood">
+                        <ImageUp className="h-4 w-4" />
+                        <span>Seleccionar archivo</span>
+                        <input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; setBarcodeImageFile(f); setBarcodeImageUrl(''); const r = new FileReader(); r.onload = () => setBarcodeImagePreview(r.result); r.readAsDataURL(f); }} className="hidden" />
+                      </label>
+                    )
+                  ) : (
+                    <input
+                      type="text"
+                      value={barcodeImageUrl}
+                      onChange={(e) => { setBarcodeImageUrl(e.target.value); setBarcodeImageFile(null); setBarcodeImagePreview(null); }}
+                      placeholder="https://ejemplo.com/imagen.jpg"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+                    />
+                  )}
+                </div>
                 <button
                   type="submit"
                   disabled={saving}
@@ -484,7 +617,7 @@ const Inventario = () => {
             )}
       </Modal>
 
-      <Modal isOpen={editingProducto !== null} onClose={() => setEditingProducto(null)} title="Editar producto">
+      <Modal isOpen={editingProducto !== null} onClose={() => { setEditingProducto(null); setEditImageFile(null); setEditImagePreview(null); setEditImageUrl(''); setEditImageMode('upload'); }} title="Editar producto">
 
             <form className="space-y-3" onSubmit={handleSubmitEdit}>
               <input
@@ -547,6 +680,49 @@ const Inventario = () => {
                   <option key={prov.id} value={prov.id}>{prov.nombre}</option>
                 ))}
               </select>
+
+              <div>
+                <div className="flex gap-1 rounded-lg border border-gray-300 p-0.5 bg-gray-50 mb-2">
+                  {['upload', 'url'].map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setEditImageMode(m)}
+                      className={`flex-1 flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition ${editImageMode === m ? 'bg-white text-rosewood shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                      {m === 'upload' ? <><ImageUp className="h-3.5 w-3.5" /> Subir archivo</> : <><Link className="h-3.5 w-3.5" /> Pegar URL</>}
+                    </button>
+                  ))}
+                </div>
+                {editImageMode === 'upload' ? (
+                  editImagePreview ? (
+                    <div className="relative inline-block">
+                      <img src={editImagePreview} alt="" className="h-20 w-20 rounded-lg border border-gray-300 object-cover" />
+                      <button type="button" onClick={() => { setEditImageFile(null); setEditImagePreview(null); setEditImageUrl(''); }} className="absolute -right-2 -top-2 rounded-full border border-gray-300 bg-white p-0.5 text-gray-500 hover:text-red-600"><X className="h-4 w-4" /></button>
+                    </div>
+                  ) : editingProducto?.imagen_url && !editImageUrl ? (
+                    <div className="relative inline-block">
+                      <img src={editingProducto.imagen_url.startsWith('http') ? editingProducto.imagen_url : `${import.meta.env.VITE_API_URL ?? ''}${editingProducto.imagen_url}`} alt="" className="h-20 w-20 rounded-lg border border-gray-300 object-cover" />
+                      <button type="button" onClick={() => { setEditImageFile(null); setEditImagePreview(null); setEditImageUrl('__remove__'); }} className="absolute -right-2 -top-2 rounded-full border border-gray-300 bg-white p-0.5 text-gray-500 hover:text-red-600" title="Eliminar imagen"><X className="h-4 w-4" /></button>
+                    </div>
+                  ) : (
+                    <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-gray-300 px-3 py-2.5 text-sm text-gray-500 hover:border-rosewood hover:text-rosewood">
+                      <ImageUp className="h-4 w-4" />
+                      <span>Seleccionar archivo</span>
+                      <input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; setEditImageFile(f); setEditImageUrl(''); setEditImagePreview(URL.createObjectURL(f)); }} className="hidden" />
+                    </label>
+                  )
+                ) : (
+                  <input
+                    type="text"
+                    value={editImageUrl}
+                    onChange={(e) => { setEditImageUrl(e.target.value); setEditImageFile(null); setEditImagePreview(null); }}
+                    placeholder="https://ejemplo.com/imagen.jpg"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+                  />
+                )}
+              </div>
+
               <button
                 type="submit"
                 disabled={saving}
@@ -642,6 +818,7 @@ const Inventario = () => {
             <thead>
               <tr className="border-b border-gray-200">
                 <th className="px-4 py-3 text-left font-semibold text-gray-700">Producto</th>
+                <th className="hidden px-4 py-3 text-left font-semibold text-gray-700 md:table-cell">Imagen</th>
                 <th className="hidden px-4 py-3 text-left font-semibold text-gray-700 md:table-cell">Código</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700">Stock</th>
                 <th className="hidden px-4 py-3 text-left font-semibold text-gray-700 sm:table-cell">Mín</th>
@@ -653,13 +830,13 @@ const Inventario = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="7" className="px-4 py-6">
+                  <td colSpan="8" className="px-4 py-6">
                     <Skeleton lines={4} />
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr className="border-b border-gray-100 hover:bg-gray-50">
-                  <td colSpan="7" className="py-8 text-center text-gray-500">
+                  <td colSpan="8" className="py-8 text-center text-gray-500">
                     {searchTerm ? 'No se encontraron productos con ese criterio' : 'No hay productos registrados en el catálogo de tienda'}
                   </td>
                 </tr>
@@ -667,6 +844,13 @@ const Inventario = () => {
                 filtered.map((producto) => (
                   <tr key={producto.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-900">{producto.nombre}</td>
+                    <td className="hidden px-4 py-3 md:table-cell">
+                      {producto.imagen_url ? (
+                        <img src={producto.imagen_url.startsWith('http') ? producto.imagen_url : `${import.meta.env.VITE_API_URL ?? ''}${producto.imagen_url}`} alt="" className="h-10 w-10 rounded-lg border border-gray-200 object-cover" />
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
+                    </td>
                     <td className="hidden px-4 py-3 text-gray-700 md:table-cell">{producto.codigo_barras || '-'}</td>
                     <td className="px-4 py-3 text-gray-700">{producto.stock_actual}</td>
                     <td className="hidden px-4 py-3 text-gray-700 sm:table-cell">{producto.stock_minimo}</td>

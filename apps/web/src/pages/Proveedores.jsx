@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Plus, Trash2, Truck, X } from 'lucide-react';
+import { CheckCircle2, Pencil, Plus, Trash2, Truck, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
-import { apiGet, apiPost } from '../api/httpClient';
+import { apiGet, apiPatch, apiPost } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage'
 import SuccessMessage from '../components/SuccessMessage'
 import Skeleton from '../components/Skeleton'
@@ -80,6 +80,7 @@ const Proveedores = () => {
   });
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editingProveedor, setEditingProveedor] = useState(null);
 
   const [pedidoForm, setPedidoForm] = useState({
     proveedor_id: '',
@@ -274,6 +275,62 @@ const Proveedores = () => {
     }
   };
 
+  const handleEditClick = (proveedor) => {
+    setProveedorForm({
+      nombre: proveedor.nombre || '',
+      contacto: proveedor.contacto || '',
+      telefono: proveedor.telefono || '',
+    });
+    setEditingProveedor(proveedor);
+  };
+
+  const handleUpdateProveedor = async (event) => {
+    event.preventDefault();
+    clearMessages();
+
+    const nombre = proveedorForm.nombre.trim();
+    if (!nombre) {
+      setError('El nombre del proveedor es obligatorio');
+      return;
+    }
+
+    if (!editingProveedor) return;
+
+    try {
+      setSavingProveedor(true);
+      const updated = await apiPatch(`/api/proveedores/${editingProveedor.id}`, {
+        nombre,
+        contacto: proveedorForm.contacto.trim() || null,
+        telefono: proveedorForm.telefono.trim() || null,
+      });
+      setProveedores((current) =>
+        current.map((p) => (p.id === updated.id ? updated : p)),
+      );
+      setProveedorForm({ nombre: '', contacto: '', telefono: '' });
+      setEditingProveedor(null);
+      setSuccess('Proveedor actualizado correctamente');
+    } catch (err) {
+      setError(err.message || 'No se pudo actualizar el proveedor');
+    } finally {
+      setSavingProveedor(false);
+    }
+  };
+
+  const handleToggleActivo = async (proveedor) => {
+    clearMessages();
+    try {
+      await apiPatch(`/api/proveedores/${proveedor.id}`, { activo: !proveedor.activo });
+      setProveedores((current) =>
+        current.map((p) =>
+          p.id === proveedor.id ? { ...p, activo: !p.activo } : p,
+        ),
+      );
+      setSuccess(proveedor.activo ? 'Proveedor desactivado' : 'Proveedor activado');
+    } catch (err) {
+      setError(err.message || 'No se pudo cambiar el estado');
+    }
+  };
+
   const handleCreatePedido = async (event) => {
     event.preventDefault();
     clearMessages();
@@ -410,6 +467,42 @@ const Proveedores = () => {
                 {savingProveedor ? 'Guardando proveedor...' : 'Guardar proveedor'}
               </button>
             </form>
+      </Modal>
+
+      <Modal isOpen={editingProveedor !== null} onClose={() => { setEditingProveedor(null); setProveedorForm({ nombre: '', contacto: '', telefono: '' }); }} title="Editar proveedor">
+        <form className="space-y-3" onSubmit={handleUpdateProveedor}>
+          <input
+            type="text"
+            value={proveedorForm.nombre}
+            onChange={(event) => handleProveedorChange('nombre', event.target.value)}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+            placeholder="Nombre del proveedor"
+            maxLength={120}
+          />
+          <input
+            type="text"
+            value={proveedorForm.contacto}
+            onChange={(event) => handleProveedorChange('contacto', event.target.value)}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+            placeholder="Contacto principal"
+            maxLength={120}
+          />
+          <input
+            type="text"
+            value={proveedorForm.telefono}
+            onChange={(event) => handleProveedorChange('telefono', event.target.value)}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+            placeholder="Teléfono"
+            maxLength={25}
+          />
+          <button
+            type="submit"
+            disabled={savingProveedor}
+            className="w-full rounded-lg bg-rosewood px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300"
+          >
+            {savingProveedor ? 'Guardando...' : 'Guardar cambios'}
+          </button>
+        </form>
       </Modal>
 
         <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
@@ -624,6 +717,7 @@ const Proveedores = () => {
                     <th className="px-3 py-3 font-semibold text-gray-700">Contacto</th>
                     <th className="px-3 py-3 font-semibold text-gray-700">Teléfono</th>
                     <th className="px-3 py-3 font-semibold text-gray-700">Estado</th>
+                    <th className="px-3 py-3 font-semibold text-gray-700">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -639,6 +733,26 @@ const Proveedores = () => {
                           <span className="rounded-full bg-gray-200 px-2 py-1 text-xs font-semibold text-gray-700">Inactivo</span>
                         )}
                       </td>
+                      <td className="px-3 py-3">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleEditClick(proveedor)}
+                            className="rounded-lg border border-gray-300 p-1.5 text-gray-600 transition hover:bg-gray-100"
+                            title="Editar proveedor"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleActivo(proveedor)}
+                            className={`rounded-lg border p-1.5 transition ${proveedor.activo ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'}`}
+                            title={proveedor.activo ? 'Desactivar proveedor' : 'Activar proveedor'}
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -649,14 +763,34 @@ const Proveedores = () => {
                 <div key={proveedor.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
                   <div className="mb-2 flex items-start justify-between gap-2">
                     <span className="font-semibold text-gray-900">{proveedor.nombre}</span>
-                    {proveedor.activo ? (
-                      <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">Activo</span>
-                    ) : (
-                      <span className="shrink-0 rounded-full bg-gray-200 px-2 py-0.5 text-xs font-semibold text-gray-700">Inactivo</span>
-                    )}
+                    <div className="flex shrink-0 items-center gap-1">
+                      {proveedor.activo ? (
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">Activo</span>
+                      ) : (
+                        <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-semibold text-gray-700">Inactivo</span>
+                      )}
+                    </div>
                   </div>
                   <p className="text-sm text-gray-600">Contacto: {proveedor.contacto || '-'}</p>
                   <p className="text-sm text-gray-600">Tel: {proveedor.telefono || '-'}</p>
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleEditClick(proveedor)}
+                      className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                    >
+                      <Pencil className="mr-1 inline h-4 w-4" />
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleActivo(proveedor)}
+                      className={`flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition ${proveedor.activo ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'}`}
+                    >
+                      <X className="mr-1 inline h-4 w-4" />
+                      {proveedor.activo ? 'Desactivar' : 'Activar'}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

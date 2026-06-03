@@ -33,6 +33,7 @@ class ProductoResponse(BaseModel):
     stock_actual: int
     stock_minimo: int
     stock_critico: bool
+    imagen_url: str | None = None
     proveedor_id: int | None = None
     proveedor_nombre: str | None = None
 
@@ -47,6 +48,7 @@ class ProductoCreateRequest(BaseModel):
     precio_venta: Annotated[float, Field(ge=0)]
     stock_actual: Annotated[int, Field(ge=0)] = 0
     stock_minimo: Annotated[int, Field(ge=0)] = 0
+    imagen_url: str | None = None
     proveedor_id: int | None = None
 
 
@@ -60,7 +62,9 @@ class ProductoUpdateRequest(BaseModel):
     precio_venta: Annotated[float | None, Field(ge=0)] = None
     stock_actual: Annotated[int | None, Field(ge=0)] = None
     stock_minimo: Annotated[int | None, Field(ge=0)] = None
+    imagen_url: str | None = None
     proveedor_id: int | None = None
+    activo: bool | None = None
 
 
 class ProductoStockPatchRequest(BaseModel):
@@ -100,6 +104,7 @@ def _to_producto_response(producto: Producto) -> ProductoResponse:
         stock_actual=producto.stock_actual,
         stock_minimo=producto.stock_minimo,
         stock_critico=producto.stock_critico,
+        imagen_url=producto.imagen_url,
     )
 
 
@@ -114,6 +119,7 @@ def _to_producto_response_from_model(p: ProductoModel) -> ProductoResponse:
         stock_actual=p.stock_actual,
         stock_minimo=p.stock_minimo,
         stock_critico=p.stock_actual <= p.stock_minimo,
+        imagen_url=p.imagen_url,
         proveedor_id=p.proveedor_id,
         proveedor_nombre=p.proveedor.nombre if p.proveedor else None,
     )
@@ -197,6 +203,7 @@ def create_producto(
         stock=payload.stock_actual,
         stock_minimo=payload.stock_minimo,
         catalogo=payload.catalogo,
+        imagen_url=payload.imagen_url,
     )
 
     try:
@@ -270,6 +277,12 @@ def update_producto(
     if payload.proveedor_id is not None:
         producto.proveedor_id = payload.proveedor_id
 
+    if payload.imagen_url is not None:
+        producto.imagen_url = payload.imagen_url
+
+    if payload.activo is not None:
+        producto.activo = payload.activo
+
     db.commit()
     db.refresh(producto)
 
@@ -283,6 +296,7 @@ def update_producto(
         stock_actual=producto.stock_actual,
         stock_minimo=producto.stock_minimo,
         stock_critico=producto.stock_actual <= producto.stock_minimo,
+        imagen_url=producto.imagen_url,
         proveedor_id=producto.proveedor_id,
         proveedor_nombre=producto.proveedor.nombre if producto.proveedor else None,
     )
@@ -305,6 +319,7 @@ def delete_producto(
         raise HTTPException(status_code=404, detail="Producto no encontrado")
 
     producto.activo = False
+    producto.proveedor_id = None
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

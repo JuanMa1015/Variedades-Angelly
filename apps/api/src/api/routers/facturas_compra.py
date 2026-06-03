@@ -36,6 +36,8 @@ class FacturaDetalleCreateRequest(BaseModel):
 class FacturaCompraCreateRequest(BaseModel):
     proveedor_id: Annotated[int, Field(gt=0)]
     items: Annotated[list[FacturaDetalleCreateRequest], Field(min_length=1)]
+    encomienda: Annotated[float, Field(ge=0)] = 0.0
+    porcentaje_ganancia: Annotated[float, Field(gt=0, le=1)] = 0.70
 
 
 class FacturaDetalleResponse(BaseModel):
@@ -45,6 +47,8 @@ class FacturaDetalleResponse(BaseModel):
     aplica_iva: bool
     precio_unitario: float
     precio_total: float
+    precio_venta_sugerido: float | None = None
+    ganancia_estimada: float | None = None
 
 
 class FacturaCompraResponse(BaseModel):
@@ -55,6 +59,8 @@ class FacturaCompraResponse(BaseModel):
     subtotal: float
     total_iva: float
     total_factura: float
+    encomienda: float | None = 0.0
+    porcentaje_ganancia: float | None = None
     fecha_creacion: datetime
     items: list[FacturaDetalleResponse]
 
@@ -81,6 +87,8 @@ def _to_factura_response(
         subtotal=factura.subtotal,
         total_iva=factura.total_iva,
         total_factura=factura.total_factura,
+        encomienda=factura.encomienda,
+        porcentaje_ganancia=factura.porcentaje_ganancia,
         fecha_creacion=factura.fecha_creacion,
         items=[
             FacturaDetalleResponse(
@@ -90,6 +98,8 @@ def _to_factura_response(
                 aplica_iva=item.aplica_iva,
                 precio_unitario=item.precio_unitario,
                 precio_total=item.precio_total,
+                precio_venta_sugerido=item.precio_venta_sugerido,
+                ganancia_estimada=item.ganancia_estimada,
             )
             for item in items
         ],
@@ -101,7 +111,7 @@ def list_facturas_compra(
     db: Session = Depends(get_db),
     fecha_desde: date | None = Query(default=None),
     fecha_hasta: date | None = Query(default=None),
-    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> list[FacturaCompraResponse]:
     query = select(FacturaCompraModel)
     if fecha_desde:
@@ -147,7 +157,7 @@ def list_facturas_compra_paginadas(
     fecha_desde: date | None = Query(default=None),
     fecha_hasta: date | None = Query(default=None),
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> FacturaCompraPageResponse:
     query = select(FacturaCompraModel)
     if fecha_desde:
@@ -191,7 +201,7 @@ def list_facturas_compra_paginadas(
 def create_factura_compra(
     payload: FacturaCompraCreateRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> FacturaCompraResponse:
     proveedor = db.execute(
         select(ProveedorModel).where(ProveedorModel.id == payload.proveedor_id),
@@ -217,6 +227,8 @@ def create_factura_compra(
         base = item.cantidad * item.precio_unitario
         iva = base * IVA_RATE if item.aplica_iva else 0.0
         total_linea = base + iva
+        precio_venta_sugerido = item.precio_unitario / payload.porcentaje_ganancia
+        ganancia_estimada = precio_venta_sugerido - item.precio_unitario
 
         subtotal += base
         total_iva += iva
@@ -228,6 +240,8 @@ def create_factura_compra(
                 "aplica_iva": item.aplica_iva,
                 "precio_unitario": item.precio_unitario,
                 "precio_total": total_linea,
+                "precio_venta_sugerido": round(precio_venta_sugerido, 2),
+                "ganancia_estimada": round(ganancia_estimada, 2),
             },
         )
 
@@ -237,6 +251,8 @@ def create_factura_compra(
         subtotal=subtotal,
         total_iva=total_iva,
         total_factura=subtotal + total_iva,
+        encomienda=payload.encomienda or None,
+        porcentaje_ganancia=payload.porcentaje_ganancia,
     )
     db.add(factura)
     db.flush()
@@ -251,6 +267,8 @@ def create_factura_compra(
             aplica_iva=item["aplica_iva"],
             precio_unitario=item["precio_unitario"],
             precio_total=item["precio_total"],
+            precio_venta_sugerido=item["precio_venta_sugerido"],
+            ganancia_estimada=item["ganancia_estimada"],
         )
         db.add(detalle)
         detalles_creados.append(detalle)
@@ -270,7 +288,7 @@ def update_factura_compra(
     factura_id: int,
     payload: FacturaCompraUpdateRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> FacturaCompraResponse:
     factura = db.execute(
         select(FacturaCompraModel).where(FacturaCompraModel.id == factura_id),
@@ -304,7 +322,7 @@ def update_factura_compra(
 def delete_factura_compra(
     factura_id: int,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> None:
     factura = db.execute(
         select(FacturaCompraModel).where(FacturaCompraModel.id == factura_id),

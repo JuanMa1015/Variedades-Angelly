@@ -2,7 +2,7 @@ import { useCallback, useMemo, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { ChevronDown, ChevronRight, RefreshCw, Shield } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
-import { apiDelete, apiRequest } from '../api/httpClient';
+import { apiDelete, apiPatch, apiRequest } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage';
 import SuccessMessage from '../components/SuccessMessage';
 import useConfirm from '../components/useConfirm';
@@ -28,12 +28,13 @@ import CreateAbonoCarteraDialog from './admin/components/CreateDialogs/CreateAbo
 const ROLE_GROUPS = [
   {
     role: 'Vendedor',
-    modules: [
-      { id: 'productos', label: 'Productos' },
-      { id: 'proveedores', label: 'Proveedores' },
-      { id: 'gastos', label: 'Gastos' },
-      { id: 'pedidos_proveedor', label: 'Pedidos proveedor' },
-    ],
+      modules: [
+        { id: 'productos', label: 'Productos' },
+        { id: 'proveedores', label: 'Proveedores' },
+        { id: 'facturas_compra', label: 'Facturas compra' },
+        { id: 'gastos', label: 'Gastos' },
+        { id: 'pedidos_proveedor', label: 'Pedidos proveedor' },
+      ],
   },
   {
     role: 'Cartera',
@@ -92,7 +93,7 @@ const CREATE_DIALOGS = {
 
 const Admin = ({ moduleKey: moduleKeyProp }) => {
   const { moduleKey: moduleKeyParam } = useParams();
-  const moduleKey = moduleKeyProp ?? moduleKeyParam ?? null;
+  const moduleKey = (moduleKeyProp ?? moduleKeyParam ?? null)?.replace(/-/g, '_');
   const { token, isSuperAdmin } = useAuth();
 
   const [activeTab, setActiveTab] = useState(moduleKey ?? 'productos');
@@ -197,7 +198,7 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         request({ endpoint: '/api/fidelizacion/clientes', signal }),
         request({ endpoint: '/api/ventas', signal }),
         request({ endpoint: '/api/proveedores/pedidos', signal }),
-        request({ endpoint: '/api/facturas-compra', signal }),
+        request({ endpoint: '/api/superadmin/facturas-compra', signal }),
         request({ endpoint: '/api/gastos', signal }),
         request({ endpoint: '/api/cartera/abonos', signal }),
         request({ endpoint: '/api/superadmin/auditorias', signal }),
@@ -645,17 +646,18 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     openEditModal(
       'Editar producto',
       [
-        { name: 'nombre', label: 'Nombre', type: 'text', required: true },
-        { name: 'precio_venta', label: 'Precio de venta', type: 'number', required: true },
-      ],
-      { nombre: item.nombre, precio_venta: String(item.precio_venta ?? '') },
-      async (values) => {
-        if (Number(values.precio_venta) < 0) { notifyError('El precio de venta no puede ser negativo'); return; }
-        await request({
-          endpoint: `/api/productos/${item.id}`,
-          method: 'PATCH',
-          body: { nombre: values.nombre.trim(), precio_venta: Number(values.precio_venta) },
-        });
+      { name: 'nombre', label: 'Nombre', type: 'text', required: true },
+      { name: 'contacto', label: 'Contacto', type: 'text' },
+      { name: 'telefono', label: 'Telefono', type: 'text' },
+      { name: 'activo', label: 'Activo', type: 'checkbox' },
+    ],
+    { nombre: item.nombre, contacto: item.contacto ?? '', telefono: item.telefono ?? '', activo: item.activo ?? true },
+    async (values) => {
+      await request({
+        endpoint: `/api/proveedores/${item.id}`,
+        method: 'PATCH',
+        body: { nombre: values.nombre.trim(), contacto: values.contacto.trim() || null, telefono: values.telefono.trim() || null, activo: values.activo },
+      });
         await loadAll();
         notifySuccess('Producto actualizado');
       },
@@ -672,6 +674,26 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
       notifyError(err.message || 'No se pudo eliminar producto');
     }
   }, [confirm, loadAll, notifySuccess, notifyError]);
+
+  const handleToggleProductoActivo = useCallback(async (item) => {
+    try {
+      await apiPatch(`/api/productos/${item.id}`, { activo: !item.activo });
+      await loadAll();
+      notifySuccess(item.activo ? 'Producto desactivado' : 'Producto activado');
+    } catch (err) {
+      notifyError(err.message || 'Error al cambiar estado');
+    }
+  }, [loadAll, notifySuccess, notifyError]);
+
+  const handleToggleProveedorActivo = useCallback(async (item) => {
+    try {
+      await apiRequest(`/api/proveedores/${item.id}/toggle-activo`, { method: 'PUT' });
+      await loadAll();
+      notifySuccess(item.activo ? 'Proveedor desactivado' : 'Proveedor activado');
+    } catch (err) {
+      notifyError(err.message || 'Error al cambiar estado');
+    }
+  }, [loadAll, notifySuccess, notifyError]);
 
   const handleEditProveedor = useCallback((item) => {
     openEditModal(
@@ -694,7 +716,7 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
   }, [openEditModal, request, loadAll, notifySuccess]);
 
   const handleDeleteProveedor = useCallback(async (item) => {
-    const confirmed = await confirm({ title: 'Eliminar proveedor', message: `Eliminar proveedor ${item.nombre}?` }); if (!confirmed) return;
+    const confirmed = await confirm({ title: 'Eliminar proveedor', message: `Eliminar permanentemente ${item.nombre}?` }); if (!confirmed) return;
     try {
       await apiDelete(`/api/proveedores/${item.id}`);
       await loadAll();
@@ -747,14 +769,17 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     { key: 'productos', title: 'Productos', desc: 'Inventario y precios con control visual.', data: productos, createDialog: 'productos',
       columns: [
         { key: 'nombre', label: 'Nombre', mono: true },
+        { key: 'proveedor_nombre', label: 'Proveedor' },
         { key: 'precio_costo', label: 'Costo', align: 'right', render: (i) => formatMoney(i.precio_costo) },
         { key: 'precio_venta', label: 'Venta', align: 'right', render: (i) => formatMoney(i.precio_venta) },
         { key: 'stock_actual', label: 'Stock', align: 'right' }, { key: 'stock_minimo', label: 'Min', align: 'right' },
-      ], onEdit: handleEditProducto, onDelete: handleDeleteProducto, minWidth: '900px' },
+        { key: 'activo', label: 'Activo', align: 'right', render: (i) => i.activo ? '✅' : '❌' },
+      ], onEdit: handleEditProducto, onDelete: handleDeleteProducto, onToggle: handleToggleProductoActivo, minWidth: '900px' },
     { key: 'proveedores', title: 'Proveedores', desc: 'Catálogo de contactos y pedidos.', data: proveedores, createDialog: 'proveedores',
       columns: [
         { key: 'nombre', label: 'Nombre', mono: true }, { key: 'contacto', label: 'Contacto' }, { key: 'telefono', label: 'Telefono' },
-      ], onEdit: handleEditProveedor, onDelete: handleDeleteProveedor, minWidth: '760px' },
+        { key: 'activo', label: 'Activo', align: 'right', render: (i) => i.activo ? '✅' : '❌' },
+      ], onEdit: handleEditProveedor, onDelete: handleDeleteProveedor, onToggle: handleToggleProveedorActivo, minWidth: '760px' },
     { key: 'clientes_cartera', title: 'Clientes cartera', desc: 'Clientes con cupo y deuda.', data: clientesCartera, createDialog: 'clientes_cartera',
       columns: [
         { key: 'id', label: 'ID', mono: true }, { key: 'nombre', label: 'Nombre' }, { key: 'documento', label: 'Documento' },
@@ -950,6 +975,7 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
               data={section.data}
               onEdit={section.onEdit}
               onDelete={section.onDelete}
+              onToggle={section.onToggle}
               minWidth={section.minWidth}
             />
           </AdminSection>

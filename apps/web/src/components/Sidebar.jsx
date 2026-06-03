@@ -3,6 +3,7 @@ import {
   BarChart3,
   ChevronLeft,
   ChevronRight,
+  FileText,
   Gift,
   LayoutDashboard,
   LogOut,
@@ -38,6 +39,7 @@ const Sidebar = ({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMobile })
       { label: 'Clientes', path: '/clientes', icon: Users, description: 'Clientes de tienda' },
       { label: 'Inventario', path: '/inventario', icon: Package, description: 'Gestión de Stock' },
       { label: 'Proveedores', path: '/proveedores', icon: Truck, description: 'Gestión de Proveedores' },
+      { label: 'Facturas', path: '/facturas', icon: FileText, description: 'Facturas de compra y análisis' },
       { label: 'Fidelización', path: '/fidelizacion', icon: Gift, description: 'Clientes para Bonos' },
     ];
 

@@ -6,13 +6,18 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.pagination import PageInfo, build_page
 from src.infrastructure.database.connection import get_db
-from src.infrastructure.database.models import PedidoProveedorModel, ProveedorModel
+from src.infrastructure.database.models import (
+    FacturaCompraModel,
+    PedidoProveedorModel,
+    ProductoModel,
+    ProveedorModel,
+)
 
 router = APIRouter(tags=["proveedores"])
 
@@ -115,7 +120,7 @@ def update_proveedor(
     proveedor_id: int,
     payload: ProveedorUpdateRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> ProveedorResponse:
     proveedor = db.execute(
         select(ProveedorModel).where(ProveedorModel.id == proveedor_id),
@@ -152,6 +157,27 @@ def update_proveedor(
     return _to_proveedor_response(proveedor)
 
 
+@router.put(
+    "/api/proveedores/{proveedor_id}/toggle-activo",
+    response_model=ProveedorResponse,
+)
+def toggle_proveedor_activo(
+    proveedor_id: int,
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+) -> ProveedorResponse:
+    proveedor = db.execute(
+        select(ProveedorModel).where(ProveedorModel.id == proveedor_id),
+    ).scalar_one_or_none()
+    if proveedor is None:
+        raise HTTPException(status_code=404, detail="Proveedor no encontrado")
+
+    proveedor.activo = not proveedor.activo
+    db.commit()
+    db.refresh(proveedor)
+    return _to_proveedor_response(proveedor)
+
+
 @router.delete(
     "/api/proveedores/{proveedor_id}",
     status_code=204,
@@ -161,7 +187,7 @@ def update_proveedor(
 def delete_proveedor(
     proveedor_id: int,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> Response:
     proveedor = db.execute(
         select(ProveedorModel).where(ProveedorModel.id == proveedor_id),
@@ -169,17 +195,32 @@ def delete_proveedor(
     if proveedor is None:
         raise HTTPException(status_code=404, detail="Proveedor no encontrado")
 
-    pedidos_asociados = db.execute(
-        select(func.count())
-        .select_from(PedidoProveedorModel)
-        .where(PedidoProveedorModel.proveedor_id == proveedor_id),
+    pedidos = db.execute(
+        select(func.count()).select_from(PedidoProveedorModel).where(PedidoProveedorModel.proveedor_id == proveedor_id),
     ).scalar_one()
-    if pedidos_asociados > 0:
+    facturas = db.execute(
+        select(func.count()).select_from(FacturaCompraModel).where(FacturaCompraModel.proveedor_id == proveedor_id),
+    ).scalar_one()
+
+    bloqueos = []
+    if pedidos > 0:
+        bloqueos.append(f"{pedidos} pedido(s) de proveedor")
+    if facturas > 0:
+        bloqueos.append(f"{facturas} factura(s) de compra")
+
+    if bloqueos:
         raise HTTPException(
             status_code=409,
-            detail="No se puede eliminar un proveedor con pedidos registrados",
+            detail=f"No se puede eliminar: el proveedor tiene {' y '.join(bloqueos)}. Borra {'/'.join(b.split()[-1] for b in bloqueos)} primero.",
         )
 
+    # Desvincular productos (activos o inactivos) para evitar FK constraint
+    db.execute(
+        update(ProductoModel)
+        .where(ProductoModel.proveedor_id == proveedor_id)
+        .values(proveedor_id=None),
+    )
+    db.flush()
     db.delete(proveedor)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -99,6 +99,7 @@ class ProductoModel(Base):
     stock_actual: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     stock_minimo: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    imagen_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     proveedor_id: Mapped[int | None] = mapped_column(ForeignKey("proveedores.id"), nullable=True)
     proveedor: Mapped["ProveedorModel | None"] = relationship("ProveedorModel", foreign_keys=[proveedor_id])
 
@@ -209,6 +210,8 @@ class FacturaCompraModel(Base):
     subtotal: Mapped[float] = mapped_column(Float, nullable=False)
     total_iva: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     total_factura: Mapped[float] = mapped_column(Float, nullable=False)
+    encomienda: Mapped[float | None] = mapped_column(Float, nullable=True, default=0.0)
+    porcentaje_ganancia: Mapped[float | None] = mapped_column(Float, nullable=True, default=0.70)
     proveedor: Mapped["ProveedorModel"] = relationship(
         "ProveedorModel",
         back_populates="facturas_compra",
@@ -240,6 +243,8 @@ class FacturaCompraDetalleModel(Base):
     aplica_iva: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     precio_unitario: Mapped[float] = mapped_column(Float, nullable=False)
     precio_total: Mapped[float] = mapped_column(Float, nullable=False)
+    precio_venta_sugerido: Mapped[float | None] = mapped_column(Float, nullable=True)
+    ganancia_estimada: Mapped[float | None] = mapped_column(Float, nullable=True)
     factura: Mapped["FacturaCompraModel"] = relationship(
         "FacturaCompraModel",
         back_populates="detalles",

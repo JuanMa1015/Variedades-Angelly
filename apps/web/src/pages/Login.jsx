@@ -10,7 +10,10 @@ const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState(() => {
+    const remembered = localStorage.getItem('angelly.auth.remember') === 'true';
+    return remembered ? (localStorage.getItem('angelly.auth.username') || '') : '';
+  });
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(() => localStorage.getItem('angelly.auth.remember') === 'true');
 
@@ -52,6 +55,12 @@ const Login = () => {
         password,
         rememberMe,
       });
+
+      if (rememberMe) {
+        localStorage.setItem('angelly.auth.username', username.trim());
+      } else {
+        localStorage.removeItem('angelly.auth.username');
+      }
 
       const fallbackPath = getDefaultRouteForRole(nextUser?.role);
       pendingPathRef.current = typeof location.state?.from === 'string' ? location.state.from : fallbackPath;

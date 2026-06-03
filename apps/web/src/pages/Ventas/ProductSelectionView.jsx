@@ -18,6 +18,9 @@ const getProductIcon = (nombre = '') => {
   return rule?.icon || '🛒';
 };
 
+const API_BASE = import.meta.env.VITE_API_URL ?? '';
+const getImageUrl = (url) => (url ? `${API_BASE}${url}` : null);
+
 const getCategoryName = (producto) => {
   const raw = producto.categoria || producto.catalogo || producto.tipo || 'General';
   return String(raw).trim() || 'General';
@@ -203,7 +206,13 @@ const ProductSelectionView = ({
                 )}
                 <div className="mb-2 flex items-start gap-3">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="text-2xl">{getProductIcon(producto.nombre)}</div>
+                    <div className="text-2xl">
+                      {producto.imagen_url ? (
+                        <img src={getImageUrl(producto.imagen_url)} alt={producto.nombre} className="h-9 w-9 rounded-lg object-cover" />
+                      ) : (
+                        getProductIcon(producto.nombre)
+                      )}
+                    </div>
                     <div className="min-w-0">
                       <p className="truncate text-sm font-bold text-gray-900">{producto.nombre}</p>
                       <p className="mt-1 text-xs text-gray-500">{formatMoney(producto.precio_venta)}</p>

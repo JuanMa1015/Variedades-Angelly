@@ -18,11 +18,17 @@ from src.api.services.vendedor import (
     list_vendedores as _list_vendedores,
     update_vendedor as _update_vendedor,
 )
+from src.api.routers.facturas_compra import (
+    FacturaCompraResponse,
+    _to_factura_response,
+)
 from src.infrastructure.database.connection import get_db
 from src.infrastructure.database.models import (
     AuditoriaModel,
     CierreCajaModel,
     DetalleVentaModel,
+    FacturaCompraDetalleModel,
+    FacturaCompraModel,
     ProductoModel,
     ProveedorModel,
     UsuarioModel,
@@ -58,6 +64,10 @@ class ProductoSchema(BaseModel):
     catalogo: str
     stock_actual: int
     stock_minimo: int
+    imagen_url: str | None = None
+    activo: bool = True
+    proveedor_id: int | None = None
+    proveedor_nombre: str | None = None
 
 
 class ProductoCreateUpdate(BaseModel):
@@ -68,6 +78,7 @@ class ProductoCreateUpdate(BaseModel):
     catalogo: str = "tienda"
     stock_actual: Annotated[int, Field(ge=0)] = 0
     stock_minimo: Annotated[int, Field(ge=0)] = 0
+    imagen_url: str | None = None
 
 
 class ProveedorSchema(BaseModel):
@@ -265,17 +276,26 @@ def list_productos(
 ):
     offset = (page - 1) * limit
     rows = db.execute(
-        select(ProductoModel).order_by(ProductoModel.nombre.asc()).offset(offset).limit(limit),
-    ).scalars().all()
+        select(ProductoModel, ProveedorModel.nombre)
+        .outerjoin(ProveedorModel, ProductoModel.proveedor_id == ProveedorModel.id)
+        .where(ProductoModel.activo == True)
+        .order_by(ProductoModel.nombre.asc())
+        .offset(offset)
+        .limit(limit),
+    ).all()
     return [ProductoSchema(
-        id=r.id,
-        nombre=r.nombre,
-        codigo_barras=r.codigo_barras,
-        precio_costo=r.precio_costo,
-        precio_venta=r.precio_venta,
-        catalogo=r.catalogo,
-        stock_actual=r.stock_actual,
-        stock_minimo=r.stock_minimo,
+        id=r.ProductoModel.id,
+        nombre=r.ProductoModel.nombre,
+        codigo_barras=r.ProductoModel.codigo_barras,
+        precio_costo=r.ProductoModel.precio_costo,
+        precio_venta=r.ProductoModel.precio_venta,
+        catalogo=r.ProductoModel.catalogo,
+        stock_actual=r.ProductoModel.stock_actual,
+        stock_minimo=r.ProductoModel.stock_minimo,
+        imagen_url=r.ProductoModel.imagen_url,
+        activo=r.ProductoModel.activo,
+        proveedor_id=r.ProductoModel.proveedor_id,
+        proveedor_nombre=r.nombre,
     ) for r in rows]
 
 
@@ -289,6 +309,7 @@ def create_producto(payload: ProductoCreateUpdate, db: Session = Depends(get_db)
         catalogo=payload.catalogo,
         stock_actual=payload.stock_actual,
         stock_minimo=payload.stock_minimo,
+        imagen_url=payload.imagen_url,
     )
     db.add(producto)
     db.commit()
@@ -302,6 +323,7 @@ def create_producto(payload: ProductoCreateUpdate, db: Session = Depends(get_db)
         catalogo=producto.catalogo,
         stock_actual=producto.stock_actual,
         stock_minimo=producto.stock_minimo,
+        imagen_url=producto.imagen_url,
     )
 
 
@@ -322,12 +344,15 @@ def update_producto(
     producto.catalogo = payload.catalogo
     producto.stock_actual = payload.stock_actual
     producto.stock_minimo = payload.stock_minimo
+    if payload.imagen_url is not None:
+        producto.imagen_url = payload.imagen_url
     db.commit()
     db.refresh(producto)
     return ProductoSchema(
         id=producto.id, nombre=producto.nombre, codigo_barras=producto.codigo_barras,
         precio_costo=producto.precio_costo, precio_venta=producto.precio_venta,
         catalogo=producto.catalogo, stock_actual=producto.stock_actual, stock_minimo=producto.stock_minimo,
+        imagen_url=producto.imagen_url,
     )
 
 
@@ -600,4 +625,46 @@ def list_caja(
             esta_abierta=r.fecha_cierre is None,
         )
         for r in rows
+    ]
+
+
+@router.get("/api/superadmin/facturas-compra", response_model=list[FacturaCompraResponse])
+def list_facturas_compra(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=200, ge=1, le=500),
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("superadmin")),
+):
+    offset = (page - 1) * limit
+    facturas = db.execute(
+        select(FacturaCompraModel)
+        .order_by(FacturaCompraModel.fecha_creacion.desc())
+        .offset(offset)
+        .limit(limit),
+    ).scalars().all()
+
+    if not facturas:
+        return []
+
+    proveedor_ids = {f.proveedor_id for f in facturas}
+    proveedores = db.execute(
+        select(ProveedorModel).where(ProveedorModel.id.in_(proveedor_ids)),
+    ).scalars().all()
+    proveedor_map = {p.id: p.nombre for p in proveedores}
+
+    factura_ids = [f.id for f in facturas]
+    detalles = db.execute(
+        select(FacturaCompraDetalleModel).where(FacturaCompraDetalleModel.factura_id.in_(factura_ids)),
+    ).scalars().all()
+    detalles_map: dict[int, list[FacturaCompraDetalleModel]] = {}
+    for d in detalles:
+        detalles_map.setdefault(d.factura_id, []).append(d)
+
+    return [
+        _to_factura_response(
+            f,
+            proveedor_nombre=proveedor_map.get(f.proveedor_id, "Proveedor"),
+            items=detalles_map.get(f.id, []),
+        )
+        for f in facturas
     ]

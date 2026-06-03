@@ -155,3 +155,24 @@ export const apiPatch = (endpoint, body, options = {}) => apiRequest(endpoint, {
 export const apiDelete = async (endpoint, options = {}) => {
   await apiRequest(endpoint, { ...options, method: 'DELETE' });
 };
+
+export const apiUpload = async (endpoint, file) => {
+  const token = getStorage().getItem(TOKEN_STORAGE_KEY);
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(buildUrl(endpoint), {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    const message = payload?.detail || 'No se pudo subir el archivo';
+    throw new ApiError(message, response.status, payload);
+  }
+
+  return response.json();
+};

@@ -7,10 +7,13 @@ import os
 import re
 import time
 
+from pathlib import Path
+
 from fastapi import FastAPI, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -57,8 +60,12 @@ from src.api.routers.productos import router as productos_router
 from src.api.routers.ventas_fidelizacion import router as ventas_fidelizacion_router
 from src.api.routers.superadmin import router as superadmin_router
 from src.api.routers.export import router as export_router
+from src.api.routers.upload import router as upload_router
+from sqlalchemy import inspect
+
 from src.api.limiter import limiter
-from src.infrastructure.database.connection import get_db
+from src.infrastructure.database.connection import engine, get_db
+from src.infrastructure.database.models import Base
 
 logger = logging.getLogger("tienda_angelly")
 logger.setLevel(logging.INFO)
@@ -69,6 +76,24 @@ if not logger.handlers:
 
 app = FastAPI(title="Tienda Angelly API", version="0.1.0")
 app.state.limiter = limiter
+
+
+@app.on_event("startup")
+def on_startup():
+    """Crea tablas faltantes y agrega columnas nuevas a tablas existentes."""
+    Base.metadata.create_all(bind=engine)
+    inspector = inspect(engine)
+    with engine.connect() as conn:
+        for table_name in Base.metadata.tables:
+            existing = {c["name"] for c in inspector.get_columns(table_name)}
+            model_table = Base.metadata.tables[table_name]
+            for col in model_table.columns:
+                if col.name not in existing:
+                    col_type = col.type.compile(engine.dialect)
+                    conn.execute(
+                        text(f"ALTER TABLE {table_name} ADD COLUMN {col.name} {col_type}")
+                    )
+        conn.commit()
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
@@ -235,6 +260,13 @@ def _extract_integrity_detail(error_text: str) -> str:
         return "Un campo obligatorio está vacío."
     return f"Error de integridad en la base de datos: {error_str[:200]}"
 
+# ─── Static Files (imagenes subidas) ───
+
+UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads"
+UPLOAD_DIR.mkdir(exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
+
+
 # ─── Health Check ───
 
 @app.get("/health")
@@ -271,3 +303,4 @@ app.include_router(facturas_compra_router)
 app.include_router(auditorias_router)
 app.include_router(caja_router)
 app.include_router(export_router)
+app.include_router(upload_router)

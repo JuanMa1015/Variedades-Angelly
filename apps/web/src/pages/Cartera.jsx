@@ -1,4 +1,5 @@
-import { Package, Plus, UserPlus } from 'lucide-react';
+import { useState } from 'react';
+import { ImageUp, Package, Plus, UserPlus, X } from 'lucide-react';
 import ErrorMessage from '../components/ErrorMessage';
 import SuccessMessage from '../components/SuccessMessage';
 import Skeleton from '../components/Skeleton';
@@ -10,11 +11,39 @@ import CarteraCobrarSection from './cartera/CarteraCobrarSection';
 import CarteraProductosSection from './cartera/CarteraProductosSection';
 import CarteraVentaSection from './cartera/CarteraVentaSection';
 import { useCarteraData } from './cartera/useCarteraData';
+import { apiUpload } from '../api/httpClient';
 
 import { formatDateTime } from '../utils/format';
 
 const Cartera = () => {
   const data = useCarteraData();
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+
+  const handleImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setImagePreview(reader.result);
+    reader.readAsDataURL(file);
+  };
+
+  const handleProductoSubmitWithImage = async (e) => {
+    let imagen_url = data.productoForm.imagen_url;
+    if (imageFile) {
+      try {
+        const result = await apiUpload('/api/upload-imagen', imageFile);
+        imagen_url = result.url;
+      } catch {
+        imagen_url = null;
+      }
+    }
+    setProductoForm((prev) => ({ ...prev, imagen_url }));
+    setImageFile(null);
+    setImagePreview(null);
+    await data.handleSubmitProducto(e);
+  };
 
   const {
     activeSection,
@@ -63,7 +92,6 @@ const Cartera = () => {
     cancelEditingProducto,
     handleSubmitCliente,
     handleDeleteCliente,
-    handleSubmitProducto,
     handleDeleteProducto,
     handleAbrirWhatsapp,
     handleRegistrarAbono,
@@ -252,7 +280,7 @@ const Cartera = () => {
               <button type="button" onClick={cancelEditingProducto} className="rounded-full border border-gray-200 p-2 text-gray-500 transition hover:bg-gray-50" aria-label="Cerrar modal">×</button>
             </div>
 
-            <form className="mt-5 space-y-3" onSubmit={handleSubmitProducto}>
+            <form className="mt-5 space-y-3" onSubmit={handleProductoSubmitWithImage}>
               <input
                 type="text"
                 value={productoForm.nombre}
@@ -286,6 +314,28 @@ const Cartera = () => {
                   className="w-full rounded-lg border border-gray-300 px-3 py-3 text-sm focus:border-rosewood focus:outline-none"
                   placeholder="Precio venta"
                 />
+              </div>
+
+              {/* Image upload */}
+              <div>
+                {imagePreview ? (
+                  <div className="relative inline-block">
+                    <img src={imagePreview} alt="Preview" className="h-24 w-24 rounded-xl border border-gray-300 object-cover" />
+                    <button type="button" onClick={() => { setImageFile(null); setImagePreview(null); }} className="absolute -right-2 -top-2 rounded-full border border-gray-300 bg-white p-0.5 text-gray-500 hover:text-red-600">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : productoForm.imagen_url ? (
+                  <div className="relative inline-block">
+                    <img src={productoForm.imagen_url} alt="Producto" className="h-24 w-24 rounded-xl border border-gray-300 object-cover" />
+                  </div>
+                ) : (
+                  <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-gray-300 px-3 py-3 text-sm text-gray-500 hover:border-rosewood hover:text-rosewood">
+                    <ImageUp className="h-5 w-5" />
+                    <span>Subir imagen del producto</span>
+                    <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+                  </label>
+                )}
               </div>
 
               <div className="flex flex-wrap gap-2 pt-2">

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FileText, Plus, Printer, Trash2 } from 'lucide-react';
+import { FileText, Plus, Printer, Trash2, X, ImageUp, Link as LinkIcon } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { apiGet, apiPost } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage'
 import SuccessMessage from '../components/SuccessMessage'
 import Skeleton from '../components/Skeleton'
-import { formatDate, formatMoney } from '../utils/format';
+import Modal from '../components/Modal';
+import { formatMoney } from '../utils/format';
 
 const EMPTY_ITEM = {
   producto_id: '',
@@ -13,6 +14,8 @@ const EMPTY_ITEM = {
   aplica_iva: false,
   precio_unitario: '',
 };
+
+const PORCENTAJE_DEFAULT = 0.70;
 
 const Facturas = () => {
   const { token } = useAuth();
@@ -22,6 +25,8 @@ const Facturas = () => {
   const [facturas, setFacturas] = useState([]);
 
   const [proveedorId, setProveedorId] = useState('');
+  const [encomienda, setEncomienda] = useState('');
+  const [porcentajeGanancia, setPorcentajeGanancia] = useState(String(PORCENTAJE_DEFAULT));
   const [items, setItems] = useState([{ ...EMPTY_ITEM }]);
 
   const [loading, setLoading] = useState(true);
@@ -29,6 +34,10 @@ const Facturas = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [selectedPrintFactura, setSelectedPrintFactura] = useState(null);
+
+  const [isProductoModalOpen, setIsProductoModalOpen] = useState(false);
+  const [newProductoForm, setNewProductoForm] = useState({ nombre: '', codigo_barras: '', precio_costo: '', precio_venta: '', stock_actual: '' });
+  const [savingProducto, setSavingProducto] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -77,9 +86,12 @@ const Facturas = () => {
     [productos],
   );
 
+  const pct = Number(porcentajeGanancia) || PORCENTAJE_DEFAULT;
+
   const resumen = useMemo(() => {
     let subtotal = 0;
     let totalIva = 0;
+    let totalGanancia = 0;
 
     for (const item of items) {
       const cantidad = Number(item.cantidad || 0);
@@ -88,14 +100,20 @@ const Facturas = () => {
       const base = cantidad * precio;
       subtotal += base;
       if (item.aplica_iva) totalIva += base * 0.19;
+      const pvs = precio / pct;
+      totalGanancia += (pvs - precio) * cantidad;
     }
+
+    const enf = Number(encomienda) || 0;
 
     return {
       subtotal,
       totalIva,
-      totalFactura: subtotal + totalIva,
+      totalFactura: subtotal + totalIva - enf,
+      encomienda: enf,
+      totalGanancia,
     };
-  }, [items]);
+  }, [items, encomienda, pct]);
 
   const handleAddItem = () => setItems((current) => [...current, { ...EMPTY_ITEM }]);
 
@@ -152,15 +170,49 @@ const Facturas = () => {
       const payload = await apiPost('/api/facturas-compra', {
         proveedor_id: proveedor,
         items: itemsPayload,
+        encomienda: Number(encomienda) || 0,
+        porcentaje_ganancia: Number(porcentajeGanancia) || PORCENTAJE_DEFAULT,
       });
 
       setFacturas((current) => [payload, ...current]);
       setItems([{ ...EMPTY_ITEM }]);
+      setEncomienda('');
       setSuccess(`Factura #${payload.id} registrada correctamente`);
     } catch (err) {
       setError(err.message || 'No se pudo registrar la factura');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleCreateProducto = async (event) => {
+    event.preventDefault();
+    setError('');
+
+    if (!newProductoForm.nombre.trim()) {
+      setError('El nombre es obligatorio');
+      return;
+    }
+
+    try {
+      setSavingProducto(true);
+      const producto = await apiPost('/api/productos', {
+        nombre: newProductoForm.nombre.trim(),
+        codigo_barras: newProductoForm.codigo_barras.trim() || null,
+        precio_costo: Number(newProductoForm.precio_costo || 0),
+        precio_venta: Number(newProductoForm.precio_venta || 0),
+        stock_actual: Number(newProductoForm.stock_actual || 0),
+        stock_minimo: 0,
+        catalogo: 'tienda',
+      });
+      setProductos((current) => [...current, producto]);
+      setNewProductoForm({ nombre: '', codigo_barras: '', precio_costo: '', precio_venta: '', stock_actual: '' });
+      setIsProductoModalOpen(false);
+      setSuccess(`Producto "${producto.nombre}" creado`);
+    } catch (err) {
+      setError(err.message || 'No se pudo crear el producto');
+    } finally {
+      setSavingProducto(false);
     }
   };
 
@@ -186,7 +238,7 @@ const Facturas = () => {
         <FileText className="h-8 w-8 text-rosewood" />
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Facturas de compra</h1>
-          <p className="text-gray-600">Registra facturas por proveedor con detalle de productos</p>
+          <p className="text-gray-600">Registra facturas, calcula precios de venta y ganancias</p>
         </div>
       </div>
 
@@ -197,16 +249,44 @@ const Facturas = () => {
         <h2 className="mb-4 text-xl font-bold text-gray-900">Añadir factura</h2>
 
         <form className="space-y-4" onSubmit={handleCreateFactura}>
-          <select
-            value={proveedorId}
-            onChange={(event) => setProveedorId(event.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
-          >
-            <option value="">Selecciona proveedor</option>
-            {proveedores.map((proveedor) => (
-              <option key={proveedor.id} value={proveedor.id}>{proveedor.nombre}</option>
-            ))}
-          </select>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <select
+              value={proveedorId}
+              onChange={(event) => setProveedorId(event.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+            >
+              <option value="">Selecciona proveedor</option>
+              {proveedores.map((proveedor) => (
+                <option key={proveedor.id} value={proveedor.id}>{proveedor.nombre}</option>
+              ))}
+            </select>
+
+            <div className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm focus-within:border-rosewood">
+              <span className="text-gray-500">% Ganancia:</span>
+              <input
+                type="number"
+                min="0.01"
+                max="1"
+                step="0.01"
+                value={porcentajeGanancia}
+                onChange={(e) => setPorcentajeGanancia(e.target.value)}
+                className="w-20 border-0 p-0 text-sm focus:outline-none"
+                placeholder="0.70"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm focus-within:border-rosewood">
+              <span className="text-gray-500">Encomienda:</span>
+              <input
+                type="number"
+                min="0"
+                value={encomienda}
+                onChange={(e) => setEncomienda(e.target.value)}
+                className="w-full border-0 p-0 text-sm focus:outline-none"
+                placeholder="0"
+              />
+            </div>
+          </div>
 
           <div className="space-y-2">
             {items.map((item, index) => {
@@ -215,77 +295,101 @@ const Facturas = () => {
               const base = cantidad * precio;
               const iva = item.aplica_iva ? base * 0.19 : 0;
               const total = base + iva;
+              const pvs = precio / pct;
+              const ganancia = pvs - precio;
 
               return (
-                <div key={`factura-item-${index}`} className="grid grid-cols-1 gap-2 rounded-xl border border-gray-200 p-3 md:grid-cols-[1.5fr_110px_110px_120px_120px_44px]">
-                  <select
-                    value={item.producto_id}
-                    onChange={(event) => handleSelectProducto(index, event.target.value)}
-                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
-                  >
-                    <option value="">Producto</option>
-                    {productos.map((producto) => (
-                      <option key={producto.id} value={producto.id}>{producto.nombre}</option>
-                    ))}
-                  </select>
+                <div key={`factura-item-${index}`} className="rounded-xl border border-gray-200 p-3">
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-[1.5fr_100px_auto_120px_120px_120px_120px_44px] items-end">
+                    <select
+                      value={item.producto_id}
+                      onChange={(event) => handleSelectProducto(index, event.target.value)}
+                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+                    >
+                      <option value="">Producto</option>
+                      {productos.map((producto) => (
+                        <option key={producto.id} value={producto.id}>{producto.nombre}</option>
+                      ))}
+                    </select>
 
-                  <input
-                    type="number"
-                    min="1"
-                    value={item.cantidad}
-                    onChange={(event) => handleItemChange(index, 'cantidad', event.target.value)}
-                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
-                    placeholder="Cantidad"
-                  />
-
-                  <label className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm">
                     <input
-                      type="checkbox"
-                      checked={item.aplica_iva}
-                      onChange={(event) => handleItemChange(index, 'aplica_iva', event.target.checked)}
+                      type="number"
+                      min="1"
+                      value={item.cantidad}
+                      onChange={(event) => handleItemChange(index, 'cantidad', event.target.value)}
+                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+                      placeholder="Cant."
                     />
-                    IVA
-                  </label>
 
-                  <input
-                    type="number"
-                    min="0"
-                    value={item.precio_unitario}
-                    onChange={(event) => handleItemChange(index, 'precio_unitario', event.target.value)}
-                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
-                    placeholder="Precio unit."
-                  />
+                    <label className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={item.aplica_iva}
+                        onChange={(event) => handleItemChange(index, 'aplica_iva', event.target.checked)}
+                      />
+                      IVA
+                    </label>
 
-                  <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800">
-                    {formatMoney(total)}
+                    <input
+                      type="number"
+                      min="0"
+                      value={item.precio_unitario}
+                      onChange={(event) => handleItemChange(index, 'precio_unitario', event.target.value)}
+                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+                      placeholder="P. unit."
+                    />
+
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800">
+                      {formatMoney(total)}
+                    </div>
+
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
+                      {precio > 0 ? formatMoney(pvs) : '-'}
+                    </div>
+
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
+                      {ganancia > 0 ? formatMoney(ganancia) : '-'}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveItem(index)}
+                      className="inline-flex items-center justify-center rounded-lg border border-gray-300 p-2 text-gray-600 transition hover:bg-gray-50"
+                      aria-label="Eliminar línea"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveItem(index)}
-                    className="inline-flex items-center justify-center rounded-lg border border-gray-300 text-gray-600 transition hover:bg-gray-50"
-                    aria-label="Eliminar línea"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
                 </div>
               );
             })}
           </div>
 
-          <button
-            type="button"
-            onClick={handleAddItem}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-          >
-            <Plus className="h-4 w-4" />
-            Agregar producto
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleAddItem}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+            >
+              <Plus className="h-4 w-4" />
+              Agregar producto
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsProductoModalOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-rosewood/50 px-3 py-2 text-sm font-semibold text-rosewood transition hover:bg-rosewood/5"
+            >
+              <Plus className="h-4 w-4" />
+              Producto nuevo
+            </button>
+          </div>
 
-          <div className="grid grid-cols-1 gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm md:grid-cols-5">
             <p>Subtotal: <span className="font-semibold">{formatMoney(resumen.subtotal)}</span></p>
             <p>IVA: <span className="font-semibold">{formatMoney(resumen.totalIva)}</span></p>
-            <p>Total factura: <span className="font-semibold">{formatMoney(resumen.totalFactura)}</span></p>
+            <p>Encomienda: <span className="font-semibold text-red-600">-{formatMoney(resumen.encomienda)}</span></p>
+            <p>Total factura: <span className="font-semibold text-gray-900">{formatMoney(resumen.totalFactura)}</span></p>
+            <p>Ganancia estimada: <span className="font-semibold text-emerald-700">{formatMoney(resumen.totalGanancia)}</span></p>
           </div>
 
           <button
@@ -297,6 +401,19 @@ const Facturas = () => {
           </button>
         </form>
       </section>
+
+      <Modal isOpen={isProductoModalOpen} onClose={() => setIsProductoModalOpen(false)} title="Crear producto rápido">
+        <form className="space-y-3" onSubmit={handleCreateProducto}>
+          <input type="text" value={newProductoForm.nombre} onChange={(e) => setNewProductoForm((c) => ({ ...c, nombre: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none" placeholder="Nombre del producto" />
+          <input type="text" value={newProductoForm.codigo_barras} onChange={(e) => setNewProductoForm((c) => ({ ...c, codigo_barras: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none" placeholder="Código de barras (opcional)" />
+          <div className="grid grid-cols-2 gap-3">
+            <input type="number" min="0" value={newProductoForm.precio_costo} onChange={(e) => setNewProductoForm((c) => ({ ...c, precio_costo: e.target.value }))} className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none" placeholder="Precio costo" />
+            <input type="number" min="0" value={newProductoForm.precio_venta} onChange={(e) => setNewProductoForm((c) => ({ ...c, precio_venta: e.target.value }))} className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none" placeholder="Precio venta" />
+          </div>
+          <input type="number" min="0" value={newProductoForm.stock_actual} onChange={(e) => setNewProductoForm((c) => ({ ...c, stock_actual: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none" placeholder="Stock inicial" />
+          <button type="submit" disabled={savingProducto} className="w-full rounded-lg bg-rosewood px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:bg-gray-300">{savingProducto ? 'Creando...' : 'Crear producto'}</button>
+        </form>
+      </Modal>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
         <h2 className="mb-4 text-xl font-bold text-gray-900">Facturas registradas</h2>
@@ -317,7 +434,9 @@ const Facturas = () => {
                     <th className="px-3 py-3 font-semibold text-gray-700">Proveedor</th>
                     <th className="px-3 py-3 font-semibold text-gray-700">Subtotal</th>
                     <th className="px-3 py-3 font-semibold text-gray-700">IVA</th>
+                    <th className="px-3 py-3 font-semibold text-gray-700">Encomienda</th>
                     <th className="px-3 py-3 font-semibold text-gray-700">Total</th>
+                    <th className="px-3 py-3 font-semibold text-gray-700">%Ganancia</th>
                     <th className="px-3 py-3 font-semibold text-gray-700">Ítems</th>
                     <th className="px-3 py-3 font-semibold text-gray-700">Acción</th>
                   </tr>
@@ -329,7 +448,9 @@ const Facturas = () => {
                       <td className="px-3 py-3 text-gray-700">{factura.proveedor_nombre}</td>
                       <td className="px-3 py-3 text-gray-700">{formatMoney(factura.subtotal)}</td>
                       <td className="px-3 py-3 text-gray-700">{formatMoney(factura.total_iva)}</td>
+                      <td className="px-3 py-3 text-gray-700">{factura.encomienda ? formatMoney(factura.encomienda) : '-'}</td>
                       <td className="px-3 py-3 font-semibold text-gray-900">{formatMoney(factura.total_factura)}</td>
+                      <td className="px-3 py-3 text-gray-700">{factura.porcentaje_ganancia ? `${(factura.porcentaje_ganancia * 100).toFixed(0)}%` : '-'}</td>
                       <td className="px-3 py-3 text-gray-700">{Array.isArray(factura.items) ? factura.items.length : 0}</td>
                       <td className="px-3 py-3">
                         <button
@@ -360,6 +481,16 @@ const Facturas = () => {
                   <div className="mb-1 flex items-center justify-between text-sm">
                     <span className="text-gray-500">IVA:</span>
                     <span className="text-gray-900">{formatMoney(factura.total_iva)}</span>
+                  </div>
+                  {factura.encomienda ? (
+                    <div className="mb-1 flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Encomienda:</span>
+                      <span className="text-gray-900">{formatMoney(factura.encomienda)}</span>
+                    </div>
+                  ) : null}
+                  <div className="mb-1 flex items-center justify-between text-sm">
+                    <span className="text-gray-500">Ganancia:</span>
+                    <span className="text-gray-900">{factura.porcentaje_ganancia ? `${(factura.porcentaje_ganancia * 100).toFixed(0)}%` : '-'}</span>
                   </div>
                   <div className="mb-1 flex items-center justify-between text-sm">
                     <span className="text-gray-500">Total:</span>
@@ -405,7 +536,9 @@ const Facturas = () => {
 
             <div className="mb-4 space-y-1 text-xs text-gray-700 print:grid print:grid-cols-2 print:gap-2 print:text-sm">
               <p><span className="font-semibold">Proveedor:</span> {selectedPrintFactura.proveedor_nombre}</p>
-              <p><span className="font-semibold">Fecha:</span> {formatDate(selectedPrintFactura.fecha_creacion)}</p>
+              <p><span className="font-semibold">Fecha:</span> {new Date(selectedPrintFactura.fecha_creacion).toLocaleDateString()}</p>
+              {selectedPrintFactura.encomienda ? <p><span className="font-semibold">Encomienda:</span> {formatMoney(selectedPrintFactura.encomienda)}</p> : null}
+              {selectedPrintFactura.porcentaje_ganancia ? <p><span className="font-semibold">% Ganancia:</span> {(selectedPrintFactura.porcentaje_ganancia * 100).toFixed(0)}%</p> : null}
             </div>
 
             <div className="my-3 border-t border-dashed border-gray-400 print:my-4 print:border-gray-300" />
@@ -415,21 +548,27 @@ const Facturas = () => {
                 <tr className="border-b border-gray-300 font-semibold text-gray-900">
                   <th className="py-1 text-left print:py-2">Producto</th>
                   <th className="py-1 text-right print:py-2">Cant</th>
-                  <th className="py-1 text-right print:py-2">Precio unit.</th>
-                  <th className="py-1 text-right print:py-2">Subtotal</th>
+                  <th className="py-1 text-right print:py-2">P. unit.</th>
+                  <th className="py-1 text-right print:py-2">Total</th>
+                  <th className="py-1 text-right print:py-2">P.Venta</th>
+                  <th className="py-1 text-right print:py-2">Ganancia</th>
                 </tr>
               </thead>
               <tbody>
                 {Array.isArray(selectedPrintFactura.items) && selectedPrintFactura.items.map((item, idx) => {
                   const cantidad = Number(item.cantidad || 0);
                   const precio = Number(item.precio_unitario || 0);
-                  const subtotal = cantidad * precio;
+                  const total = cantidad * precio;
+                  const pvs = item.precio_venta_sugerido || (precio / (selectedPrintFactura.porcentaje_ganancia || 0.70));
+                  const ganancia = item.ganancia_estimada || (pvs - precio);
                   return (
                     <tr key={idx} className="border-b border-gray-100">
-                      <td className="py-1 pr-2 print:py-1.5">{item.producto_nombre || `Producto #${item.producto_id}`}</td>
+                      <td className="py-1 pr-2 print:py-1.5">{item.nombre_producto || `Producto #${item.producto_id}`}</td>
                       <td className="py-1 text-right print:py-1.5">{cantidad}</td>
                       <td className="py-1 text-right print:py-1.5">{formatMoney(precio)}</td>
-                      <td className="py-1 text-right font-medium print:py-1.5">{formatMoney(subtotal)}</td>
+                      <td className="py-1 text-right print:py-1.5">{formatMoney(total)}</td>
+                      <td className="py-1 text-right print:py-1.5">{formatMoney(pvs)}</td>
+                      <td className="py-1 text-right print:py-1.5">{formatMoney(ganancia)}</td>
                     </tr>
                   );
                 })}
@@ -447,6 +586,12 @@ const Facturas = () => {
                 <span>IVA (19%):</span>
                 <span>{formatMoney(selectedPrintFactura.total_iva || 0)}</span>
               </div>
+              {selectedPrintFactura.encomienda ? (
+                <div className="flex justify-between text-red-600">
+                  <span>Encomienda:</span>
+                  <span>-{formatMoney(selectedPrintFactura.encomienda)}</span>
+                </div>
+              ) : null}
             </div>
 
             <div className="my-3 border-t border-double border-gray-800 print:my-4" />
