@@ -206,6 +206,14 @@ def create_factura_compra(
     db: Session = Depends(get_db),
     current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> FacturaCompraResponse:
+    for i, item in enumerate(payload.items):
+        if not item.producto_id or item.producto_id <= 0:
+            raise HTTPException(status_code=422, detail=f"Item #{i + 1}: producto invalido")
+        if not item.cantidad or item.cantidad <= 0:
+            raise HTTPException(status_code=422, detail=f"Item #{i + 1}: cantidad debe ser mayor a 0")
+        if not item.precio_unitario or item.precio_unitario <= 0:
+            raise HTTPException(status_code=422, detail=f"Item #{i + 1}: precio unitario debe ser mayor a 0")
+
     proveedor = db.execute(
         select(ProveedorModel).where(ProveedorModel.id == payload.proveedor_id),
     ).scalar_one_or_none()

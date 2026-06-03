@@ -167,6 +167,12 @@ const Facturas = () => {
   };
 
   const handleItemChange = (index, key, value) => {
+    // Strip leading zeros from numeric inputs
+    if (key === 'cantidad' || key === 'precio_unitario') {
+      if (typeof value === 'string' && value.length > 1 && value.startsWith('0') && !value.startsWith('0.')) {
+        value = String(Number(value));
+      }
+    }
     setItems((current) => current.map((item, row) => (
       row === index
         ? { ...item, [key]: value }
