@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FileText, Plus, Printer, Trash2, X, ImageUp, Link as LinkIcon } from 'lucide-react';
+import { FileText, Plus, Printer, Search, Trash2, X, ImageUp, Link as LinkIcon } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { apiGet, apiPost } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage'
@@ -13,6 +13,7 @@ const EMPTY_ITEM = {
   cantidad: 1,
   aplica_iva: false,
   precio_unitario: '',
+  search: '',
 };
 
 const PORCENTAJE_DEFAULT = 0.70;
@@ -93,7 +94,9 @@ const Facturas = () => {
           if (draft.proveedorId) setProveedorId(draft.proveedorId);
           if (draft.encomienda !== undefined) setEncomienda(draft.encomienda);
           if (draft.porcentajeGanancia) setPorcentajeGanancia(draft.porcentajeGanancia);
-          if (Array.isArray(draft.items) && draft.items.length > 0) setItems(draft.items);
+          if (Array.isArray(draft.items) && draft.items.length > 0) {
+            setItems(draft.items.map((item) => ({ ...EMPTY_ITEM, ...item, search: '' })));
+          }
         }
       } catch (err) {
         if (controller.signal.aborted) return;
@@ -109,7 +112,9 @@ const Facturas = () => {
 
   // Auto-save draft to localStorage
   useEffect(() => {
-    saveDraft({ proveedorId, encomienda, porcentajeGanancia, items });
+    const cleanItems = items.map(({ search, _focus, ...rest }) => rest);
+    saveDraft({ proveedorId, encomienda, porcentajeGanancia, items: cleanItems });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proveedorId, encomienda, porcentajeGanancia, items]);
 
   const productosById = useMemo(
@@ -338,15 +343,44 @@ const Facturas = () => {
                   <div className="grid grid-cols-2 gap-2 md:grid-cols-[1.5fr_90px_80px_130px]">
                     <div className="col-span-2 md:col-span-1">
                       <label className="mb-1 block text-xs font-semibold text-gray-500 uppercase tracking-wide">Producto</label>
+                      <div className="relative mb-1">
+                        <input
+                          type="text"
+                          value={item.search}
+                          onChange={(event) => handleItemChange(index, 'search', event.target.value)}
+                          className="w-full rounded-lg border border-gray-300 pl-8 pr-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+                          placeholder="Buscar por nombre o código..."
+                        />
+                        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                        {item.search && (
+                          <button
+                            type="button"
+                            onClick={() => handleItemChange(index, 'search', '')}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
                       <select
                         value={item.producto_id}
-                        onChange={(event) => handleSelectProducto(index, event.target.value)}
+                        onChange={(event) => {
+                          handleSelectProducto(index, event.target.value);
+                          handleItemChange(index, 'search', '');
+                        }}
                         className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
                       >
                         <option value="">Seleccionar</option>
-                        {productos.map((producto) => (
-                          <option key={producto.id} value={producto.id}>{producto.nombre}</option>
-                        ))}
+                        {productos
+                          .filter((p) => {
+                            if (!item.search) return true;
+                            const q = item.search.toLowerCase();
+                            return p.nombre.toLowerCase().includes(q) || (p.codigo_barras && p.codigo_barras.toLowerCase().includes(q));
+                          })
+                          .sort((a, b) => a.nombre.localeCompare(b.nombre))
+                          .map((producto) => (
+                            <option key={producto.id} value={producto.id}>{producto.nombre}</option>
+                          ))}
                       </select>
                     </div>
 
