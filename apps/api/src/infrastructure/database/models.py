@@ -210,6 +210,7 @@ class FacturaCompraModel(Base):
     subtotal: Mapped[float] = mapped_column(Float, nullable=False)
     total_iva: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     total_factura: Mapped[float] = mapped_column(Float, nullable=False)
+    numero_factura: Mapped[str | None] = mapped_column(String(20), nullable=True)
     encomienda: Mapped[float | None] = mapped_column(Float, nullable=True, default=0.0)
     porcentaje_ganancia: Mapped[float | None] = mapped_column(Float, nullable=True, default=0.70)
     proveedor: Mapped["ProveedorModel"] = relationship(

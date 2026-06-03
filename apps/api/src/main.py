@@ -94,6 +94,16 @@ def on_startup():
                         text(f"ALTER TABLE {table_name} ADD COLUMN {col.name} {col_type}")
                     )
         conn.commit()
+
+        # Fix numero_factura column — exists in DB as NOT NULL but unused
+        factura_cols = inspector.get_columns("facturas_compra")
+        for c in factura_cols:
+            if c["name"] == "numero_factura" and not c["nullable"]:
+                conn.execute(
+                    text("ALTER TABLE facturas_compra ALTER COLUMN numero_factura DROP NOT NULL")
+                )
+                conn.commit()
+                break
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
