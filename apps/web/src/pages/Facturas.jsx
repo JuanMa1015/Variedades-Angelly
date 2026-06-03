@@ -112,7 +112,7 @@ const Facturas = () => {
 
   // Auto-save draft to localStorage
   useEffect(() => {
-    const cleanItems = items.map(({ search, _focus, ...rest }) => rest);
+    const cleanItems = items.map(({ search, _focus, _focused, ...rest }) => rest);
     saveDraft({ proveedorId, encomienda, porcentajeGanancia, items: cleanItems });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proveedorId, encomienda, porcentajeGanancia, items]);
@@ -343,45 +343,69 @@ const Facturas = () => {
                   <div className="grid grid-cols-2 gap-2 md:grid-cols-[1.5fr_90px_80px_130px]">
                     <div className="col-span-2 md:col-span-1">
                       <label className="mb-1 block text-xs font-semibold text-gray-500 uppercase tracking-wide">Producto</label>
-                      <div className="relative mb-1">
-                        <input
-                          type="text"
-                          value={item.search}
-                          onChange={(event) => handleItemChange(index, 'search', event.target.value)}
-                          className="w-full rounded-lg border border-gray-300 pl-8 pr-3 py-2 text-sm focus:border-rosewood focus:outline-none"
-                          placeholder="Buscar por nombre o código..."
-                        />
-                        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                        {item.search && (
-                          <button
-                            type="button"
-                            onClick={() => handleItemChange(index, 'search', '')}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
+                      <div className="relative">
+                        {item.producto_id ? (
+                          <div className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm bg-gray-50">
+                            <span className="flex-1 font-medium text-gray-900">
+                              {productosById.get(Number(item.producto_id))?.nombre || 'Producto'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleItemChange(index, 'producto_id', '')}
+                              className="text-gray-400 hover:text-gray-600"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="relative">
+                            <input
+                              type="text"
+                              value={item.search}
+                              onChange={(event) => handleItemChange(index, 'search', event.target.value)}
+                              onFocus={() => handleItemChange(index, '_focused', true)}
+                              onBlur={() => setTimeout(() => handleItemChange(index, '_focused', false), 200)}
+                              className="w-full rounded-lg border border-gray-300 pl-8 pr-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+                              placeholder="Buscar producto..."
+                              autoComplete="off"
+                            />
+                            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                          </div>
+                        )}
+
+                        {!item.producto_id && item._focused && (
+                          <div className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                            {(() => {
+                              const q = (item.search || '').toLowerCase();
+                              const filtered = productos.filter((p) =>
+                                !q || p.nombre.toLowerCase().includes(q) || (p.codigo_barras && p.codigo_barras.toLowerCase().includes(q))
+                              ).sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+                              if (filtered.length === 0) {
+                                return <div className="px-3 py-2 text-sm text-gray-500">Sin resultados</div>;
+                              }
+                              return filtered.map((producto) => (
+                                <button
+                                  key={producto.id}
+                                  type="button"
+                                  onMouseDown={(e) => e.preventDefault()}
+                                  onClick={() => {
+                                    handleSelectProducto(index, String(producto.id));
+                                    handleItemChange(index, 'search', '');
+                                    handleItemChange(index, '_focused', false);
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-sm transition hover:bg-rosewood/10 focus:bg-rosewood/10 focus:outline-none"
+                                >
+                                  <span className="font-medium text-gray-900">{producto.nombre}</span>
+                                  {producto.codigo_barras && (
+                                    <span className="ml-2 text-xs text-gray-400">{producto.codigo_barras}</span>
+                                  )}
+                                </button>
+                              ));
+                            })()}
+                          </div>
                         )}
                       </div>
-                      <select
-                        value={item.producto_id}
-                        onChange={(event) => {
-                          handleSelectProducto(index, event.target.value);
-                          handleItemChange(index, 'search', '');
-                        }}
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
-                      >
-                        <option value="">Seleccionar</option>
-                        {productos
-                          .filter((p) => {
-                            if (!item.search) return true;
-                            const q = item.search.toLowerCase();
-                            return p.nombre.toLowerCase().includes(q) || (p.codigo_barras && p.codigo_barras.toLowerCase().includes(q));
-                          })
-                          .sort((a, b) => a.nombre.localeCompare(b.nombre))
-                          .map((producto) => (
-                            <option key={producto.id} value={producto.id}>{producto.nombre}</option>
-                          ))}
-                      </select>
                     </div>
 
                     <div>
