@@ -251,7 +251,7 @@ def create_factura_compra(
         creado_por=current_user.username,
         subtotal=subtotal,
         total_iva=total_iva,
-        total_factura=subtotal + total_iva,
+        total_factura=subtotal + total_iva - (payload.encomienda or 0),
         encomienda=payload.encomienda or None,
         porcentaje_ganancia=payload.porcentaje_ganancia,
     )

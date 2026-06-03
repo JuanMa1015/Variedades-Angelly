@@ -194,6 +194,7 @@ async def pydantic_validation_handler(request, exc):
 
 @app.exception_handler(IntegrityError)
 async def integrity_error_handler(request, exc):
+    logger.error("IntegrityError: %s", str(exc.orig)[:300])
     detail = _extract_integrity_detail(str(exc.orig))
     return _cors_response(
         status.HTTP_409_CONFLICT,
