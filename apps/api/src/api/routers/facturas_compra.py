@@ -227,8 +227,9 @@ def create_factura_compra(
         base = item.cantidad * item.precio_unitario
         iva = base * IVA_RATE if item.aplica_iva else 0.0
         total_linea = base + iva
-        precio_venta_sugerido = item.precio_unitario / payload.porcentaje_ganancia
-        ganancia_estimada = precio_venta_sugerido - item.precio_unitario
+        precio_con_iva = item.precio_unitario * (1 + IVA_RATE) if item.aplica_iva else item.precio_unitario
+        precio_venta_sugerido = precio_con_iva / payload.porcentaje_ganancia
+        ganancia_estimada = precio_venta_sugerido - precio_con_iva
 
         subtotal += base
         total_iva += iva

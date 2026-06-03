@@ -100,8 +100,9 @@ const Facturas = () => {
       const base = cantidad * precio;
       subtotal += base;
       if (item.aplica_iva) totalIva += base * 0.19;
-      const pvs = precio / pct;
-      totalGanancia += (pvs - precio) * cantidad;
+      const precioConIva = precio * (item.aplica_iva ? 1.19 : 1);
+      const pvs = precioConIva / pct;
+      totalGanancia += (pvs - precioConIva) * cantidad;
     }
 
     const enf = Number(encomienda) || 0;
@@ -289,18 +290,32 @@ const Facturas = () => {
           </div>
 
           <div className="space-y-2">
+            {/* column headers */}
+            <div className="hidden md:grid md:grid-cols-[1.5fr_100px_auto_120px_120px_120px_120px_120px_44px] gap-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              <span>Producto</span>
+              <span>Cantidad</span>
+              <span>IVA</span>
+              <span>P. unit (sin IVA)</span>
+              <span>P. con IVA</span>
+              <span>Total</span>
+              <span>P. Venta sugerido</span>
+              <span>Ganancia</span>
+              <span />
+            </div>
+
             {items.map((item, index) => {
               const cantidad = Number(item.cantidad || 0);
               const precio = Number(item.precio_unitario || 0);
               const base = cantidad * precio;
               const iva = item.aplica_iva ? base * 0.19 : 0;
               const total = base + iva;
-              const pvs = precio / pct;
-              const ganancia = pvs - precio;
+              const precioConIva = precio * (item.aplica_iva ? 1.19 : 1);
+              const pvs = precioConIva / pct;
+              const ganancia = pvs - precioConIva;
 
               return (
                 <div key={`factura-item-${index}`} className="rounded-xl border border-gray-200 p-3">
-                  <div className="grid grid-cols-1 gap-2 md:grid-cols-[1.5fr_100px_auto_120px_120px_120px_120px_44px] items-end">
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-[1.5fr_100px_auto_120px_120px_120px_120px_120px_44px] items-end">
                     <select
                       value={item.producto_id}
                       onChange={(event) => handleSelectProducto(index, event.target.value)}
@@ -338,6 +353,10 @@ const Facturas = () => {
                       className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
                       placeholder="P. unit."
                     />
+
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800">
+                      {precio > 0 ? formatMoney(precioConIva) : '-'}
+                    </div>
 
                     <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800">
                       {formatMoney(total)}
@@ -558,9 +577,11 @@ const Facturas = () => {
                 {Array.isArray(selectedPrintFactura.items) && selectedPrintFactura.items.map((item, idx) => {
                   const cantidad = Number(item.cantidad || 0);
                   const precio = Number(item.precio_unitario || 0);
+                  const aplicaIva = Boolean(item.aplica_iva);
                   const total = cantidad * precio;
-                  const pvs = item.precio_venta_sugerido || (precio / (selectedPrintFactura.porcentaje_ganancia || 0.70));
-                  const ganancia = item.ganancia_estimada || (pvs - precio);
+                  const precioConIva = precio * (aplicaIva ? 1.19 : 1);
+                  const pvs = item.precio_venta_sugerido || (precioConIva / (selectedPrintFactura.porcentaje_ganancia || 0.70));
+                  const ganancia = item.ganancia_estimada || (pvs - precioConIva);
                   return (
                     <tr key={idx} className="border-b border-gray-100">
                       <td className="py-1 pr-2 print:py-1.5">{item.nombre_producto || `Producto #${item.producto_id}`}</td>
