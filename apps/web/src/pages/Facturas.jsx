@@ -112,10 +112,13 @@ const Facturas = () => {
     return () => controller.abort();
   }, [token]);
 
-  // Auto-save draft to localStorage
+  // Auto-save draft to localStorage (and on unmount)
   useEffect(() => {
     const cleanItems = items.map(({ search, _focus, _focused, ...rest }) => rest);
     saveDraft({ proveedorId, numeroFactura, encomienda, porcentajeGanancia, items: cleanItems });
+    return () => {
+      saveDraft({ proveedorId, numeroFactura, encomienda, porcentajeGanancia, items: cleanItems });
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proveedorId, encomienda, porcentajeGanancia, items]);
 
