@@ -38,6 +38,7 @@ class FacturaCompraCreateRequest(BaseModel):
     items: Annotated[list[FacturaDetalleCreateRequest], Field(min_length=1)]
     encomienda: Annotated[float, Field(ge=0)] = 0.0
     porcentaje_ganancia: Annotated[float, Field(gt=0, le=1)] = 0.70
+    numero_factura: Annotated[str | None, Field(max_length=20)] = None
 
 
 class FacturaDetalleResponse(BaseModel):
@@ -59,6 +60,7 @@ class FacturaCompraResponse(BaseModel):
     subtotal: float
     total_iva: float
     total_factura: float
+    numero_factura: str | None = None
     encomienda: float | None = 0.0
     porcentaje_ganancia: float | None = None
     fecha_creacion: datetime
@@ -87,6 +89,7 @@ def _to_factura_response(
         subtotal=factura.subtotal,
         total_iva=factura.total_iva,
         total_factura=factura.total_factura,
+        numero_factura=factura.numero_factura,
         encomienda=factura.encomienda,
         porcentaje_ganancia=factura.porcentaje_ganancia,
         fecha_creacion=factura.fecha_creacion,
@@ -252,6 +255,7 @@ def create_factura_compra(
         subtotal=subtotal,
         total_iva=total_iva,
         total_factura=subtotal + total_iva - (payload.encomienda or 0),
+        numero_factura=payload.numero_factura.strip() if payload.numero_factura else None,
         encomienda=payload.encomienda or None,
         porcentaje_ganancia=payload.porcentaje_ganancia,
     )

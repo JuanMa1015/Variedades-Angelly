@@ -815,13 +815,14 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
       ], onEdit: handleEditPedidoProveedor, onDelete: handleDeletePedidoProveedor, minWidth: '900px' },
     { key: 'facturas_compra', title: 'Facturas compra', desc: 'Ingresos de factura con detalle.', data: facturasCompra, createDialog: 'facturas_compra',
       columns: [
-        { key: 'id', label: 'ID', mono: true }, { key: 'proveedor_nombre', label: 'Proveedor' },
+        { key: 'id', label: 'ID', mono: true }, { key: 'numero_factura', label: 'No. Factura' },
+        { key: 'proveedor_nombre', label: 'Proveedor' },
         { key: 'subtotal', label: 'Subtotal', align: 'right', render: (i) => formatMoney(i.subtotal) },
         { key: 'total_iva', label: 'IVA', align: 'right', render: (i) => formatMoney(i.total_iva) },
         { key: 'total_factura', label: 'Total', align: 'right', render: (i) => formatMoney(i.total_factura) },
         { key: 'items', label: 'Items', render: (i) => i.items?.length || 0 },
         { key: 'fecha_creacion', label: 'Fecha', render: (i) => formatDateTime(i.fecha_creacion) },
-      ], onEdit: handleEditFacturaCompra, onDelete: handleDeleteFacturaCompra, minWidth: '1000px' },
+      ], onEdit: handleEditFacturaCompra, onDelete: handleDeleteFacturaCompra, minWidth: '1100px' },
     { key: 'gastos', title: 'Gastos', desc: 'Gastos operativos.', data: gastos, createDialog: 'gastos',
       columns: [
         { key: 'id', label: 'ID', mono: true }, { key: 'categoria', label: 'Categoria' }, { key: 'descripcion', label: 'Descripcion' },

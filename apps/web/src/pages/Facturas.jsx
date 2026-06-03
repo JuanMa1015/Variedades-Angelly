@@ -43,6 +43,7 @@ const Facturas = () => {
   const [facturas, setFacturas] = useState([]);
 
   const [proveedorId, setProveedorId] = useState('');
+  const [numeroFactura, setNumeroFactura] = useState('');
   const [encomienda, setEncomienda] = useState('');
   const [porcentajeGanancia, setPorcentajeGanancia] = useState(String(PORCENTAJE_DEFAULT));
   const [items, setItems] = useState([{ ...EMPTY_ITEM }]);
@@ -92,6 +93,7 @@ const Facturas = () => {
         const draft = loadDraft();
         if (draft) {
           if (draft.proveedorId) setProveedorId(draft.proveedorId);
+          if (draft.numeroFactura !== undefined) setNumeroFactura(draft.numeroFactura);
           if (draft.encomienda !== undefined) setEncomienda(draft.encomienda);
           if (draft.porcentajeGanancia) setPorcentajeGanancia(draft.porcentajeGanancia);
           if (Array.isArray(draft.items) && draft.items.length > 0) {
@@ -113,7 +115,7 @@ const Facturas = () => {
   // Auto-save draft to localStorage
   useEffect(() => {
     const cleanItems = items.map(({ search, _focus, _focused, ...rest }) => rest);
-    saveDraft({ proveedorId, encomienda, porcentajeGanancia, items: cleanItems });
+    saveDraft({ proveedorId, numeroFactura, encomienda, porcentajeGanancia, items: cleanItems });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proveedorId, encomienda, porcentajeGanancia, items]);
 
@@ -209,11 +211,13 @@ const Facturas = () => {
         items: itemsPayload,
         encomienda: Number(encomienda) || 0,
         porcentaje_ganancia: Number(porcentajeGanancia) || PORCENTAJE_DEFAULT,
+        numero_factura: numeroFactura.trim() || null,
       });
 
       setFacturas((current) => [payload, ...current]);
       setItems([{ ...EMPTY_ITEM }]);
       setEncomienda('');
+      setNumeroFactura('');
       clearDraft();
       setSuccess(`Factura #${payload.id} registrada correctamente`);
     } catch (err) {
@@ -287,7 +291,7 @@ const Facturas = () => {
         <h2 className="mb-4 text-xl font-bold text-gray-900">Añadir factura</h2>
 
         <form className="space-y-4" onSubmit={handleCreateFactura}>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
             <select
               value={proveedorId}
               onChange={(event) => setProveedorId(event.target.value)}
@@ -298,6 +302,17 @@ const Facturas = () => {
                 <option key={proveedor.id} value={proveedor.id}>{proveedor.nombre}</option>
               ))}
             </select>
+
+            <div className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm focus-within:border-rosewood">
+              <span className="text-gray-500">No. Factura:</span>
+              <input
+                type="text"
+                value={numeroFactura}
+                onChange={(e) => setNumeroFactura(e.target.value)}
+                className="w-full border-0 p-0 text-sm focus:outline-none"
+                placeholder="FEV-36965"
+              />
+            </div>
 
             <div className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm focus-within:border-rosewood">
               <span className="text-gray-500">% Ganancia:</span>
@@ -549,20 +564,22 @@ const Facturas = () => {
                 <thead className="border-b border-gray-200 bg-gray-50">
                   <tr>
                     <th className="px-3 py-3 font-semibold text-gray-700">Factura</th>
+                    <th className="px-3 py-3 font-semibold text-gray-700">No. Factura</th>
                     <th className="px-3 py-3 font-semibold text-gray-700">Proveedor</th>
                     <th className="px-3 py-3 font-semibold text-gray-700">Subtotal</th>
                     <th className="px-3 py-3 font-semibold text-gray-700">IVA</th>
                     <th className="px-3 py-3 font-semibold text-gray-700">Encomienda</th>
                     <th className="px-3 py-3 font-semibold text-gray-700">Total</th>
                     <th className="px-3 py-3 font-semibold text-gray-700">%Ganancia</th>
-                    <th className="px-3 py-3 font-semibold text-gray-700">Ítems</th>
-                    <th className="px-3 py-3 font-semibold text-gray-700">Acción</th>
+                    <th className="px-3 py-3 font-semibold text-gray-700">Items</th>
+                    <th className="px-3 py-3 font-semibold text-gray-700">Accion</th>
                   </tr>
                 </thead>
                 <tbody>
                   {facturas.map((factura) => (
                     <tr key={factura.id} className="border-b border-gray-100">
                       <td className="px-3 py-3 font-semibold text-gray-900">#{factura.id}</td>
+                      <td className="px-3 py-3 text-gray-700">{factura.numero_factura || '-'}</td>
                       <td className="px-3 py-3 text-gray-700">{factura.proveedor_nombre}</td>
                       <td className="px-3 py-3 text-gray-700">{formatMoney(factura.subtotal)}</td>
                       <td className="px-3 py-3 text-gray-700">{formatMoney(factura.total_iva)}</td>
@@ -592,6 +609,12 @@ const Facturas = () => {
                   <div className="mb-2 flex items-start justify-between gap-2">
                     <span className="font-semibold text-gray-900">#{factura.id} - {factura.proveedor_nombre}</span>
                   </div>
+                  {factura.numero_factura && (
+                    <div className="mb-1 flex items-center justify-between text-sm">
+                      <span className="text-gray-500">No. Factura:</span>
+                      <span className="font-semibold text-gray-900">{factura.numero_factura}</span>
+                    </div>
+                  )}
                   <div className="mb-1 flex items-center justify-between text-sm">
                     <span className="text-gray-500">Subtotal:</span>
                     <span className="text-gray-900">{formatMoney(factura.subtotal)}</span>
@@ -648,6 +671,9 @@ const Facturas = () => {
             <div className="mb-4">
               <h3 className="text-center text-sm font-bold uppercase tracking-wide text-gray-900 print:text-lg">Factura de Compra</h3>
               <p className="text-center text-xs text-gray-600 print:text-sm">No. {selectedPrintFactura.id}</p>
+              {selectedPrintFactura.numero_factura && (
+                <p className="text-center text-xs text-gray-600 print:text-sm">Ref: {selectedPrintFactura.numero_factura}</p>
+              )}
             </div>
 
             <div className="my-3 border-t border-dashed border-gray-400 print:my-4 print:border-gray-300" />
