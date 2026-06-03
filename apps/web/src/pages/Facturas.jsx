@@ -280,7 +280,7 @@ const Facturas = () => {
         @media print {
           body * { visibility: hidden !important; }
           #print-ticket, #print-ticket * { visibility: visible !important; }
-          #print-ticket { position: fixed !important; left: 0 !important; top: 0 !important; width: 210mm !important; height: 297mm !important; background: white !important; z-index: 99999 !important; display: block !important; padding: 20mm 15mm !important; }
+          #print-ticket { position: fixed !important; left: 0 !important; top: 0 !important; width: 100% !important; height: 100% !important; background: white !important; z-index: 99999 !important; display: block !important; padding: 15mm 10mm !important; overflow: visible !important; }
           #print-ticket > div { width: 100% !important; max-width: 100% !important; border: none !important; box-shadow: none !important; padding: 0 !important; }
           .no-print { display: none !important; }
         }
@@ -667,7 +667,7 @@ const Facturas = () => {
 
       {selectedPrintFactura && (
         <div id="print-ticket" className="fixed inset-0 z-50 flex items-start justify-center bg-white/95 print:static print:inset-auto print:z-auto print:items-start">
-          <div className="w-[80mm] rounded-xl border border-gray-300 bg-white p-6 shadow-2xl print:w-full print:max-w-none print:border-0 print:shadow-none print:p-0">
+          <div className="w-full max-w-lg rounded-xl border border-gray-300 bg-white p-6 shadow-2xl print:w-full print:max-w-none print:border-0 print:shadow-none print:p-0">
             <div className="text-center print:mb-8">
               <h2 className="text-lg font-bold uppercase tracking-wide text-gray-900 print:text-2xl">Variedades Angelly</h2>
               <p className="text-xs text-gray-600 print:text-sm">NIT: 123.456.789-0</p>
@@ -696,17 +696,18 @@ const Facturas = () => {
 
             <div className="my-3 border-t border-dashed border-gray-400 print:my-4 print:border-gray-300" />
 
-            <table className="w-full text-xs text-gray-700 print:text-sm">
-              <thead>
-                <tr className="border-b border-gray-300 font-semibold text-gray-900">
-                  <th className="py-1 text-left print:py-2">Producto</th>
-                  <th className="py-1 text-right print:py-2">Cant</th>
-                  <th className="py-1 text-right print:py-2">P. unit.</th>
-                  <th className="py-1 text-right print:py-2">Total</th>
-                  <th className="py-1 text-right print:py-2">P.Venta</th>
-                  <th className="py-1 text-right print:py-2">Ganancia</th>
-                </tr>
-              </thead>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-gray-700 print:text-sm">
+                <thead>
+                  <tr className="border-b border-gray-300 font-semibold text-gray-900">
+                    <th className="whitespace-nowrap py-1 pr-2 text-left print:py-2">Producto</th>
+                    <th className="whitespace-nowrap py-1 pl-2 text-right print:py-2">Cant</th>
+                    <th className="whitespace-nowrap py-1 pl-2 text-right print:py-2">P.Unit</th>
+                    <th className="whitespace-nowrap py-1 pl-2 text-right print:py-2">Total</th>
+                    <th className="whitespace-nowrap py-1 pl-2 text-right print:py-2">P.Venta</th>
+                    <th className="whitespace-nowrap py-1 pl-2 text-right print:py-2">Ganancia</th>
+                  </tr>
+                </thead>
               <tbody>
                 {Array.isArray(selectedPrintFactura.items) && selectedPrintFactura.items.map((item, idx) => {
                   const cantidad = Number(item.cantidad || 0);
@@ -718,17 +719,18 @@ const Facturas = () => {
                   const ganancia = item.ganancia_estimada || (pvs - precioConIva);
                   return (
                     <tr key={idx} className="border-b border-gray-100">
-                      <td className="py-1 pr-2 print:py-1.5">{item.nombre_producto || `Producto #${item.producto_id}`}</td>
-                      <td className="py-1 text-right print:py-1.5">{cantidad}</td>
-                      <td className="py-1 text-right print:py-1.5">{formatMoney(precio)}</td>
-                      <td className="py-1 text-right print:py-1.5">{formatMoney(total)}</td>
-                      <td className="py-1 text-right print:py-1.5">{formatMoney(pvs)}</td>
-                      <td className="py-1 text-right print:py-1.5">{formatMoney(ganancia)}</td>
+                      <td className="whitespace-nowrap py-1 pr-2 print:py-1.5">{item.nombre_producto || `Producto #${item.producto_id}`}</td>
+                      <td className="whitespace-nowrap py-1 pl-2 text-right print:py-1.5">{cantidad}</td>
+                      <td className="whitespace-nowrap py-1 pl-2 text-right print:py-1.5">{formatMoney(precio)}</td>
+                      <td className="whitespace-nowrap py-1 pl-2 text-right print:py-1.5">{formatMoney(total)}</td>
+                      <td className="whitespace-nowrap py-1 pl-2 text-right print:py-1.5">{formatMoney(pvs)}</td>
+                      <td className="whitespace-nowrap py-1 pl-2 text-right print:py-1.5">{formatMoney(ganancia)}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
+            </div>
 
             <div className="my-3 border-t border-dashed border-gray-400 print:my-4 print:border-gray-300" />
 
