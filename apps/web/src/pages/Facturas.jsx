@@ -278,10 +278,12 @@ const Facturas = () => {
     <div className="space-y-6">
       <style>{`
         @media print {
-          body * { visibility: hidden !important; }
-          #print-ticket, #print-ticket * { visibility: visible !important; }
-          #print-ticket { position: fixed !important; left: 0 !important; top: 0 !important; width: 100% !important; height: 100% !important; background: white !important; z-index: 99999 !important; display: block !important; padding: 15mm 10mm !important; overflow: visible !important; }
-          #print-ticket > div { width: 100% !important; max-width: 100% !important; border: none !important; box-shadow: none !important; padding: 0 !important; }
+          @page { size: auto; margin: 5mm; }
+          html, body { height: auto !important; overflow: visible !important; }
+          body > * { display: none !important; }
+          #print-ticket { display: block !important; position: static !important; width: 100% !important; max-width: 100% !important; padding: 5mm 8mm !important; background: white !important; box-shadow: none !important; border: none !important; border-radius: 0 !important; }
+          #print-ticket > div { width: 100% !important; max-width: 100% !important; padding: 0 !important; border: none !important; box-shadow: none !important; }
+          #print-ticket * { display: revert !important; }
           .no-print { display: none !important; }
         }
       `}</style>
@@ -666,46 +668,46 @@ const Facturas = () => {
       </section>
 
       {selectedPrintFactura && (
-        <div id="print-ticket" className="fixed inset-0 z-50 flex items-start justify-center bg-white/95 print:static print:inset-auto print:z-auto print:items-start">
-          <div className="w-full max-w-lg rounded-xl border border-gray-300 bg-white p-6 shadow-2xl print:w-full print:max-w-none print:border-0 print:shadow-none print:p-0">
-            <div className="text-center print:mb-8">
-              <h2 className="text-lg font-bold uppercase tracking-wide text-gray-900 print:text-2xl">Variedades Angelly</h2>
-              <p className="text-xs text-gray-600 print:text-sm">NIT: 123.456.789-0</p>
-              <p className="text-xs text-gray-600 print:text-sm">Carrera XX #YY-ZZ, Ciudad</p>
-              <p className="text-xs text-gray-600 print:text-sm">Tel: (123) 456-7890</p>
+        <div id="print-ticket" className="fixed inset-0 z-50 flex items-start justify-center bg-white/95 no-print">
+          <div className="w-full max-w-lg rounded-xl border border-gray-300 bg-white p-6 shadow-2xl">
+            <div className="text-center">
+              <h2 className="text-lg font-bold uppercase tracking-wide text-gray-900">Variedades Angelly</h2>
+              <p className="text-xs text-gray-600">NIT: 123.456.789-0</p>
+              <p className="text-xs text-gray-600">Carrera XX #YY-ZZ, Ciudad</p>
+              <p className="text-xs text-gray-600">Tel: (123) 456-7890</p>
             </div>
 
-            <div className="my-3 border-t border-dashed border-gray-400 print:my-6 print:border-gray-300" />
+            <div className="my-3 border-t border-dashed border-gray-400" />
 
             <div className="mb-4">
-              <h3 className="text-center text-sm font-bold uppercase tracking-wide text-gray-900 print:text-lg">Factura de Compra</h3>
-              <p className="text-center text-xs text-gray-600 print:text-sm">No. {selectedPrintFactura.id}</p>
+              <h3 className="text-center text-sm font-bold uppercase tracking-wide text-gray-900">Factura de Compra</h3>
+              <p className="text-center text-xs text-gray-600">No. {selectedPrintFactura.id}</p>
               {selectedPrintFactura.numero_factura && (
-                <p className="text-center text-xs text-gray-600 print:text-sm">Ref: {selectedPrintFactura.numero_factura}</p>
+                <p className="text-center text-xs text-gray-600">Ref: {selectedPrintFactura.numero_factura}</p>
               )}
             </div>
 
-            <div className="my-3 border-t border-dashed border-gray-400 print:my-4 print:border-gray-300" />
+            <div className="my-3 border-t border-dashed border-gray-400" />
 
-            <div className="mb-4 space-y-1 text-xs text-gray-700 print:grid print:grid-cols-2 print:gap-2 print:text-sm">
+            <div className="mb-4 space-y-1 text-xs text-gray-700">
               <p><span className="font-semibold">Proveedor:</span> {selectedPrintFactura.proveedor_nombre}</p>
               <p><span className="font-semibold">Fecha:</span> {new Date(selectedPrintFactura.fecha_creacion).toLocaleDateString()}</p>
               {selectedPrintFactura.encomienda ? <p><span className="font-semibold">Encomienda:</span> {formatMoney(selectedPrintFactura.encomienda)}</p> : null}
               {selectedPrintFactura.porcentaje_ganancia ? <p><span className="font-semibold">% Ganancia:</span> {(selectedPrintFactura.porcentaje_ganancia * 100).toFixed(0)}%</p> : null}
             </div>
 
-            <div className="my-3 border-t border-dashed border-gray-400 print:my-4 print:border-gray-300" />
+            <div className="my-3 border-t border-dashed border-gray-400" />
 
             <div className="overflow-x-auto">
-              <table className="w-full text-xs text-gray-700 print:text-sm">
+              <table className="w-full text-xs text-gray-700">
                 <thead>
                   <tr className="border-b border-gray-300 font-semibold text-gray-900">
-                    <th className="whitespace-nowrap py-1 pr-2 text-left print:py-2">Producto</th>
-                    <th className="whitespace-nowrap py-1 pl-2 text-right print:py-2">Cant</th>
-                    <th className="whitespace-nowrap py-1 pl-2 text-right print:py-2">P.Unit</th>
-                    <th className="whitespace-nowrap py-1 pl-2 text-right print:py-2">Total</th>
-                    <th className="whitespace-nowrap py-1 pl-2 text-right print:py-2">P.Venta</th>
-                    <th className="whitespace-nowrap py-1 pl-2 text-right print:py-2">Ganancia</th>
+                    <th className="whitespace-nowrap py-1 pr-2 text-left">Producto</th>
+                    <th className="whitespace-nowrap py-1 pl-2 text-right">Cant</th>
+                    <th className="whitespace-nowrap py-1 pl-2 text-right">P.Unit</th>
+                    <th className="whitespace-nowrap py-1 pl-2 text-right">Total</th>
+                    <th className="whitespace-nowrap py-1 pl-2 text-right">P.Venta</th>
+                    <th className="whitespace-nowrap py-1 pl-2 text-right">Ganancia</th>
                   </tr>
                 </thead>
               <tbody>
@@ -719,12 +721,12 @@ const Facturas = () => {
                   const ganancia = item.ganancia_estimada || (pvs - precioConIva);
                   return (
                     <tr key={idx} className="border-b border-gray-100">
-                      <td className="whitespace-nowrap py-1 pr-2 print:py-1.5">{item.nombre_producto || `Producto #${item.producto_id}`}</td>
-                      <td className="whitespace-nowrap py-1 pl-2 text-right print:py-1.5">{cantidad}</td>
-                      <td className="whitespace-nowrap py-1 pl-2 text-right print:py-1.5">{formatMoney(precio)}</td>
-                      <td className="whitespace-nowrap py-1 pl-2 text-right print:py-1.5">{formatMoney(total)}</td>
-                      <td className="whitespace-nowrap py-1 pl-2 text-right print:py-1.5">{formatMoney(pvs)}</td>
-                      <td className="whitespace-nowrap py-1 pl-2 text-right print:py-1.5">{formatMoney(ganancia)}</td>
+                      <td className="whitespace-nowrap py-1 pr-2">{item.nombre_producto || `Producto #${item.producto_id}`}</td>
+                      <td className="whitespace-nowrap py-1 pl-2 text-right">{cantidad}</td>
+                      <td className="whitespace-nowrap py-1 pl-2 text-right">{formatMoney(precio)}</td>
+                      <td className="whitespace-nowrap py-1 pl-2 text-right">{formatMoney(total)}</td>
+                      <td className="whitespace-nowrap py-1 pl-2 text-right">{formatMoney(pvs)}</td>
+                      <td className="whitespace-nowrap py-1 pl-2 text-right">{formatMoney(ganancia)}</td>
                     </tr>
                   );
                 })}
@@ -732,9 +734,9 @@ const Facturas = () => {
             </table>
             </div>
 
-            <div className="my-3 border-t border-dashed border-gray-400 print:my-4 print:border-gray-300" />
+            <div className="my-3 border-t border-dashed border-gray-400" />
 
-            <div className="space-y-1 text-xs text-gray-700 print:ml-auto print:w-72 print:text-sm">
+            <div className="space-y-1 text-xs text-gray-700">
               <div className="flex justify-between">
                 <span>Subtotal:</span>
                 <span>{formatMoney(selectedPrintFactura.subtotal || 0)}</span>
@@ -751,21 +753,22 @@ const Facturas = () => {
               ) : null}
             </div>
 
-            <div className="my-3 border-t border-double border-gray-800 print:my-4" />
+            <div className="my-3 border-t border-double border-gray-800" />
 
-            <div className="flex justify-between text-sm font-bold text-gray-900 print:text-lg">
+            <div className="flex justify-between text-sm font-bold text-gray-900">
               <span>TOTAL:</span>
               <span>{formatMoney(selectedPrintFactura.total_factura || 0)}</span>
             </div>
 
             <div className="mt-8 border-t border-gray-300" />
 
-            <p className="mt-2 text-center text-xs text-gray-500 print:text-sm">¡Gracias por su preferencia!</p>
+            <p className="mt-2 text-center text-xs text-gray-500">¡Gracias por su preferencia!</p>
 
             <button
               type="button"
               onClick={() => setSelectedPrintFactura(null)}
-              className="mt-4 w-full rounded-lg bg-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-300 print:hidden"
+              className="mt-4 w-full rounded-lg bg-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-300 no-print"
+              aria-label="Cerrar ticket"
             >
               Cerrar
             </button>
