@@ -22,6 +22,7 @@ class ClienteFiadoTiendaResponse(BaseModel):
     id: int
     nombre: str
     telefono_whatsapp: str | None
+    deuda_total: float = 0.0
 
 
 class ClienteFiadoTiendaCreateRequest(BaseModel):
@@ -36,6 +37,7 @@ class ClienteFiadoTiendaUpdateRequest(BaseModel):
 
     nombre: Annotated[str | None, Field(min_length=3, max_length=120)] = None
     telefono_whatsapp: Annotated[str | None, Field(max_length=25)] = None
+    deuda_total: Annotated[float | None, Field(ge=0)] = None
 
 
 @router.get("/api/clientes/tienda-fiado", response_model=list[ClienteFiadoTiendaResponse])
@@ -59,6 +61,7 @@ def list_clientes_fiado_tienda(
             id=cliente.id,
             nombre=cliente.nombre,
             telefono_whatsapp=cliente.telefono_whatsapp,
+            deuda_total=cliente.deuda_total,
         )
         for cliente in clientes
     ]
@@ -90,6 +93,7 @@ def create_cliente_fiado_tienda(
         id=cliente.id,
         nombre=cliente.nombre,
         telefono_whatsapp=cliente.telefono_whatsapp,
+        deuda_total=cliente.deuda_total,
     )
 
 
@@ -124,6 +128,9 @@ def update_cliente_fiado_tienda(
     if payload.telefono_whatsapp is not None:
         cliente.telefono_whatsapp = payload.telefono_whatsapp.strip() or None
 
+    if payload.deuda_total is not None:
+        cliente.deuda_total = float(payload.deuda_total)
+
     db.commit()
     db.refresh(cliente)
 
@@ -131,6 +138,7 @@ def update_cliente_fiado_tienda(
         id=cliente.id,
         nombre=cliente.nombre,
         telefono_whatsapp=cliente.telefono_whatsapp,
+        deuda_total=cliente.deuda_total,
     )
 
 

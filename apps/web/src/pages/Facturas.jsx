@@ -271,20 +271,19 @@ const Facturas = () => {
     setSelectedPrintFactura(factura);
     setTimeout(() => {
       window.print();
-    }, 200);
+      setSelectedPrintFactura(null);
+    }, 100);
   };
 
   return (
     <div className="space-y-6">
       <style>{`
+        @media screen { .print-ticket { display: none; } }
         @media print {
           @page { size: auto; margin: 5mm; }
-          html { height: auto !important; }
-          body { height: 0 !important; overflow: hidden !important; }
           body * { visibility: hidden !important; height: 0 !important; overflow: hidden !important; }
-          #print-ticket, #print-ticket * { visibility: visible !important; height: auto !important; overflow: visible !important; }
-          #print-ticket { position: fixed !important; top: 0 !important; left: 0 !important; width: 100% !important; padding: 5mm 8mm !important; background: white !important; box-shadow: none !important; border: none !important; border-radius: 0 !important; }
-          #print-ticket > div { width: 100% !important; max-width: 100% !important; padding: 0 !important; border: none !important; box-shadow: none !important; }
+          .print-ticket, .print-ticket * { visibility: visible !important; height: auto !important; overflow: visible !important; }
+          .print-ticket { position: fixed !important; top: 0 !important; left: 0 !important; width: 100% !important; display: block !important; padding: 5mm 8mm !important; background: white !important; }
           .no-print { display: none !important; }
         }
       `}</style>
@@ -669,7 +668,7 @@ const Facturas = () => {
       </section>
 
       {selectedPrintFactura && (
-        <div id="print-ticket" className="fixed inset-0 z-50 flex items-start justify-center bg-white/95 no-print">
+        <div className="print-ticket">
           <div className="w-full max-w-lg rounded-xl border border-gray-300 bg-white p-6 shadow-2xl">
             <div className="text-center">
               <h2 className="text-lg font-bold uppercase tracking-wide text-gray-900">Variedades Angelly</h2>
@@ -764,15 +763,6 @@ const Facturas = () => {
             <div className="mt-8 border-t border-gray-300" />
 
             <p className="mt-2 text-center text-xs text-gray-500">¡Gracias por su preferencia!</p>
-
-            <button
-              type="button"
-              onClick={() => setSelectedPrintFactura(null)}
-              className="mt-4 w-full rounded-lg bg-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-300 no-print"
-              aria-label="Cerrar ticket"
-            >
-              Cerrar
-            </button>
           </div>
         </div>
       )}

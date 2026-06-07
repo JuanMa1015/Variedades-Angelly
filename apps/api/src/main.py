@@ -50,6 +50,7 @@ from src.api.routers.clientes_cartera_clientes import router as clientes_cartera
 from src.api.routers.clientes_cartera_cobros import router as clientes_cartera_cobros_router
 from src.api.routers.clientes_cartera_ventas import router as clientes_cartera_ventas_router
 from src.api.routers.clientes_tienda_fiado import router as clientes_tienda_fiado_router
+from src.api.routers.clientes_tienda_cobros import router as clientes_tienda_cobros_router
 from src.api.routers.dashboard import router as dashboard_router
 from src.api.routers.fidelizacion_clientes import router as fidelizacion_clientes_router
 from src.api.routers.proveedores import router as proveedores_router
@@ -104,6 +105,12 @@ def on_startup():
                 )
                 conn.commit()
                 break
+
+        # Set NULL deuda_total to 0 for existing tienda clients
+        conn.execute(
+            text("UPDATE clientes_fiado_tienda SET deuda_total = 0 WHERE deuda_total IS NULL")
+        )
+        conn.commit()
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
@@ -249,6 +256,8 @@ def _extract_integrity_detail(error_text: str) -> str:
         "ck_gasto_monto": "El monto del gasto debe ser mayor a cero.",
         "ck_abono_monto": "El monto del abono debe ser mayor a cero.",
         "ck_abono_saldo_cliente": "El saldo del cliente no puede ser negativo.",
+        "ck_abono_tienda_monto": "El monto del abono debe ser mayor a cero.",
+        "ck_abono_tienda_saldo_cliente": "El saldo del cliente no puede ser negativo.",
         "ck_caja_monto_inicial": "El monto de apertura no puede ser negativo.",
         "ck_caja_monto_ventas_efectivo": "El monto de ventas en efectivo no puede ser negativo.",
         "ck_caja_monto_ventas_transferencia": "El monto de ventas por transferencia no puede ser negativo.",
@@ -303,6 +312,7 @@ app.include_router(dashboard_router)
 app.include_router(superadmin_router)
 app.include_router(ventas_fidelizacion_router)
 app.include_router(clientes_tienda_fiado_router)
+app.include_router(clientes_tienda_cobros_router)
 app.include_router(fidelizacion_clientes_router)
 app.include_router(clientes_cartera_cobros_router)
 app.include_router(clientes_cartera_clientes_router)

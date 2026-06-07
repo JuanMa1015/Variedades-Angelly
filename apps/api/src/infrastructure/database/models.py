@@ -79,6 +79,7 @@ class ClienteFiadoTiendaModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     nombre: Mapped[str] = mapped_column(String(120), nullable=False)
     telefono_whatsapp: Mapped[str | None] = mapped_column(String(25), nullable=True)
+    deuda_total: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     def __repr__(self) -> str:
@@ -297,6 +298,27 @@ class AbonoCarteraModel(Base):
 
     def __repr__(self) -> str:
         return f"AbonoCarteraModel(id={self.id!r}, monto={self.monto!r})"
+
+
+class AbonoTiendaModel(Base):
+    """Abonos aplicados a clientes fiado de tienda para disminuir deuda."""
+
+    __tablename__ = "abonos_tienda"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    cliente_id: Mapped[int] = mapped_column(ForeignKey("clientes_fiado_tienda.id"), nullable=False)
+    monto: Mapped[float] = mapped_column(Float, nullable=False)
+    metodo_pago: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    saldo_cliente: Mapped[float] = mapped_column(Float, nullable=False)
+    referencia: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    fecha: Mapped[datetime] = mapped_column(
+        DateTime(timezone=False),
+        nullable=False,
+        default=_utcnow_naive,
+    )
+
+    def __repr__(self) -> str:
+        return f"AbonoTiendaModel(id={self.id!r}, monto={self.monto!r})"
 
 
 class CierreCajaModel(Base):

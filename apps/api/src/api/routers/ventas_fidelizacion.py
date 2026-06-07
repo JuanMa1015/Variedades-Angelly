@@ -198,7 +198,15 @@ def create_venta(
                     cliente.deuda_total = nueva_deuda
                     saldo_pendiente = nueva_deuda
                 elif fiado_origen == FIADO_ORIGEN_TIENDA:
-                    saldo_pendiente = float(total - abono_inicial)
+                    if cliente_tienda is None:
+                        raise HTTPException(
+                            status_code=400,
+                            detail="Debes seleccionar un cliente de tienda",
+                        )
+
+                    nueva_deuda = float(cliente_tienda.deuda_total + (total - abono_inicial))
+                    cliente_tienda.deuda_total = nueva_deuda
+                    saldo_pendiente = nueva_deuda
 
             venta = VentaModel(
                 creado_por=current_user.username,
