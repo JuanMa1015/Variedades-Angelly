@@ -208,7 +208,7 @@ const Ventas = () => {
     try {
       setSubmittingVenta(true);
 
-      const responsePayload = await apiPost('/api/ventas', payload);
+      await apiPost('/api/ventas', payload);
 
       await loadData();
 
@@ -321,21 +321,6 @@ const Ventas = () => {
     setItems((current) => current.filter((item) => Number(item.producto_id) !== Number(productoId)));
   };
 
-  const handleDecreaseProducto = (productoId) => {
-    setItems((current) => current.reduce((acc, item) => {
-      if (Number(item.producto_id) !== Number(productoId)) {
-        acc.push(item);
-        return acc;
-      }
-
-      const nextQty = Number(item.cantidad || 0) - 1;
-      if (nextQty > 0) {
-        acc.push({ ...item, cantidad: nextQty });
-      }
-      return acc;
-    }, []));
-  };
-
   const handleChangeQty = (index, delta) => {
     setItems((current) => current.reduce((acc, item, rowIndex) => {
       if (rowIndex !== index) {
@@ -363,10 +348,7 @@ const Ventas = () => {
   return (
     <div className="space-y-4">
       <ErrorMessage message={error} onDismiss={() => setError('')} />
-
-      {ventaCompletada && (
-        <SuccessMessage message="Venta registrada correctamente" onDismiss={() => {}} />
-      )}
+      <SuccessMessage message={success} onDismiss={() => setSuccess('')} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className={`lg:overflow-y-auto lg:max-h-[calc(100vh-8rem)] ${ventaCompletada ? 'pointer-events-none opacity-40' : ''}`}>
@@ -375,14 +357,9 @@ const Ventas = () => {
             searchTerm={productSearch}
             onSearchChange={setProductSearch}
             onAddItem={handleQuickAddProducto}
-            onRemoveItem={handleRemoveProducto}
-            onIncreaseItem={handleQuickAddProducto}
-            onDecreaseItem={handleDecreaseProducto}
             cart={cartItems}
-            onGoToTicket={() => {}}
             formatMoney={formatMoney}
             loading={loading}
-            showBottomBar={false}
           />
         </div>
 
