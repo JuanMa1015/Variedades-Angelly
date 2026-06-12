@@ -60,6 +60,16 @@ def create_cartera_venta(
                         detail=f"Producto {item.producto_id} no encontrado",
                     )
 
+                if producto.stock_actual < item.cantidad:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"Stock insuficiente para '{producto.nombre}'. "
+                            f"Disponible: {producto.stock_actual}"
+                        ),
+                    )
+
+                producto.stock_actual -= item.cantidad
                 subtotal = float(item.cantidad * producto.precio_venta)
                 total += subtotal
 
