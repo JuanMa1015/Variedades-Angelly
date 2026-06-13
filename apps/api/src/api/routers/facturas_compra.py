@@ -114,7 +114,7 @@ def list_facturas_compra(
     db: Session = Depends(get_db),
     fecha_desde: date | None = Query(default=None),
     fecha_hasta: date | None = Query(default=None),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> list[FacturaCompraResponse]:
     query = select(FacturaCompraModel)
     if fecha_desde:
@@ -204,7 +204,7 @@ def list_facturas_compra_paginadas(
 def create_factura_compra(
     payload: FacturaCompraCreateRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> FacturaCompraResponse:
     for i, item in enumerate(payload.items):
         if not item.producto_id or item.producto_id <= 0:
