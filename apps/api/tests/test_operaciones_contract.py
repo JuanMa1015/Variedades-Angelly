@@ -210,7 +210,7 @@ def test_no_se_puede_eliminar_proveedor_con_pedidos(
         headers={"Authorization": f"Bearer {admin_token}"},
     )
     assert delete_response.status_code == 409
-    assert "pedidos registrados" in delete_response.json()["detail"]
+    assert "pedido(s) de proveedor" in delete_response.json()["detail"]
 
 
 def test_vendedor_puede_crear_pedido_y_admin_actualizarlo(
