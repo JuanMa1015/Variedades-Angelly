@@ -327,7 +327,7 @@ const Cartera = () => {
                   </div>
                 ) : productoForm.imagen_url ? (
                   <div className="relative inline-block">
-                    <img src={productoForm.imagen_url} alt="Producto" className="h-24 w-24 rounded-xl border border-gray-300 object-cover" />
+                    <img src={productoForm.imagen_url?.startsWith('http') ? productoForm.imagen_url : `${import.meta.env.VITE_API_URL ?? ''}${productoForm.imagen_url}`} alt="Producto" className="h-24 w-24 rounded-xl border border-gray-300 object-cover" />
                   </div>
                 ) : (
                   <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-gray-300 px-3 py-3 text-sm text-gray-500 hover:border-rosewood hover:text-rosewood">
