@@ -40,7 +40,6 @@ const Login = () => {
       const nextUser = await login({
         username: username.trim(),
         password,
-        rememberMe,
       });
 
       const fallbackPath = getDefaultRouteForRole(nextUser?.role);

@@ -2,9 +2,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { apiPost } from '../api/httpClient';
 
-const TOKEN_STORAGE_KEY = 'angelly.auth.token';
-const USER_STORAGE_KEY = 'angelly.auth.user';
-const REMEMBER_KEY = 'angelly.auth.remember';
 const AuthContext = createContext(null);
 
 const parseTokenPayload = (token) => {
@@ -44,8 +41,6 @@ const normalizeUser = (rawUser) => {
   };
 };
 
-const getStorage = () => (localStorage.getItem(REMEMBER_KEY) === 'true' ? localStorage : sessionStorage);
-
 export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
@@ -53,55 +48,35 @@ export const AuthProvider = ({ children }) => {
   const refreshTimerRef = useRef(null);
 
   const clearAuth = useCallback(() => {
-    [localStorage, sessionStorage].forEach((s) => {
-      s.removeItem(TOKEN_STORAGE_KEY);
-      s.removeItem(USER_STORAGE_KEY);
-      s.removeItem(REMEMBER_KEY);
-    });
     setToken(null);
     setUser(null);
   }, []);
 
-  const persistAuth = useCallback((nextToken, nextUser, rememberMe) => {
-    const storage = rememberMe ? localStorage : sessionStorage;
-    storage.setItem(TOKEN_STORAGE_KEY, nextToken);
-    storage.setItem(USER_STORAGE_KEY, JSON.stringify(nextUser));
-    if (rememberMe) {
-      localStorage.setItem(REMEMBER_KEY, 'true');
-    } else {
-      localStorage.removeItem(REMEMBER_KEY);
-    }
-    setToken(nextToken);
-    setUser(nextUser);
-  }, []);
-
+  // Re-establish session on mount via httpOnly refresh_token cookie
   useEffect(() => {
-    const storage = getStorage();
-    const storedToken = storage.getItem(TOKEN_STORAGE_KEY);
-    const storedUserRaw = storage.getItem(USER_STORAGE_KEY);
+    let cancelled = false;
 
-    if (!storedToken || !storedUserRaw || isTokenExpired(storedToken)) {
-      clearAuth();
-      setBootstrapped(true);
-      return;
-    }
-
-    try {
-      const parsedUser = normalizeUser(JSON.parse(storedUserRaw));
-      if (!parsedUser) {
-        clearAuth();
-        setBootstrapped(true);
-        return;
+    const tryRestore = async () => {
+      try {
+        const payload = await apiPost('/api/auth/refresh', {}, { includeAuth: false });
+        if (cancelled) return;
+        if (payload?.access_token) {
+          setToken(payload.access_token);
+          setUser(normalizeUser({ username: payload.username, role: payload.role }));
+        }
+      } catch {
+        // No session to restore
+      } finally {
+        if (!cancelled) setBootstrapped(true);
       }
+    };
 
-      setToken(storedToken);
-      setUser(parsedUser);
-    } catch {
-      clearAuth();
-    } finally {
-      setBootstrapped(true);
-    }
-  }, [clearAuth]);
+    tryRestore();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const handleUnauthorized = () => {
@@ -112,7 +87,7 @@ export const AuthProvider = ({ children }) => {
     return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
   }, [clearAuth]);
 
-  const login = useCallback(async ({ username, password, rememberMe }) => {
+  const login = useCallback(async ({ username, password }) => {
     const payload = await apiPost('/api/auth/login', { username, password }, { includeAuth: false });
 
     const nextUser = normalizeUser({
@@ -124,9 +99,10 @@ export const AuthProvider = ({ children }) => {
       throw new Error('Respuesta de autenticación inválida');
     }
 
-    persistAuth(payload.access_token, nextUser, rememberMe);
+    setToken(payload.access_token);
+    setUser(nextUser);
     return nextUser;
-  }, [persistAuth]);
+  }, []);
 
   const logout = useCallback(() => {
     if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
@@ -149,9 +125,9 @@ export const AuthProvider = ({ children }) => {
     if (timeUntilExpiry <= 0) {
       const doRefresh = async () => {
         try {
-          const payload2 = await apiPost('/api/auth/refresh', {}, { includeAuth: true });
+          const payload2 = await apiPost('/api/auth/refresh', {}, { includeAuth: false });
           if (payload2.access_token) {
-            persistAuth(payload2.access_token, user);
+            setToken(payload2.access_token);
           }
         } catch {
           clearAuth();
@@ -163,9 +139,9 @@ export const AuthProvider = ({ children }) => {
 
     refreshTimerRef.current = setTimeout(async () => {
       try {
-        const payload2 = await apiPost('/api/auth/refresh', {}, { includeAuth: true });
+        const payload2 = await apiPost('/api/auth/refresh', {}, { includeAuth: false });
         if (payload2.access_token) {
-          persistAuth(payload2.access_token, user);
+          setToken(payload2.access_token);
         }
       } catch {
         // Silently fail; the 401 interceptor will handle it later
@@ -175,7 +151,7 @@ export const AuthProvider = ({ children }) => {
     return () => {
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
     };
-  }, [token, user, persistAuth, clearAuth]);
+  }, [token, clearAuth]);
 
   const value = useMemo(
     () => ({

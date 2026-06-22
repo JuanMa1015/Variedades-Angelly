@@ -32,6 +32,18 @@ from src.api.limiter import limiter, login_rate_limit
 router = APIRouter(tags=["auth"])
 
 
+def _set_access_token_cookie(response: Response, token: str, expires_in: int) -> None:
+    response.set_cookie(
+        key="access_token",
+        value=token,
+        httponly=True,
+        samesite="lax",
+        secure=os.getenv("APP_ENV") != "development",
+        max_age=expires_in,
+        path="/",
+    )
+
+
 class LoginRequest(BaseModel):
     """Credenciales de acceso para autenticacion de usuarios."""
 
@@ -109,6 +121,7 @@ def auth_login(
     token, expires_in = create_access_token(username=usuario.username, role=role)
     refresh_token, refresh_expires = create_refresh_token(username=usuario.username, role=role)
 
+    _set_access_token_cookie(response, token, expires_in)
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
@@ -163,6 +176,18 @@ def auth_refresh(
         )
 
     new_token, expires_in = create_access_token(username=username, role=role)
+    new_refresh_token, refresh_expires = create_refresh_token(username=username, role=role)
+
+    _set_access_token_cookie(response, new_token, expires_in)
+    response.set_cookie(
+        key="refresh_token",
+        value=new_refresh_token,
+        httponly=True,
+        samesite="strict",
+        secure=os.getenv("APP_ENV") != "development",
+        max_age=refresh_expires,
+        path="/api/auth",
+    )
     return RefreshResponse(
         access_token=new_token,
         expires_in=expires_in,

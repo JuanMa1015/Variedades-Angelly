@@ -1,9 +1,49 @@
-const TOKEN_STORAGE_KEY = 'angelly.auth.token';
-const USER_STORAGE_KEY = 'angelly.auth.user';
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
+
+// ─── Response Cache ───
 
 let isRefreshing = false;
 let refreshPromise = null;
+
+const responseCache = new Map();
+const CACHE_TTL_MS = 10_000;
+
+const getCacheKey = (endpoint) => {
+  const base = endpoint.split('?')[0];
+  const params = [];
+  if (endpoint.includes('?')) {
+    const searchParams = new URLSearchParams(endpoint.split('?')[1]);
+    Array.from(searchParams.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .forEach(([k, v]) => params.push(`${k}=${v}`));
+  }
+  return params.length > 0 ? `${base}?${params.join('&')}` : base;
+};
+
+const getCached = (key) => {
+  const entry = responseCache.get(key);
+  if (entry && Date.now() - entry.timestamp < CACHE_TTL_MS) {
+    return entry.data;
+  }
+  responseCache.delete(key);
+  return undefined;
+};
+
+const setCache = (key, data) => {
+  responseCache.set(key, { data, timestamp: Date.now() });
+};
+
+const invalidateCache = (pattern) => {
+  if (!pattern) {
+    responseCache.clear();
+    return;
+  }
+  for (const key of responseCache.keys()) {
+    if (key.includes(pattern)) {
+      responseCache.delete(key);
+    }
+  }
+};
 
 export class ApiError extends Error {
   constructor(message, status, payload) {
@@ -40,8 +80,7 @@ const tryRefreshToken = async () => {
     if (!response.ok) return null;
 
     const data = await response.json();
-    sessionStorage.setItem(TOKEN_STORAGE_KEY, data.access_token);
-    return data.access_token;
+    return data.access_token ?? null;
   } catch {
     return null;
   }
@@ -57,20 +96,25 @@ const shouldRetry = (response, error) => {
 };
 
 const performRequest = async (endpoint, options) => {
-  const { method = 'GET', body, headers = {}, signal, includeAuth = true } = options;
+  const { method = 'GET', body, headers = {}, signal, skipCache } = options;
 
-  const nextHeaders = { ...headers };
+  const isGet = method === 'GET';
+  const cacheKey = isGet ? getCacheKey(endpoint) : null;
 
-  if (includeAuth) {
-    const token = sessionStorage.getItem(TOKEN_STORAGE_KEY);
-    if (token && !nextHeaders.Authorization) {
-      nextHeaders.Authorization = `Bearer ${token}`;
+  if (isGet && !skipCache) {
+    const cached = getCached(cacheKey);
+    if (cached !== undefined) {
+      return { response: { ok: true, status: 200 }, payload: cached, fromCache: true };
     }
   }
 
+  const nextHeaders = { ...headers };
   const hasJsonBody = body !== undefined;
   if (hasJsonBody && !nextHeaders['Content-Type']) {
     nextHeaders['Content-Type'] = 'application/json';
+  }
+  if (!nextHeaders['X-Requested-With']) {
+    nextHeaders['X-Requested-With'] = 'XMLHttpRequest';
   }
 
   const MAX_RETRIES = 2;
@@ -98,6 +142,11 @@ const performRequest = async (endpoint, options) => {
       }
 
       const payload = await response.json().catch(() => null);
+
+      if (isGet && payload !== null && response.ok && cacheKey) {
+        setCache(cacheKey, payload);
+      }
+
       return { response, payload };
     } catch (err) {
       if (attempt < MAX_RETRIES && shouldRetry(null, err)) {
@@ -112,6 +161,10 @@ const performRequest = async (endpoint, options) => {
 };
 
 export const apiRequest = async (endpoint, options = {}) => {
+  if (options.method && options.method !== 'GET') {
+    invalidateCache(endpoint.split('?')[0]);
+  }
+
   let result = await performRequest(endpoint, options);
 
   if (result.response.status === 401 && options.includeAuth !== false) {
@@ -126,12 +179,10 @@ export const apiRequest = async (endpoint, options = {}) => {
     const newToken = await refreshPromise;
 
     if (newToken) {
-      result = await performRequest(endpoint, options);
+      result = await performRequest(endpoint, { ...options, skipCache: true });
     }
 
     if (!newToken || result.response.status === 401) {
-      sessionStorage.removeItem(TOKEN_STORAGE_KEY);
-      sessionStorage.removeItem(USER_STORAGE_KEY);
       notifyUnauthorized();
     }
   }
@@ -145,8 +196,30 @@ export const apiRequest = async (endpoint, options = {}) => {
 };
 
 export const apiGet = (endpoint, options = {}) => apiRequest(endpoint, { ...options, method: 'GET' });
+
+export { invalidateCache };
 export const apiPost = (endpoint, body, options = {}) => apiRequest(endpoint, { ...options, method: 'POST', body });
 export const apiPatch = (endpoint, body, options = {}) => apiRequest(endpoint, { ...options, method: 'PATCH', body });
 export const apiDelete = async (endpoint, options = {}) => {
   await apiRequest(endpoint, { ...options, method: 'DELETE' });
+};
+
+export const apiUpload = async (endpoint, file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(buildUrl(endpoint), {
+    method: 'POST',
+    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    const message = payload?.detail || 'No se pudo subir el archivo';
+    throw new ApiError(message, response.status, payload);
+  }
+
+  return response.json();
 };

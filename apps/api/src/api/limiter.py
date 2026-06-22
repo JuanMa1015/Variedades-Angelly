@@ -18,4 +18,4 @@ def login_rate_limit() -> str:
     return os.getenv("LOGIN_RATE_LIMIT", "10/minute")
 
 
-limiter = Limiter(key_func=_get_client_ip)
+limiter = Limiter(key_func=_get_client_ip, default_limits=["100/minute"])
