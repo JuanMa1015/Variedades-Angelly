@@ -134,7 +134,7 @@ def list_cliente_movimientos(
         AbonoCarteraModel.fecha.label('fecha'),
         null().label('articulo'),
         null().label('cantidad'),
-        null().label('monto'),
+        AbonoCarteraModel.monto.label('monto'),
         AbonoCarteraModel.referencia.label('referencia'),
         AbonoCarteraModel.saldo_cliente.label('saldo'),
         null().label('es_fiado'),

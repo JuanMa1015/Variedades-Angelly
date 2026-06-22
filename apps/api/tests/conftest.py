@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 # Asegurar que rate limiting no se active en pruebas
-os.environ.setdefault("APP_ENV", "test")
+os.environ["APP_ENV"] = "test"
 os.environ.setdefault("LOGIN_RATE_LIMIT", "10000/minute")
 
 import pytest
