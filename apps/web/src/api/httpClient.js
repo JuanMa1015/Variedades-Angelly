@@ -11,7 +11,7 @@ let refreshPromise = null;
 const responseCache = new Map();
 const CACHE_TTL_MS = 10_000;
 
-const getCacheKey = (endpoint, options) => {
+const getCacheKey = (endpoint) => {
   const base = endpoint.split('?')[0];
   const params = [];
   if (endpoint.includes('?')) {
@@ -106,7 +106,7 @@ const performRequest = async (endpoint, options) => {
   const { method = 'GET', body, headers = {}, signal, includeAuth = true, skipCache } = options;
 
   const isGet = method === 'GET';
-  const cacheKey = isGet ? getCacheKey(endpoint, options) : null;
+  const cacheKey = isGet ? getCacheKey(endpoint) : null;
 
   // Return cached response for GET requests
   if (isGet && !skipCache) {
