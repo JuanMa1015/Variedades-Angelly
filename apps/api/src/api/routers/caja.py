@@ -18,7 +18,13 @@ from src.api.schemas.caja import (
     CierreCajaResponse,
 )
 from src.infrastructure.database.connection import get_db
-from src.infrastructure.database.models import CierreCajaModel, GastoModel, VentaModel
+from src.infrastructure.database.models import (
+    AbonoCarteraModel,
+    AbonoTiendaModel,
+    CierreCajaModel,
+    GastoModel,
+    VentaModel,
+)
 
 router = APIRouter(tags=["caja"])
 
@@ -42,6 +48,23 @@ def _calcular_metricas_desde(
     ).one()
     total_efectivo = float(ventas[0] or 0.0)
     total_transferencia = float(ventas[1] or 0.0)
+
+    # Sum abonos de cartera y tienda (son ingresos en efectivo/transferencia)
+    for abono_model in (AbonoCarteraModel, AbonoTiendaModel):
+        abonos = db.execute(
+            select(
+                func.coalesce(
+                    func.sum(abono_model.monto).filter(abono_model.metodo_pago == "efectivo"),
+                    0.0,
+                ),
+                func.coalesce(
+                    func.sum(abono_model.monto).filter(abono_model.metodo_pago == "transferencia"),
+                    0.0,
+                ),
+            ).where(abono_model.fecha >= desde),
+        ).one()
+        total_efectivo += float(abonos[0] or 0.0)
+        total_transferencia += float(abonos[1] or 0.0)
 
     total_gastos = db.execute(
         select(func.coalesce(func.sum(GastoModel.monto), 0.0)).where(

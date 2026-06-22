@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import re
 import time
 
+from collections import defaultdict
 from pathlib import Path
 
 from fastapi import FastAPI, status
@@ -21,6 +23,28 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 
 
+def _csp_directive(name: str, default: str) -> str:
+    raw = os.getenv(f"CSP_{name}", "").strip()
+    return raw or default
+
+
+class InMemoryRateLimiter:
+    """Sliding-window rate limiter por IP en memoria."""
+
+    def __init__(self) -> None:
+        self._windows: dict[str, list[float]] = defaultdict(list)
+        self._lock = asyncio.Lock()
+
+    async def check(self, key: str, max_requests: int, window_seconds: int) -> bool:
+        now = time.time()
+        cutoff = now - window_seconds
+        async with self._lock:
+            self._windows[key] = [t for t in self._windows[key] if t > cutoff]
+            if len(self._windows[key]) >= max_requests:
+                return False
+            self._windows[key].append(now)
+            return True
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         response = await call_next(request)
@@ -28,14 +52,16 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        connect_src = _csp_directive("CONNECT_SRC", "'self' http://localhost:5173 ws://localhost:5173 http://localhost:5174 ws://localhost:5174")
+        img_src = _csp_directive("IMG_SRC", "'self' data: https://*.public.blob.vercel-storage.com")
         response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; "
-            "img-src 'self' data:; "
-            "style-src 'self' 'unsafe-inline'; "
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
-            "connect-src 'self'; "
-            "font-src 'self' data:; "
-            "form-action 'self'"
+            f"default-src 'self'; "
+            f"img-src {img_src}; "
+            f"style-src 'self' 'unsafe-inline'; "
+            f"script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+            f"connect-src {connect_src}; "
+            f"font-src 'self' data:; "
+            f"form-action 'self'"
         )
         return response
 from sqlalchemy.exc import IntegrityError
@@ -64,9 +90,14 @@ from src.api.routers.export import router as export_router
 from src.api.routers.upload import router as upload_router
 from sqlalchemy import inspect
 
-from src.api.limiter import limiter
+from src.api.limiter import _get_client_ip, limiter
 from src.infrastructure.database.connection import engine, get_db
 from src.infrastructure.database.models import Base
+
+_rate_limiter = InMemoryRateLimiter()
+
+_RATE_EXEMPT_PREFIXES = ("/health", "/docs", "/openapi.json", "/uploads")
+_RATE_SLOWAPI_PATHS = ("/api/auth/login", "/api/auth/refresh")
 
 logger = logging.getLogger("tienda_angelly")
 logger.setLevel(logging.INFO)
@@ -111,6 +142,12 @@ def on_startup():
             text("UPDATE clientes_fiado_tienda SET deuda_total = 0 WHERE deuda_total IS NULL")
         )
         conn.commit()
+
+        # Clean expired refresh token blacklist entries
+        conn.execute(
+            text("DELETE FROM refresh_token_blacklist WHERE expires_at < NOW()")
+        )
+        conn.commit()
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
@@ -141,6 +178,37 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ─── Global Rate Limiting Middleware ───
+
+@app.middleware("http")
+async def global_rate_limit(request, call_next):
+    # Skip rate limiting in test environment
+    if os.getenv("APP_ENV", "development").strip().lower() == "test":
+        return await call_next(request)
+
+    path = request.url.path
+    if path.startswith(_RATE_EXEMPT_PREFIXES) or path in _RATE_SLOWAPI_PATHS:
+        return await call_next(request)
+
+    ip = _get_client_ip(request)
+
+    if request.method in {"GET", "HEAD", "OPTIONS"}:
+        allowed = await _rate_limiter.check(ip, 100, 60)
+    elif request.method == "POST":
+        allowed = await _rate_limiter.check(ip, 30, 60)
+    else:
+        allowed = await _rate_limiter.check(ip, 20, 60)
+
+    if not allowed:
+        return _cors_response(
+            429,
+            {"detail": "Demasiadas solicitudes. Intenta de nuevo en un minuto."},
+            request,
+        )
+
+    return await call_next(request)
+
 
 # ─── Request Logging Middleware ───
 

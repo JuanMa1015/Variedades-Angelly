@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import uuid
 from datetime import datetime, timedelta, timezone
 
 import bcrypt  # type: ignore[import-not-found]
@@ -100,6 +101,7 @@ def create_refresh_token(username: str, role: str) -> tuple[str, int]:
     payload = {
         "sub": username,
         "role": role,
+        "jti": str(uuid.uuid4()),
         "iat": int(now.timestamp()),
         "exp": int(expires_at.timestamp()),
         "type": "refresh",

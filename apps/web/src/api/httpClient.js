@@ -3,8 +3,51 @@ const USER_STORAGE_KEY = 'angelly.auth.user';
 const REMEMBER_KEY = 'angelly.auth.remember';
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
 
+// ─── Response Cache ───
+
 let isRefreshing = false;
 let refreshPromise = null;
+
+const responseCache = new Map();
+const CACHE_TTL_MS = 10_000;
+
+const getCacheKey = (endpoint, options) => {
+  const base = endpoint.split('?')[0];
+  const params = [];
+  if (endpoint.includes('?')) {
+    const searchParams = new URLSearchParams(endpoint.split('?')[1]);
+    // Sort params for consistent cache keys
+    Array.from(searchParams.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .forEach(([k, v]) => params.push(`${k}=${v}`));
+  }
+  return params.length > 0 ? `${base}?${params.join('&')}` : base;
+};
+
+const getCached = (key) => {
+  const entry = responseCache.get(key);
+  if (entry && Date.now() - entry.timestamp < CACHE_TTL_MS) {
+    return entry.data;
+  }
+  responseCache.delete(key);
+  return undefined;
+};
+
+const setCache = (key, data) => {
+  responseCache.set(key, { data, timestamp: Date.now() });
+};
+
+const invalidateCache = (pattern) => {
+  if (!pattern) {
+    responseCache.clear();
+    return;
+  }
+  for (const key of responseCache.keys()) {
+    if (key.includes(pattern)) {
+      responseCache.delete(key);
+    }
+  }
+};
 
 const getStorage = () => (localStorage.getItem(REMEMBER_KEY) === 'true' ? localStorage : sessionStorage);
 
@@ -60,7 +103,18 @@ const shouldRetry = (response, error) => {
 };
 
 const performRequest = async (endpoint, options) => {
-  const { method = 'GET', body, headers = {}, signal, includeAuth = true } = options;
+  const { method = 'GET', body, headers = {}, signal, includeAuth = true, skipCache } = options;
+
+  const isGet = method === 'GET';
+  const cacheKey = isGet ? getCacheKey(endpoint, options) : null;
+
+  // Return cached response for GET requests
+  if (isGet && !skipCache) {
+    const cached = getCached(cacheKey);
+    if (cached !== undefined) {
+      return { response: { ok: true, status: 200 }, payload: cached, fromCache: true };
+    }
+  }
 
   const nextHeaders = { ...headers };
 
@@ -101,6 +155,12 @@ const performRequest = async (endpoint, options) => {
       }
 
       const payload = await response.json().catch(() => null);
+
+      // Cache successful GET responses
+      if (isGet && payload !== null && response.ok && cacheKey) {
+        setCache(cacheKey, payload);
+      }
+
       return { response, payload };
     } catch (err) {
       if (attempt < MAX_RETRIES && shouldRetry(null, err)) {
@@ -115,6 +175,11 @@ const performRequest = async (endpoint, options) => {
 };
 
 export const apiRequest = async (endpoint, options = {}) => {
+  // Invalidate cache on mutations
+  if (options.method && options.method !== 'GET') {
+    invalidateCache(endpoint.split('?')[0]);
+  }
+
   let result = await performRequest(endpoint, options);
 
   if (result.response.status === 401 && options.includeAuth !== false) {
@@ -129,7 +194,7 @@ export const apiRequest = async (endpoint, options = {}) => {
     const newToken = await refreshPromise;
 
     if (newToken) {
-      result = await performRequest(endpoint, options);
+      result = await performRequest(endpoint, { ...options, skipCache: true });
     }
 
     if (!newToken || result.response.status === 401) {
@@ -150,6 +215,8 @@ export const apiRequest = async (endpoint, options = {}) => {
 };
 
 export const apiGet = (endpoint, options = {}) => apiRequest(endpoint, { ...options, method: 'GET' });
+
+export { invalidateCache };
 export const apiPost = (endpoint, body, options = {}) => apiRequest(endpoint, { ...options, method: 'POST', body });
 export const apiPatch = (endpoint, body, options = {}) => apiRequest(endpoint, { ...options, method: 'PATCH', body });
 export const apiDelete = async (endpoint, options = {}) => {

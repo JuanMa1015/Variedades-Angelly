@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState } from 'react';
+import { forwardRef, useMemo, useRef, useState } from 'react';
+import { VirtuosoGrid } from 'react-virtuoso';
 import { Barcode, Search } from 'lucide-react';
 import Skeleton from '../../components/Skeleton';
 
@@ -29,6 +30,96 @@ const getCategoryName = (producto) => {
   const raw = producto.categoria || producto.catalogo || producto.tipo || 'General';
   return String(raw).trim() || 'General';
 };
+
+const ProductCard = ({ producto, cartMap, onAddItem, formatMoney, isLarge }) => {
+  const stock = Number(producto.stock_actual || 0);
+  const qtyInCart = cartMap.get(Number(producto.id)) || 0;
+  const outOfStock = stock === 0;
+  const atMax = !outOfStock && qtyInCart >= stock;
+
+  return (
+    <button
+      type="button"
+      disabled={outOfStock}
+      onClick={() => { if (!atMax) onAddItem(producto.id); }}
+      className={`group relative flex w-full flex-col overflow-hidden border text-left transition ${
+        isLarge
+          ? 'rounded-2xl active:scale-[0.98]'
+          : 'rounded-xl active:scale-[0.97]'
+      } ${
+        outOfStock
+          ? 'cursor-not-allowed border-gray-200 opacity-50'
+          : qtyInCart > 0
+            ? 'border-rosewood shadow-sm'
+            : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
+      }`}
+    >
+      <div className={`relative w-full overflow-hidden bg-gray-50 ${
+        isLarge ? 'aspect-[4/3]' : 'aspect-square'
+      }`}>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className={isLarge ? 'text-5xl' : 'text-3xl'}>
+            {getProductIcon(producto.nombre)}
+          </span>
+        </div>
+        {producto.imagen_url ? (
+          <img
+            src={getImageUrl(producto.imagen_url)}
+            alt={producto.nombre}
+            className="relative z-10 h-full w-full object-cover transition duration-200 group-hover:scale-105"
+            loading="lazy"
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+          />
+        ) : null}
+
+        {qtyInCart > 0 && (
+          <span className={`absolute flex items-center justify-center rounded-full bg-rosewood px-1 font-bold text-white shadow ${
+            isLarge
+              ? 'right-2 top-2 h-7 min-w-[28px] px-2 text-xs'
+              : 'right-1.5 top-1.5 h-5 min-w-[20px] text-[10px]'
+          }`}>
+            {qtyInCart}
+          </span>
+        )}
+
+        {outOfStock && (
+          <div className="absolute inset-0 flex items-center justify-center bg-white/60">
+            <span className={`rounded bg-red-600 font-bold text-white shadow ${
+              isLarge ? 'px-3 py-1 text-xs' : 'px-2 py-0.5 text-[9px]'
+            }`}>
+              Sin stock
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div className={`flex flex-col ${isLarge ? 'gap-0.5 px-3 py-2.5' : 'gap-0 px-2 py-1.5'}`}>
+        <span className={`truncate font-semibold leading-tight text-gray-900 ${
+          isLarge ? 'text-sm' : 'text-[11px]'
+        }`}>
+          {producto.nombre}
+        </span>
+        <span className={`font-bold text-rosewood ${
+          isLarge ? 'text-base' : 'text-xs'
+        }`}>
+          {formatMoney(producto.precio_venta)}
+        </span>
+        {!outOfStock && stock < 5 && (
+          <span className={isLarge ? 'text-[10px] font-medium text-amber-700' : 'text-[9px] font-medium text-amber-700'}>
+            {isLarge ? `Quedan ${stock} uds` : `${stock} uds`}
+          </span>
+        )}
+      </div>
+    </button>
+  );
+};
+
+const GridList = forwardRef(({ className, children, ...props }, ref) => (
+  <div ref={ref} className={className} {...props}>
+    {children}
+  </div>
+));
+GridList.displayName = 'GridList';
 
 const ProductSelectionView = ({
   productos,
@@ -122,7 +213,7 @@ const ProductSelectionView = ({
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto p-4 pt-3">
+      <div className="flex-1 overflow-hidden p-4 pt-3">
         {loading && (
           <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
             <Skeleton lines={3} />
@@ -135,144 +226,27 @@ const ProductSelectionView = ({
           </div>
         )}
 
-        {!loading && visibleProducts.length > 0 && isSearching && (
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-            {visibleProducts.map((producto) => {
-              const stock = Number(producto.stock_actual || 0);
-              const qtyInCart = cartMap.get(Number(producto.id)) || 0;
-              const outOfStock = stock === 0;
-              const atMax = !outOfStock && qtyInCart >= stock;
-
-              return (
-                <button
-                  key={producto.id}
-                  type="button"
-                  disabled={outOfStock}
-                  onClick={() => { if (!atMax) onAddItem(producto.id); }}
-                  className={`group relative flex flex-col overflow-hidden rounded-xl border text-left transition active:scale-[0.97] ${
-                    outOfStock
-                      ? 'cursor-not-allowed border-gray-200 opacity-50'
-                      : qtyInCart > 0
-                        ? 'border-rosewood shadow-sm'
-                        : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
-                  }`}
-                >
-                  <div className="relative aspect-square w-full overflow-hidden bg-gray-50">
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-3xl">{getProductIcon(producto.nombre)}</span>
-                    </div>
-                    {producto.imagen_url ? (
-                      <img
-                        src={getImageUrl(producto.imagen_url)}
-                        alt={producto.nombre}
-                        className="relative z-10 h-full w-full object-cover transition duration-200 group-hover:scale-105"
-                        loading="lazy"
-                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                      />
-                    ) : null}
-
-                    {qtyInCart > 0 && (
-                      <span className="absolute right-1.5 top-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rosewood px-1 text-[10px] font-bold text-white shadow">
-                        {qtyInCart}
-                      </span>
-                    )}
-
-                    {outOfStock && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-white/60">
-                        <span className="rounded bg-red-600 px-2 py-0.5 text-[9px] font-bold text-white shadow">
-                          Sin stock
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-0 px-2 py-1.5">
-                    <span className="truncate text-[11px] font-semibold leading-tight text-gray-900">
-                      {producto.nombre}
-                    </span>
-                    <span className="text-xs font-bold text-rosewood">
-                      {formatMoney(producto.precio_venta)}
-                    </span>
-                    {!outOfStock && stock < 5 && (
-                      <span className="text-[9px] font-medium text-amber-700">
-                        {stock} uds
-                      </span>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {!loading && visibleProducts.length > 0 && !isSearching && (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-            {visibleProducts.map((producto) => {
-              const stock = Number(producto.stock_actual || 0);
-              const qtyInCart = cartMap.get(Number(producto.id)) || 0;
-              const outOfStock = stock === 0;
-              const atMax = !outOfStock && qtyInCart >= stock;
-
-              return (
-                <button
-                  key={producto.id}
-                  type="button"
-                  disabled={outOfStock}
-                  onClick={() => { if (!atMax) onAddItem(producto.id); }}
-                  className={`group relative flex flex-col overflow-hidden rounded-2xl border text-left transition active:scale-[0.98] ${
-                    outOfStock
-                      ? 'cursor-not-allowed border-gray-200 opacity-60'
-                      : qtyInCart > 0
-                        ? 'border-rosewood shadow-md'
-                        : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
-                  }`}
-                >
-                  <div className="relative aspect-[4/3] w-full overflow-hidden bg-gray-50">
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-5xl">{getProductIcon(producto.nombre)}</span>
-                    </div>
-                    {producto.imagen_url ? (
-                      <img
-                        src={getImageUrl(producto.imagen_url)}
-                        alt={producto.nombre}
-                        className="relative z-10 h-full w-full object-cover transition duration-200 group-hover:scale-105"
-                        loading="lazy"
-                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                      />
-                    ) : null}
-
-                    {qtyInCart > 0 && (
-                      <span className="absolute right-2 top-2 flex h-7 min-w-[28px] items-center justify-center rounded-full bg-rosewood px-2 text-xs font-bold text-white shadow">
-                        {qtyInCart}
-                      </span>
-                    )}
-
-                    {outOfStock && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-white/60">
-                        <span className="rounded-lg bg-red-600 px-3 py-1 text-xs font-bold text-white shadow">
-                          Sin stock
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-0.5 px-3 py-2.5">
-                    <span className="truncate text-sm font-semibold leading-tight text-gray-900">
-                      {producto.nombre}
-                    </span>
-                    <span className="text-base font-black text-rosewood">
-                      {formatMoney(producto.precio_venta)}
-                    </span>
-                    {stock > 0 && stock < 5 && (
-                      <span className="text-[10px] font-medium text-amber-700">
-                        Quedan {stock} uds
-                      </span>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+        {!loading && visibleProducts.length > 0 && (
+          <VirtuosoGrid
+            style={{ height: '100%' }}
+            totalCount={visibleProducts.length}
+            overscan={200}
+            components={{ List: GridList }}
+            listClassName={
+              isSearching
+                ? 'grid grid-cols-3 gap-2 sm:grid-cols-4'
+                : 'grid grid-cols-2 gap-4 sm:grid-cols-3'
+            }
+            itemContent={(index) => (
+              <ProductCard
+                producto={visibleProducts[index]}
+                cartMap={cartMap}
+                onAddItem={onAddItem}
+                formatMoney={formatMoney}
+                isLarge={!isSearching}
+              />
+            )}
+          />
         )}
       </div>
     </section>
