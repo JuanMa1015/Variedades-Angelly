@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -372,3 +372,20 @@ class AuditoriaModel(Base):
 
     def __repr__(self) -> str:
         return f"AuditoriaModel(id={self.id!r}, accion={self.accion!r})"
+
+
+class RefreshTokenBlacklistModel(Base):
+    """JTIs de refresh tokens ya utilizados (rotacion)."""
+
+    __tablename__ = "refresh_token_blacklist"
+
+    jti: Mapped[str] = mapped_column(Text, primary_key=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=False),
+        nullable=False,
+        default=_utcnow_naive,
+    )
+
+    def __repr__(self) -> str:
+        return f"RefreshTokenBlacklistModel(jti={self.jti!r})"

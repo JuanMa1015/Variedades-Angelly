@@ -137,19 +137,19 @@ const mockData = {
 
 const setupApiMock = () => {
   apiRequestMock.mockImplementation((endpoint) => {
-    if (endpoint === '/api/superadmin/proveedores') return Promise.resolve(mockData.proveedores);
-    if (endpoint === '/api/superadmin/productos') return Promise.resolve(mockData.productos);
+    if (endpoint.startsWith('/api/productos/paginados')) return Promise.resolve({ data: mockData.productos });
+    if (endpoint.startsWith('/api/proveedores/paginados')) return Promise.resolve({ data: mockData.proveedores });
+    if (endpoint.startsWith('/api/ventas/paginadas')) return Promise.resolve({ data: mockData.ventas });
+    if (endpoint.startsWith('/api/proveedores/pedidos/paginados')) return Promise.resolve({ data: mockData.pedidos });
+    if (endpoint.startsWith('/api/facturas-compra/paginadas')) return Promise.resolve({ data: mockData.facturas });
+    if (endpoint.startsWith('/api/gastos/paginados')) return Promise.resolve({ data: mockData.gastos });
+    if (endpoint.startsWith('/api/clientes/tienda-fiado')) return Promise.resolve(mockData.clientesTienda);
+    if (endpoint.startsWith('/api/fidelizacion/clientes')) return Promise.resolve(mockData.clientesFidelizacion);
+    if (endpoint.startsWith('/api/superadmin/auditorias')) return Promise.resolve(mockData.auditorias);
     if (endpoint === '/api/superadmin/usuarios/vendedores') return Promise.resolve(mockData.vendedores);
     if (endpoint === '/api/superadmin/usuarios/admins') return Promise.resolve(mockData.admins);
     if (endpoint === '/api/clientes') return Promise.resolve(mockData.clientes);
-    if (endpoint === '/api/clientes/tienda-fiado') return Promise.resolve(mockData.clientesTienda);
-    if (endpoint === '/api/fidelizacion/clientes') return Promise.resolve(mockData.clientesFidelizacion);
-    if (endpoint === '/api/ventas') return Promise.resolve(mockData.ventas);
-    if (endpoint === '/api/proveedores/pedidos') return Promise.resolve(mockData.pedidos);
-    if (endpoint === '/api/facturas-compra') return Promise.resolve(mockData.facturas);
-    if (endpoint === '/api/gastos') return Promise.resolve(mockData.gastos);
     if (endpoint === '/api/cartera/abonos') return Promise.resolve(mockData.abonos);
-    if (endpoint === '/api/superadmin/auditorias') return Promise.resolve(mockData.auditorias);
     if (endpoint === '/api/superadmin/informes') return Promise.resolve(mockData.informes);
     return Promise.resolve([]);
   });
@@ -182,14 +182,14 @@ describe('Admin page', () => {
     expect(screen.getByTestId('skeleton')).toBeInTheDocument();
   });
 
-  it('loads all data on mount', async () => {
+  it('loads active module data on mount', async () => {
     useAuthMock.mockReturnValue({ token: 'token', isSuperAdmin: true });
     setupApiMock();
     render(<Admin />);
 
     await waitFor(() => {
       expect(apiRequestMock).toHaveBeenCalledWith(
-        '/api/superadmin/proveedores',
+        expect.stringContaining('/api/productos/paginados'),
         expect.any(Object),
       );
       expect(apiRequestMock).toHaveBeenCalledWith(
@@ -359,12 +359,9 @@ describe('Admin page', () => {
     render(<Admin />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Resumen:/)).toBeInTheDocument();
+      expect(screen.getByText(/Productos:/)).toBeInTheDocument();
     });
-    expect(screen.getByText(/Admins 1/)).toBeInTheDocument();
-    expect(screen.getByText(/Vendedores 1/)).toBeInTheDocument();
-    expect(screen.getByText(/Productos 1/)).toBeInTheDocument();
-    expect(screen.getByText(/Proveedores 1/)).toBeInTheDocument();
+    expect(screen.getByText(/Facturación/)).toBeInTheDocument();
   });
 
   it('hides role groups and summary when moduleKey prop given', async () => {

@@ -24,6 +24,26 @@ LOCAL_UPLOAD_DIR = Path(__file__).resolve().parents[3] / "uploads"
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 MAX_FILE_SIZE = 5 * 1024 * 1024
 
+MAGIC_BYTES: dict[bytes, set[str]] = {
+    b"\xff\xd8\xff": {".jpg", ".jpeg"},
+    b"\x89PNG\r\n\x1a\n": {".png"},
+    b"GIF87a": {".gif"},
+    b"GIF89a": {".gif"},
+    b"RIFF": {".webp"},
+    b"BM": {".bmp"},
+}
+
+
+def _validate_image(contents: bytes, ext: str) -> None:
+    for magic, exts in MAGIC_BYTES.items():
+        if contents.startswith(magic):
+            if ext in exts or (magic == b"RIFF" and ext == ".webp"):
+                return
+    raise HTTPException(
+        status_code=400,
+        detail="El archivo no es una imagen valida o su extension no coincide con el contenido",
+    )
+
 
 @router.post("/api/upload-imagen")
 async def upload_imagen(
@@ -40,6 +60,8 @@ async def upload_imagen(
     contents = await file.read()
     if len(contents) > MAX_FILE_SIZE:
         raise HTTPException(status_code=400, detail="La imagen supera los 5 MB")
+
+    _validate_image(contents, ext)
 
     filename = f"{uuid.uuid4().hex}{ext}"
 

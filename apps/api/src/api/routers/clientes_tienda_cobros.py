@@ -5,8 +5,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy import func, literal, null, or_, select, union
+from sqlalchemy.orm import Session, aliased
 
 from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.pagination import search_filter
@@ -112,73 +112,76 @@ def list_cliente_tienda_movimientos(
     if cliente is None:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
 
-    MAX_PAGE = limit * 10
-    search_limit = max(MAX_PAGE, 500)
+    ventas_q = select(
+        literal('Venta').label('tipo'),
+        DetalleVentaModel.id.label('id'),
+        VentaModel.fecha.label('fecha'),
+        DetalleVentaModel.nombre_producto.label('articulo'),
+        DetalleVentaModel.cantidad.label('cantidad'),
+        DetalleVentaModel.precio_unitario.label('precio_unitario'),
+        DetalleVentaModel.subtotal.label('monto'),
+        null().label('referencia'),
+        null().label('saldo'),
+        VentaModel.es_fiado.label('es_fiado'),
+    ).where(
+        VentaModel.cliente_tienda_id == cliente_id,
+        DetalleVentaModel.venta_id == VentaModel.id,
+    )
 
-    ventas = db.execute(
-        select(VentaModel)
-        .where(VentaModel.cliente_tienda_id == cliente_id)
-        .order_by(VentaModel.fecha.desc())
-        .limit(search_limit),
-    ).scalars().all()
+    abonos_q = select(
+        literal('Abono').label('tipo'),
+        AbonoTiendaModel.id.label('id'),
+        AbonoTiendaModel.fecha.label('fecha'),
+        null().label('articulo'),
+        null().label('cantidad'),
+        null().label('precio_unitario'),
+        AbonoTiendaModel.monto.label('monto'),
+        AbonoTiendaModel.referencia.label('referencia'),
+        AbonoTiendaModel.saldo_cliente.label('saldo'),
+        null().label('es_fiado'),
+    ).where(
+        AbonoTiendaModel.cliente_id == cliente_id,
+    )
 
-    abonos = db.execute(
-        select(AbonoTiendaModel)
-        .where(AbonoTiendaModel.cliente_id == cliente_id)
-        .order_by(AbonoTiendaModel.fecha.desc())
-        .limit(search_limit),
-    ).scalars().all()
+    union_subq = union(ventas_q, abonos_q).subquery()
 
-    venta_ids = [venta.id for venta in ventas]
-    detalles_por_venta_id: dict[int, list[DetalleVentaModel]] = {}
-    if venta_ids:
-        detalles = db.execute(
-            select(DetalleVentaModel).where(DetalleVentaModel.venta_id.in_(venta_ids)),
-        ).scalars().all()
-        for detalle in detalles:
-            detalles_por_venta_id.setdefault(detalle.venta_id, []).append(detalle)
+    total = db.execute(
+        select(func.count()).select_from(union_subq),
+    ).scalar_one()
+    total_pages = max(1, (total + limit - 1) // limit) if total > 0 else 1
+    offset = (page - 1) * limit
 
-    movimientos: list[MovimientoTiendaResponse] = []
-    for venta in ventas:
-        detalles_venta = detalles_por_venta_id.get(venta.id, [])
-        for detalle in detalles_venta:
-            movimientos.append(
-                MovimientoTiendaResponse(
-                    id=detalle.id,
-                    tipo="Venta",
-                    descripcion="Venta fiada" if venta.es_fiado else "Venta cancelada",
-                    articulo=detalle.nombre_producto,
-                    cantidad=detalle.cantidad,
-                    precio_unitario=detalle.precio_unitario,
-                    monto=detalle.subtotal,
-                    fecha=venta.fecha,
-                    saldo=None,
-                ),
-            )
+    rows = db.execute(
+        select(union_subq).order_by(union_subq.c.fecha.desc()).offset(offset).limit(limit),
+    ).all()
 
-    for abono in abonos:
-        movimientos.append(
-            MovimientoTiendaResponse(
-                id=abono.id,
+    movimientos = []
+    for row in rows:
+        if row.tipo == 'Venta':
+            movimientos.append(MovimientoTiendaResponse(
+                id=row.id,
+                tipo="Venta",
+                descripcion="Venta fiada" if row.es_fiado else "Venta cancelada",
+                articulo=row.articulo,
+                cantidad=row.cantidad,
+                precio_unitario=row.precio_unitario,
+                monto=row.monto,
+                fecha=row.fecha,
+                saldo=None,
+            ))
+        else:
+            movimientos.append(MovimientoTiendaResponse(
+                id=row.id,
                 tipo="Abono",
                 descripcion="Pago aplicado a deuda",
-                referencia=abono.referencia,
-                monto=abono.monto,
-                fecha=abono.fecha,
-                saldo=abono.saldo_cliente,
-            ),
-        )
-
-    movimientos.sort(key=lambda m: m.fecha, reverse=True)
-
-    total_items = len(movimientos)
-    total_pages = max(1, (total_items + limit - 1) // limit)
-    start = (page - 1) * limit
-    end = start + limit
-    movimientos_paginados = movimientos[start:end]
+                referencia=row.referencia,
+                monto=row.monto,
+                fecha=row.fecha,
+                saldo=row.saldo,
+            ))
 
     return MovimientoTiendaPageResponse(
-        data=movimientos_paginados,
+        data=movimientos,
         total_pages=total_pages,
         current_page=page,
     )

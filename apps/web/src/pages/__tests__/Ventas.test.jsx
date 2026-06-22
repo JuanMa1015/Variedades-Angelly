@@ -107,7 +107,7 @@ const validClientes = [
 
 const mockApiGet = () => {
   apiGetMock.mockImplementation((endpoint) => {
-    if (endpoint === '/api/productos?catalogo=tienda') return Promise.resolve(validProducts);
+    if (endpoint.startsWith('/api/productos/paginados?catalogo=tienda')) return Promise.resolve({ data: validProducts });
     if (endpoint === '/api/clientes/tienda-fiado') return Promise.resolve(validClientes);
     return Promise.resolve([]);
   });
@@ -125,7 +125,7 @@ describe('Ventas page', () => {
 
     await waitFor(() => {
       expect(apiGetMock).toHaveBeenCalledWith(
-        '/api/productos?catalogo=tienda',
+        '/api/productos/paginados?catalogo=tienda&limit=200',
         expect.any(Object),
       );
       expect(apiGetMock).toHaveBeenCalledWith(

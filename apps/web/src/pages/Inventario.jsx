@@ -60,9 +60,9 @@ const Inventario = () => {
 
   const loadProductos = useCallback(async (signal) => {
     if (!token) return;
-    const payload = await apiGet('/api/productos?catalogo=tienda', { signal });
+    const payload = await apiGet('/api/productos/paginados?catalogo=tienda&limit=200', { signal });
     if (signal?.aborted) return;
-    setProductos(Array.isArray(payload) ? payload : []);
+    setProductos(Array.isArray(payload?.data) ? payload.data : (Array.isArray(payload) ? payload : []));
   }, [token]);
 
   const loadProveedores = useCallback(async (signal) => {
