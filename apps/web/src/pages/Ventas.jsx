@@ -5,10 +5,9 @@ import { apiGet, apiPost } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage';
 import SuccessMessage from '../components/SuccessMessage';
 import ProductSelectionView from './Ventas/ProductSelectionView';
-import TicketReviewView from './Ventas/TicketReviewView';
-import CheckoutView from './Ventas/CheckoutView';
+import CartPanel from './Ventas/CartPanel';
+import SaleReceiptPanel from './Ventas/SaleReceiptPanel';
 import { formatMoney } from '../utils/format';
-import Modal from '../components/Modal';
 
 const fetchJson = async ({ endpoint, signal, errorMessage }) => {
   try {
@@ -30,7 +29,6 @@ const Ventas = () => {
 
   const [submittingVenta, setSubmittingVenta] = useState(false);
   const [creatingClient, setCreatingClient] = useState(false);
-  const [currentView, setCurrentView] = useState('products');
 
   const [esFiado, setEsFiado] = useState(false);
   const [clienteTiendaId, setClienteTiendaId] = useState('');
@@ -43,6 +41,8 @@ const Ventas = () => {
   const [newStoreClientPhone, setNewStoreClientPhone] = useState('');
   const [isStoreClientModalOpen, setIsStoreClientModalOpen] = useState(false);
   const [productSearch, setProductSearch] = useState('');
+
+  const [ventaCompletada, setVentaCompletada] = useState(null);
 
   const loadData = useCallback(
     async (signal) => {
@@ -133,7 +133,6 @@ const Ventas = () => {
     setMontoPago('0');
     setAbonoInicialFiado('0');
     setMetodoPago('efectivo');
-    setCurrentView('products');
   };
 
   const handleSubmitVenta = async (event) => {
@@ -209,19 +208,52 @@ const Ventas = () => {
     try {
       setSubmittingVenta(true);
 
-      const responsePayload = await apiPost('/api/ventas', payload);
+      await apiPost('/api/ventas', payload);
 
       await loadData();
+
+      const selectedCliente = esFiado && clienteTiendaId
+        ? clientesTienda.find((c) => String(c.id) === String(clienteTiendaId))
+        : null;
+
+      const receiptItems = items.map((item) => {
+        const producto = productosById.get(Number(item.producto_id));
+        const cantidad = Number(item.cantidad || 0);
+        const precio = Number(producto?.precio_venta || 0);
+        return {
+          nombre: producto?.nombre || `#${item.producto_id}`,
+          cantidad,
+          precio,
+          subtotal: cantidad * precio,
+        };
+      });
+
+      setVentaCompletada({
+        items: receiptItems,
+        total: totalEstimado,
+        metodoPago,
+        pago,
+        cambio: cambioContado,
+        esFiado,
+        cliente: selectedCliente?.nombre || null,
+        timestamp: new Date().toLocaleString('es-CO'),
+      });
+
       resetVentaForm();
-      const resumenCambio = !esFiado
-        ? ` Pago: ${formatMoney(pago)}. Cambio: ${formatMoney(cambioContado)}.`
-        : '';
-      setSuccess((responsePayload.resumen_recibo || 'Venta registrada correctamente') + resumenCambio);
     } catch (err) {
       setError(err.message || 'No fue posible registrar la venta');
     } finally {
       setSubmittingVenta(false);
     }
+  };
+
+  const handlePrintReceipt = () => {
+    window.print();
+  };
+
+  const handleNewSale = () => {
+    setVentaCompletada(null);
+    cleanMessages();
   };
 
   const handleCreateStoreClient = async (event) => {
@@ -289,21 +321,6 @@ const Ventas = () => {
     setItems((current) => current.filter((item) => Number(item.producto_id) !== Number(productoId)));
   };
 
-  const handleDecreaseProducto = (productoId) => {
-    setItems((current) => current.reduce((acc, item) => {
-      if (Number(item.producto_id) !== Number(productoId)) {
-        acc.push(item);
-        return acc;
-      }
-
-      const nextQty = Number(item.cantidad || 0) - 1;
-      if (nextQty > 0) {
-        acc.push({ ...item, cantidad: nextQty });
-      }
-      return acc;
-    }, []));
-  };
-
   const handleChangeQty = (index, delta) => {
     setItems((current) => current.reduce((acc, item, rowIndex) => {
       if (rowIndex !== index) {
@@ -326,83 +343,62 @@ const Ventas = () => {
     [items],
   );
 
-  const cartCount = useMemo(
-    () => cartItems.reduce((acc, item) => acc + Number(item.cantidad || 0), 0),
-    [cartItems],
-  );
-
-  const goToTicket = () => {
-    cleanMessages();
-    setCurrentView('ticket');
-  };
-
-  const goToCheckout = () => {
-    cleanMessages();
-    setCurrentView('checkout');
-  };
-
-  const goToProducts = () => {
-    cleanMessages();
-    setCurrentView('products');
-  };
+  const printReceipt = ventaCompletada || null;
 
   return (
     <div className="space-y-4">
       <ErrorMessage message={error} onDismiss={() => setError('')} />
       <SuccessMessage message={success} onDismiss={() => setSuccess('')} />
 
-      {currentView === 'products' && (
-        <ProductSelectionView
-          productos={productosFiltrados}
-          searchTerm={productSearch}
-          onSearchChange={setProductSearch}
-          onAddItem={handleQuickAddProducto}
-          onRemoveItem={handleRemoveProducto}
-          onIncreaseItem={handleQuickAddProducto}
-          onDecreaseItem={handleDecreaseProducto}
-          cart={cartItems}
-          onGoToTicket={goToTicket}
-          formatMoney={formatMoney}
-          loading={loading}
-        />
-      )}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className={`lg:overflow-y-auto lg:max-h-[calc(100vh-8rem)] ${ventaCompletada ? 'pointer-events-none opacity-40' : ''}`}>
+          <ProductSelectionView
+            productos={productosFiltrados}
+            searchTerm={productSearch}
+            onSearchChange={setProductSearch}
+            onAddItem={handleQuickAddProducto}
+            cart={cartItems}
+            formatMoney={formatMoney}
+            loading={loading}
+          />
+        </div>
 
-      {currentView === 'ticket' && (
-        <TicketReviewView
-          cart={cartItems}
-          productosById={productosById}
-          totalEstimado={totalEstimado}
-          onChangeQty={handleChangeQty}
-          onGoToProducts={goToProducts}
-          onGoToCheckout={goToCheckout}
-          formatMoney={formatMoney}
-        />
-      )}
-
-      {currentView === 'checkout' && (
-        <CheckoutView
-          totalEstimado={totalEstimado}
-          cambioContado={cambioContado}
-          esFiado={esFiado}
-          onSetEsFiado={setEsFiado}
-          montoPago={montoPago}
-          onSetMontoPago={setMontoPago}
-          metodoPago={metodoPago}
-          onSetMetodoPago={setMetodoPago}
-          clientesTiendaFiado={clientesTienda}
-          clienteTiendaId={clienteTiendaId}
-          onSetClienteTiendaId={setClienteTiendaId}
-          onCrearCliente={() => {
-            cleanMessages();
-            setIsStoreClientModalOpen(true);
-          }}
-          onConfirmar={handleSubmitVenta}
-          onGoToTicket={goToTicket}
-          formatMoney={formatMoney}
-          submittingVenta={submittingVenta}
-          cartCount={cartCount}
-        />
-      )}
+        <div className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-6rem)]">
+          {ventaCompletada ? (
+            <SaleReceiptPanel
+              receipt={ventaCompletada}
+              formatMoney={formatMoney}
+              onPrint={handlePrintReceipt}
+              onNewSale={handleNewSale}
+            />
+          ) : (
+            <CartPanel
+              cart={cartItems}
+              productosById={productosById}
+              totalEstimado={totalEstimado}
+              onChangeQty={handleChangeQty}
+              onRemoveItem={handleRemoveProducto}
+              formatMoney={formatMoney}
+              esFiado={esFiado}
+              onSetEsFiado={setEsFiado}
+              montoPago={montoPago}
+              onSetMontoPago={setMontoPago}
+              metodoPago={metodoPago}
+              onSetMetodoPago={setMetodoPago}
+              cambioContado={cambioContado}
+              clientesTiendaFiado={clientesTienda}
+              clienteTiendaId={clienteTiendaId}
+              onSetClienteTiendaId={setClienteTiendaId}
+              onCrearCliente={() => {
+                cleanMessages();
+                setIsStoreClientModalOpen(true);
+              }}
+              onConfirmar={handleSubmitVenta}
+              submittingVenta={submittingVenta}
+            />
+          )}
+        </div>
+      </div>
 
       {isStoreClientModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
@@ -464,6 +460,7 @@ const Ventas = () => {
 
       <style>{`
         @media print {
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           body * { visibility: hidden !important; }
           #print-receipt, #print-receipt * { visibility: visible !important; }
           #print-receipt { position: fixed !important; left: 0 !important; top: 0 !important; width: 100% !important; height: 100% !important; display: flex !important; align-items: center !important; justify-content: center !important; background: white !important; z-index: 99999 !important; }
@@ -485,13 +482,15 @@ const Ventas = () => {
 
           <div className="mb-2 text-center">
             <p className="text-xs font-bold uppercase tracking-wide">Factura de Venta</p>
-            <p className="text-[10px] text-gray-600">{new Date().toLocaleDateString('es-CO', { year: 'numeric', month: '2-digit', day: '2-digit' })} {new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</p>
+            <p className="text-[10px] text-gray-600">{printReceipt?.timestamp || ''}</p>
           </div>
 
           <div className="mb-2 border-t border-dashed border-gray-400" />
 
-          {currentView === 'checkout' && (
-            <p className="mb-2 text-[10px] text-gray-600">Método de pago: {metodoPago === 'efectivo' ? 'Efectivo' : metodoPago === 'nequi' ? 'Nequi' : 'Tarjeta'}</p>
+          {printReceipt && (
+            <p className="mb-2 text-[10px] text-gray-600">
+              Método de pago: {printReceipt.metodoPago === 'efectivo' ? 'Efectivo' : printReceipt.metodoPago === 'nequi' ? 'Nequi' : 'Tarjeta'}
+            </p>
           )}
 
           <table className="w-full text-[10px]">
@@ -504,42 +503,41 @@ const Ventas = () => {
               </tr>
             </thead>
             <tbody>
-              {cartItems.map((item, idx) => {
-                const producto = productosById.get(Number(item.producto_id));
-                const cantidad = Number(item.cantidad || 0);
-                const precio = Number(producto?.precio_venta || 0);
-                return (
-                  <tr key={idx}>
-                    <td className="py-1 pr-1">{producto?.nombre || `#${item.producto_id}`}</td>
-                    <td className="py-1 text-right">{cantidad}</td>
-                    <td className="py-1 text-right">{formatMoney(precio)}</td>
-                    <td className="py-1 text-right font-medium">{formatMoney(cantidad * precio)}</td>
-                  </tr>
-                );
-              })}
+              {(printReceipt?.items || []).map((item, idx) => (
+                <tr key={idx}>
+                  <td className="py-1 pr-1">{item.nombre}</td>
+                  <td className="py-1 text-right">{item.cantidad}</td>
+                  <td className="py-1 text-right">{formatMoney(item.precio)}</td>
+                  <td className="py-1 text-right font-medium">{formatMoney(item.subtotal)}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
 
           <div className="my-2 border-t border-dashed border-gray-400" />
 
-          <div className="space-y-0.5 text-[10px]">
-            <div className="flex justify-between font-bold">
-              <span>TOTAL:</span>
-              <span>{formatMoney(totalEstimado)}</span>
+          {printReceipt && (
+            <div className="space-y-0.5 text-[10px]">
+              <div className="flex justify-between font-bold">
+                <span>TOTAL:</span>
+                <span>{formatMoney(printReceipt.total)}</span>
+              </div>
+              {!printReceipt.esFiado && (
+                <>
+                  <div className="flex justify-between">
+                    <span>Pago:</span>
+                    <span>{formatMoney(printReceipt.pago)}</span>
+                  </div>
+                  {printReceipt.cambio > 0 && (
+                    <div className="flex justify-between">
+                      <span>Cambio:</span>
+                      <span>{formatMoney(printReceipt.cambio)}</span>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
-            {currentView === 'checkout' && !esFiado && (
-              <>
-                <div className="flex justify-between">
-                  <span>Pago:</span>
-                  <span>{formatMoney(Number(montoPago || 0))}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Cambio:</span>
-                  <span>{formatMoney(cambioContado)}</span>
-                </div>
-              </>
-            )}
-          </div>
+          )}
 
           <div className="mt-4 border-t border-dashed border-gray-400" />
 

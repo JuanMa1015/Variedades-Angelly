@@ -11,6 +11,7 @@ class Producto:
         catalogo: str = "tienda",
         codigo_barras: str | None = None,
         producto_id: int | None = None,
+        imagen_url: str | None = None,
     ) -> None:
         """Inicializa el producto validando reglas de inventario.
 
@@ -22,6 +23,7 @@ class Producto:
             stock_minimo: Umbral minimo para alertas de reposicion.
             catalogo: Segmento del inventario al que pertenece (tienda/cartera).
             producto_id: Identificador persistente si ya existe en base de datos.
+            imagen_url: URL de la imagen del producto.
         """
         if not nombre or not nombre.strip():
             raise ValueError("El nombre del producto es obligatorio")
@@ -40,6 +42,7 @@ class Producto:
         self._stock_actual = int(stock)
         self._stock_minimo = int(stock_minimo)
         self._catalogo = str(catalogo or "tienda").strip().lower() or "tienda"
+        self._imagen_url = imagen_url
 
     def __str__(self) -> str:
         return f"{self.nombre} (Stock: {self.stock_actual})"
@@ -88,6 +91,11 @@ class Producto:
     def catalogo(self) -> str:
         """Catalogo operativo del producto."""
         return self._catalogo
+
+    @property
+    def imagen_url(self) -> str | None:
+        """URL de la imagen del producto."""
+        return self._imagen_url
 
     def actualizar_precio_venta(self, nuevo_precio: float) -> None:
         """Modifica el precio de venta para ajustes rapidos de mostrador."""

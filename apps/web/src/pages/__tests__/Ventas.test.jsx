@@ -15,7 +15,7 @@ vi.mock('../../auth/AuthContext', () => ({
 }));
 
 vi.mock('../Ventas/ProductSelectionView', () => ({
-  default: ({ productos, cart, onAddItem, onGoToTicket, loading }) => (
+  default: ({ productos, cart, onAddItem, loading }) => (
     <div data-testid="product-selection">
       <h2>Product Selection</h2>
       <p>Products: {productos.length}</p>
@@ -30,41 +30,21 @@ vi.mock('../Ventas/ProductSelectionView', () => ({
           Add {p.nombre}
         </button>
       ))}
-      <button data-testid="go-to-ticket" onClick={onGoToTicket} disabled={cart.length === 0}>
-        Ver ticket
-      </button>
     </div>
   ),
 }));
 
-vi.mock('../Ventas/TicketReviewView', () => ({
-  default: ({ cart, totalEstimado, onGoToProducts, onGoToCheckout, formatMoney }) => (
-    <div data-testid="ticket-review">
-      <h2>Ticket Review</h2>
+vi.mock('../Ventas/CartPanel', () => ({
+  default: ({
+    cart, totalEstimado, esFiado, onSetEsFiado, montoPago, onSetMontoPago,
+    clientesTiendaFiado, clienteTiendaId, onSetClienteTiendaId,
+    onCrearCliente, onConfirmar, formatMoney, submittingVenta,
+  }) => (
+    <div data-testid="cart-panel">
+      <h2>CartPanel</h2>
       <p>Cart items: {cart.length}</p>
       <p>Total: {typeof formatMoney === 'function' ? formatMoney(totalEstimado) : totalEstimado}</p>
-      <button data-testid="go-to-products" onClick={onGoToProducts}>
-        + Productos
-      </button>
-      <button data-testid="go-to-checkout" onClick={onGoToCheckout} disabled={cart.length === 0}>
-        Cobrar →
-      </button>
-    </div>
-  ),
-}));
-
-vi.mock('../Ventas/CheckoutView', () => ({
-  default: ({
-    totalEstimado, esFiado, onSetEsFiado, montoPago, onSetMontoPago,
-    clientesTiendaFiado, clienteTiendaId,
-    onSetClienteTiendaId, onCrearCliente, onConfirmar, onGoToTicket,
-    formatMoney, submittingVenta, cartCount,
-  }) => (
-    <div data-testid="checkout-view">
-      <h2>Checkout</h2>
-      <p>Total: {typeof formatMoney === 'function' ? formatMoney(totalEstimado) : totalEstimado}</p>
       <p>Fiado: {String(esFiado)}</p>
-      <p>Cart count: {cartCount}</p>
       <button data-testid="set-contado" onClick={() => onSetEsFiado(false)}>
         Contado
       </button>
@@ -76,7 +56,6 @@ vi.mock('../Ventas/CheckoutView', () => ({
         value={montoPago}
         onChange={(e) => onSetMontoPago(Number(e.target.value))}
       />
-
       <select
         data-testid="cliente-select"
         value={clienteTiendaId}
@@ -97,9 +76,19 @@ vi.mock('../Ventas/CheckoutView', () => ({
       >
         {submittingVenta ? 'Confirmando venta...' : 'Confirmar venta'}
       </button>
-      <button data-testid="go-to-ticket-from-checkout" onClick={onGoToTicket}>
-        ← Volver al ticket
-      </button>
+    </div>
+  ),
+}));
+
+vi.mock('../Ventas/SaleReceiptPanel', () => ({
+  default: ({ receipt, onPrint, onNewSale }) => (
+    <div data-testid="sale-receipt">
+      <h2>Sale Receipt</h2>
+      <p>Total: {receipt.total}</p>
+      <p>Items: {receipt.items.length}</p>
+      <p>Metodo: {receipt.metodoPago}</p>
+      <button data-testid="print-receipt" onClick={onPrint}>Imprimir recibo</button>
+      <button data-testid="new-sale" onClick={onNewSale}>Nueva venta</button>
     </div>
   ),
 }));
@@ -146,7 +135,7 @@ describe('Ventas page', () => {
     });
   });
 
-  it('renders product selection view initially', async () => {
+  it('renders product selection and cart panel', async () => {
     render(<Ventas />);
 
     await waitFor(() => {
@@ -154,6 +143,7 @@ describe('Ventas page', () => {
     });
     expect(screen.getByText('Products: 2')).toBeInTheDocument();
     expect(screen.getByText('Cart: 0')).toBeInTheDocument();
+    expect(screen.getByTestId('cart-panel')).toBeInTheDocument();
   });
 
   it('shows loading state while fetching data', () => {
@@ -171,7 +161,7 @@ describe('Ventas page', () => {
     });
   });
 
-  it('navigates from products to ticket view', async () => {
+  it('adds a product to cart on click', async () => {
     render(<Ventas />);
 
     await waitFor(() => {
@@ -182,77 +172,7 @@ describe('Ventas page', () => {
     await waitFor(() => {
       expect(screen.getByText('Cart: 1')).toBeInTheDocument();
     });
-
-    fireEvent.click(screen.getByTestId('go-to-ticket'));
-    await waitFor(() => {
-      expect(screen.getByTestId('ticket-review')).toBeInTheDocument();
-    });
-  });
-
-  it('navigates from ticket to checkout', async () => {
-    render(<Ventas />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('product-selection')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByTestId('add-product-1'));
-    fireEvent.click(screen.getByTestId('go-to-ticket'));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('ticket-review')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByTestId('go-to-checkout'));
-    await waitFor(() => {
-      expect(screen.getByTestId('checkout-view')).toBeInTheDocument();
-    });
-  });
-
-  it('navigates back from ticket to products', async () => {
-    render(<Ventas />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('product-selection')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByTestId('add-product-1'));
-    fireEvent.click(screen.getByTestId('go-to-ticket'));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('ticket-review')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByTestId('go-to-products'));
-    await waitFor(() => {
-      expect(screen.getByTestId('product-selection')).toBeInTheDocument();
-    });
-  });
-
-  it('navigates back from checkout to ticket', async () => {
-    render(<Ventas />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('product-selection')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByTestId('add-product-1'));
-    fireEvent.click(screen.getByTestId('go-to-ticket'));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('ticket-review')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByTestId('go-to-checkout'));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('checkout-view')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByTestId('go-to-ticket-from-checkout'));
-    await waitFor(() => {
-      expect(screen.getByTestId('ticket-review')).toBeInTheDocument();
-    });
+    expect(screen.getByText('Cart items: 1')).toBeInTheDocument();
   });
 
   it('submits a contado sale successfully', async () => {
@@ -264,17 +184,6 @@ describe('Ventas page', () => {
     });
 
     fireEvent.click(screen.getByTestId('add-product-1'));
-    fireEvent.click(screen.getByTestId('go-to-ticket'));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('ticket-review')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByTestId('go-to-checkout'));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('checkout-view')).toBeInTheDocument();
-    });
 
     const pagoInput = screen.getByTestId('monto-pago');
     fireEvent.change(pagoInput, { target: { value: '10000' } });
@@ -290,12 +199,12 @@ describe('Ventas page', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText((text) => text.includes('Venta registrada'))).toBeInTheDocument();
+      expect(screen.getByTestId('sale-receipt')).toBeInTheDocument();
     });
   });
 
   it('submits a fiado sale successfully', async () => {
-    apiPostMock.mockResolvedValue({ resumen_recibo: 'Venta fiada registrada' });
+    apiPostMock.mockResolvedValue({});
     render(<Ventas />);
 
     await waitFor(() => {
@@ -303,24 +212,15 @@ describe('Ventas page', () => {
     });
 
     fireEvent.click(screen.getByTestId('add-product-1'));
-    fireEvent.click(screen.getByTestId('go-to-ticket'));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('ticket-review')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByTestId('go-to-checkout'));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('checkout-view')).toBeInTheDocument();
-    });
 
     fireEvent.click(screen.getByTestId('set-fiado'));
-    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    await waitFor(() => {
+      expect(screen.getByText('Fiado: true')).toBeInTheDocument();
+    });
 
     const clienteSelect = screen.getByTestId('cliente-select');
     fireEvent.change(clienteSelect, { target: { value: '10' } });
-    await new Promise((resolve) => setTimeout(resolve, 0));
 
     fireEvent.click(screen.getByTestId('confirmar-venta'));
 
@@ -336,27 +236,17 @@ describe('Ventas page', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText((text) => text.includes('Venta fiada registrada'))).toBeInTheDocument();
+      expect(screen.getByTestId('sale-receipt')).toBeInTheDocument();
     });
   });
 
-  it('creates a new store client from checkout', async () => {
+  it('creates a new store client', async () => {
     const newClient = { id: 20, nombre: 'Nuevo Cliente' };
     apiPostMock.mockResolvedValue(newClient);
     render(<Ventas />);
 
     await waitFor(() => {
       expect(screen.getByTestId('product-selection')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByTestId('add-product-1'));
-    fireEvent.click(screen.getByTestId('go-to-ticket'));
-    await waitFor(() => {
-      expect(screen.getByTestId('ticket-review')).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByTestId('go-to-checkout'));
-    await waitFor(() => {
-      expect(screen.getByTestId('checkout-view')).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByTestId('set-fiado'));
@@ -403,14 +293,6 @@ describe('Ventas page', () => {
     });
 
     fireEvent.click(screen.getByTestId('add-product-1'));
-    fireEvent.click(screen.getByTestId('go-to-ticket'));
-    await waitFor(() => {
-      expect(screen.getByTestId('ticket-review')).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByTestId('go-to-checkout'));
-    await waitFor(() => {
-      expect(screen.getByTestId('checkout-view')).toBeInTheDocument();
-    });
 
     const pagoInput = screen.getByTestId('monto-pago');
     fireEvent.change(pagoInput, { target: { value: '10000' } });
@@ -421,8 +303,8 @@ describe('Ventas page', () => {
     });
   });
 
-  it('resets to products view after successful sale', async () => {
-    apiPostMock.mockResolvedValue({ resumen_recibo: 'Venta OK' });
+  it('shows sale receipt after successful sale and can start new sale', async () => {
+    apiPostMock.mockResolvedValue({});
     render(<Ventas />);
 
     await waitFor(() => {
@@ -430,23 +312,20 @@ describe('Ventas page', () => {
     });
 
     fireEvent.click(screen.getByTestId('add-product-1'));
-    fireEvent.click(screen.getByTestId('go-to-ticket'));
-    await waitFor(() => {
-      expect(screen.getByTestId('ticket-review')).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByTestId('go-to-checkout'));
-    await waitFor(() => {
-      expect(screen.getByTestId('checkout-view')).toBeInTheDocument();
-    });
 
     const pagoInput = screen.getByTestId('monto-pago');
     fireEvent.change(pagoInput, { target: { value: '10000' } });
+
     fireEvent.click(screen.getByTestId('confirmar-venta'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('product-selection')).toBeInTheDocument();
+      expect(screen.getByTestId('sale-receipt')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Cart: 0')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('new-sale'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Cart: 0')).toBeInTheDocument();
+    });
   });
 });

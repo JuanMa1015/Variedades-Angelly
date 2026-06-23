@@ -65,6 +65,16 @@ const EditFormModal = ({ isOpen, title, fields, initialValues, onSave, onClose }
                   className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm transition focus:border-blush-300 focus:outline-none focus:ring-2 focus:ring-blush-50"
                   rows={3}
                 />
+              ) : field.type === 'checkbox' ? (
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!!formValues[field.name]}
+                    onChange={(e) => handleChange(field.name, e.target.checked)}
+                    className="h-5 w-5 rounded border-gray-300 text-blush-500 focus:ring-blush-300 cursor-pointer"
+                  />
+                  <span className="text-sm text-gray-600">{field.checkboxLabel || ''}</span>
+                </label>
               ) : (
                 <input
                   ref={i === 0 ? firstInputRef : null}

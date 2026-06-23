@@ -15,6 +15,9 @@ const getProductIcon = (nombre = '') => {
   return rule?.icon || '🛒';
 };
 
+const API_BASE = import.meta.env.VITE_API_URL ?? '';
+const getImageUrl = (url) => (url ? `${API_BASE}${url}` : null);
+
 const CarteraVentaSection = ({
   clientesCatalogo,
   formatMoney,
@@ -199,7 +202,13 @@ const CarteraVentaSection = ({
                           x{qtyInCart}
                         </div>
                       )}
-                      <div className="text-xl mb-1">{getProductIcon(producto.nombre)}</div>
+                      <div className="text-xl mb-1">
+                        {producto.imagen_url ? (
+                          <img src={getImageUrl(producto.imagen_url)} alt={producto.nombre} className="h-8 w-8 rounded-lg object-cover" />
+                        ) : (
+                          getProductIcon(producto.nombre)
+                        )}
+                      </div>
                       <p className="truncate text-xs font-bold text-gray-900">{producto.nombre}</p>
                       <p className="mt-0.5 text-xs font-semibold text-gray-600">{formatMoney(producto.precio_venta)}</p>
                     </div>

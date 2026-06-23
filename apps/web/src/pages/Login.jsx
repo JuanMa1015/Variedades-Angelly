@@ -10,9 +10,22 @@ const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState(() => {
+    const remembered = localStorage.getItem('angelly.auth.remember') === 'true';
+    return remembered ? (localStorage.getItem('angelly.auth.username') || '') : '';
+  });
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => localStorage.getItem('angelly.auth.remember') === 'true');
+
+  const handleRememberChange = (e) => {
+    const checked = e.target.checked;
+    setRememberMe(checked);
+    if (checked) {
+      localStorage.setItem('angelly.auth.remember', 'true');
+    } else {
+      localStorage.removeItem('angelly.auth.remember');
+    }
+  };
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const pendingPathRef = useRef(null);
@@ -41,6 +54,12 @@ const Login = () => {
         username: username.trim(),
         password,
       });
+
+      if (rememberMe) {
+        localStorage.setItem('angelly.auth.username', username.trim());
+      } else {
+        localStorage.removeItem('angelly.auth.username');
+      }
 
       const fallbackPath = getDefaultRouteForRole(nextUser?.role);
       pendingPathRef.current = typeof location.state?.from === 'string' ? location.state.from : fallbackPath;
@@ -101,7 +120,7 @@ const Login = () => {
             <input
               type="checkbox"
               checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
+              onChange={handleRememberChange}
               className="h-4 w-4 rounded border-gray-300 text-rosewood focus:ring-rosewood"
             />
             Recuérdame

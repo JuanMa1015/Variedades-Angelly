@@ -19,6 +19,10 @@ const CheckoutView = ({
   submittingVenta,
   cartCount,
 }) => {
+  const selectedCliente = esFiado && clienteTiendaId
+    ? clientesTiendaFiado.find((c) => String(c.id) === String(clienteTiendaId))
+    : null;
+  const deudaActual = Number(selectedCliente?.deuda_total || 0);
   return (
     <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
       <div className="mb-4 flex items-start justify-between gap-3">
@@ -157,6 +161,18 @@ const CheckoutView = ({
             >
               + Crear cliente de ventas
             </button>
+
+            {selectedCliente && (
+              <div className="rounded-xl border border-amber-300 bg-white p-3 text-sm">
+                <p className="font-medium text-gray-700">
+                  Deuda actual de <span className="font-semibold text-gray-900">{selectedCliente.nombre}</span>
+                </p>
+                <p className="mt-1 text-xl font-bold text-amber-700">{formatMoney(deudaActual)}</p>
+                <p className="mt-1 text-xs text-gray-500">
+                  Al confirmar, se acumularán {formatMoney(totalEstimado)} a su deuda.
+                </p>
+              </div>
+            )}
 
             <label className="block space-y-1 text-sm">
               <span className="font-medium text-gray-700">Nota / observación (opcional)</span>

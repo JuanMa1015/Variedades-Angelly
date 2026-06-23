@@ -154,6 +154,7 @@ class SqlAlchemyProductoRepository(
             catalogo=entity.catalogo,
             stock_actual=entity.stock_actual,
             stock_minimo=entity.stock_minimo,
+            imagen_url=entity.imagen_url,
         )
 
     def _to_domain(self, model: ProductoModel) -> Producto:
@@ -166,6 +167,7 @@ class SqlAlchemyProductoRepository(
             stock_minimo=model.stock_minimo,
             catalogo=model.catalogo,
             producto_id=model.id,
+            imagen_url=model.imagen_url,
         )
 
     def _find_model_for_update(self, entity: Producto) -> ProductoModel | None:
@@ -182,6 +184,7 @@ class SqlAlchemyProductoRepository(
         model.catalogo = entity.catalogo
         model.stock_actual = entity.stock_actual
         model.stock_minimo = entity.stock_minimo
+        model.imagen_url = entity.imagen_url
 
     def get_by_nombre(self, nombre: str) -> Producto | None:
         """Busca un producto por nombre exacto."""
