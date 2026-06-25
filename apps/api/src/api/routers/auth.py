@@ -33,12 +33,13 @@ router = APIRouter(tags=["auth"])
 
 
 def _set_access_token_cookie(response: Response, token: str, expires_in: int) -> None:
+    is_prod = os.getenv("APP_ENV", "development") != "development"
     response.set_cookie(
         key="access_token",
         value=token,
         httponly=True,
-        samesite="lax",
-        secure=os.getenv("APP_ENV") != "development",
+        samesite="none" if is_prod else "lax",
+        secure=is_prod,
         max_age=expires_in,
         path="/",
     )
@@ -122,12 +123,13 @@ def auth_login(
     refresh_token, refresh_expires = create_refresh_token(username=usuario.username, role=role)
 
     _set_access_token_cookie(response, token, expires_in)
+    is_prod = os.getenv("APP_ENV", "development") != "development"
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        samesite="lax",
-        secure=os.getenv("APP_ENV") != "development",
+        samesite="none" if is_prod else "lax",
+        secure=is_prod,
         max_age=refresh_expires,
         path="/api/auth",
     )
@@ -144,6 +146,7 @@ def auth_login(
 @limiter.limit("20/minute")
 def auth_refresh(
     request: Request,
+    response: Response,
 ) -> RefreshResponse:
     """Valida refresh token (desde httpOnly cookie) y emite un nuevo access token."""
     refresh_token = request.cookies.get("refresh_token")
@@ -179,12 +182,13 @@ def auth_refresh(
     new_refresh_token, refresh_expires = create_refresh_token(username=username, role=role)
 
     _set_access_token_cookie(response, new_token, expires_in)
+    is_prod = os.getenv("APP_ENV", "development") != "development"
     response.set_cookie(
         key="refresh_token",
         value=new_refresh_token,
         httponly=True,
-        samesite="strict",
-        secure=os.getenv("APP_ENV") != "development",
+        samesite="none" if is_prod else "strict",
+        secure=is_prod,
         max_age=refresh_expires,
         path="/api/auth",
     )
