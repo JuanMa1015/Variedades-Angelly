@@ -50,7 +50,7 @@ const Ventas = () => {
 
       const requestList = [
         fetchJson({
-          endpoint: '/api/productos?catalogo=tienda',
+          endpoint: '/api/productos/paginados?catalogo=tienda&limit=200',
           signal,
           errorMessage: 'No fue posible cargar productos',
         }),
@@ -65,7 +65,7 @@ const Ventas = () => {
 
       if (signal?.aborted) return;
 
-      setProductos(Array.isArray(productosPayload) ? productosPayload : []);
+      setProductos(Array.isArray(productosPayload?.data) ? productosPayload.data : (Array.isArray(productosPayload) ? productosPayload : []));
       setClientesTienda(Array.isArray(tiendaPayload) ? tiendaPayload : []);
     },
     [token],

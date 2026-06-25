@@ -411,12 +411,12 @@ const ClientesTienda = () => {
               </div>
               <button type="button" onClick={openCreateModal} className="inline-flex items-center gap-2 rounded-lg bg-rosewood px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90">
                 <Plus className="h-4 w-4" />
-                Nuevo cliente
+                Nuevo Cliente
               </button>
             </div>
           </section>
 
-          <Modal isOpen={isModalOpen} onClose={resetForm} title={editingId ? 'Editar cliente' : 'Nuevo cliente'}>
+          <Modal isOpen={isModalOpen} onClose={resetForm} title={editingId ? 'Editar cliente' : 'Nuevo Cliente'}>
             {error && <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
             <form onSubmit={handleSubmit} className="space-y-3">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

@@ -16,7 +16,11 @@ const getProductIcon = (nombre = '') => {
 };
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
-const getImageUrl = (url) => (url ? `${API_BASE}${url}` : null);
+const getImageUrl = (url) => {
+  if (!url) return null;
+  if (url.startsWith('http')) return url;
+  return `${API_BASE}${url}`;
+};
 
 const CarteraVentaSection = ({
   clientesCatalogo,
