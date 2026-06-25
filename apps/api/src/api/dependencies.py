@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import Depends, HTTPException, Security, status
+from fastapi import Depends, HTTPException, Request, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -36,17 +36,29 @@ def _normalize_role(role_value: object) -> str:
     return ""
 
 
+def _extract_token(request: Request, credentials: HTTPAuthorizationCredentials | None) -> str | None:
+    """Intenta leer token de la cookie access_token primero, luego del header Bearer."""
+    cookie_token = request.cookies.get("access_token")
+    if cookie_token:
+        return cookie_token
+    if credentials is not None and credentials.scheme.lower() == "bearer":
+        return credentials.credentials
+    return None
+
+
 def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Security(security_scheme),
 ) -> AuthenticatedUser:
-    """Valida JWT Bearer y retorna usuario autenticado."""
-    if credentials is None or credentials.scheme.lower() != "bearer":
+    """Valida JWT Bearer o cookie httpOnly y retorna usuario autenticado."""
+    token = _extract_token(request, credentials)
+    if token is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token de autenticacion requerido",
         )
 
-    payload = decode_access_token(credentials.credentials)
+    payload = decode_access_token(token)
     if payload is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -27,10 +26,22 @@ from src.auth.security import (
     verify_password,
 )
 from src.infrastructure.database.connection import get_db
-from src.infrastructure.database.models import RefreshTokenBlacklistModel, UsuarioModel
+from src.infrastructure.database.models import UsuarioModel
 from src.api.limiter import limiter, login_rate_limit
 
 router = APIRouter(tags=["auth"])
+
+
+def _set_access_token_cookie(response: Response, token: str, expires_in: int) -> None:
+    response.set_cookie(
+        key="access_token",
+        value=token,
+        httponly=True,
+        samesite="lax",
+        secure=os.getenv("APP_ENV") != "development",
+        max_age=expires_in,
+        path="/",
+    )
 
 
 class LoginRequest(BaseModel):
@@ -110,11 +121,12 @@ def auth_login(
     token, expires_in = create_access_token(username=usuario.username, role=role)
     refresh_token, refresh_expires = create_refresh_token(username=usuario.username, role=role)
 
+    _set_access_token_cookie(response, token, expires_in)
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        samesite="strict",
+        samesite="lax",
         secure=os.getenv("APP_ENV") != "development",
         max_age=refresh_expires,
         path="/api/auth",
@@ -128,37 +140,12 @@ def auth_login(
     )
 
 
-# ─── Refresh Token Rotation Helpers ───
-
-
-def _blacklist_jti(jti: str, exp_timestamp: int, db: Session) -> None:
-    """Marca un JTI como usado para evitar reuso."""
-    expires_at = datetime.fromtimestamp(exp_timestamp, tz=timezone.utc).replace(tzinfo=None)
-    existing = db.execute(
-        select(RefreshTokenBlacklistModel).where(RefreshTokenBlacklistModel.jti == jti),
-    ).scalar_one_or_none()
-    if existing:
-        return
-    entry = RefreshTokenBlacklistModel(jti=jti, expires_at=expires_at)
-    db.add(entry)
-    db.commit()
-
-
-def _is_jti_blacklisted(jti: str, db: Session) -> bool:
-    """Retorna True si el JTI ya fue usado (replay detection)."""
-    return db.execute(
-        select(RefreshTokenBlacklistModel).where(RefreshTokenBlacklistModel.jti == jti),
-    ).scalar_one_or_none() is not None
-
-
 @router.post("/api/auth/refresh", response_model=RefreshResponse)
 @limiter.limit("20/minute")
 def auth_refresh(
     request: Request,
-    response: Response,
-    db: Session = Depends(get_db),
 ) -> RefreshResponse:
-    """Valida refresh token, aplica rotacion (invalida el anterior) y emite nuevo par."""
+    """Valida refresh token (desde httpOnly cookie) y emite un nuevo access token."""
     refresh_token = request.cookies.get("refresh_token")
     if not refresh_token:
         raise HTTPException(
@@ -182,29 +169,16 @@ def auth_refresh(
 
     username = str(decoded.get("sub", ""))
     role = str(decoded.get("role", ""))
-    jti = str(decoded.get("jti", ""))
-    exp = int(decoded.get("exp", 0))
-
-    if not username or not role or not jti:
+    if not username or not role:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Refresh token invalido",
         )
 
-    # Replay detection: if this jti was already used, reject
-    if _is_jti_blacklisted(jti, db):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Sesion expirada. Inicia sesion nuevamente.",
-        )
-
-    # Blacklist the old refresh token (rotation)
-    _blacklist_jti(jti, exp, db)
-
-    # Issue new pair
     new_token, expires_in = create_access_token(username=username, role=role)
     new_refresh_token, refresh_expires = create_refresh_token(username=username, role=role)
 
+    _set_access_token_cookie(response, new_token, expires_in)
     response.set_cookie(
         key="refresh_token",
         value=new_refresh_token,
@@ -214,7 +188,6 @@ def auth_refresh(
         max_age=refresh_expires,
         path="/api/auth",
     )
-
     return RefreshResponse(
         access_token=new_token,
         expires_in=expires_in,

@@ -1,6 +1,3 @@
-const TOKEN_STORAGE_KEY = 'angelly.auth.token';
-const USER_STORAGE_KEY = 'angelly.auth.user';
-const REMEMBER_KEY = 'angelly.auth.remember';
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
 
 // ─── Response Cache ───
@@ -16,7 +13,6 @@ const getCacheKey = (endpoint) => {
   const params = [];
   if (endpoint.includes('?')) {
     const searchParams = new URLSearchParams(endpoint.split('?')[1]);
-    // Sort params for consistent cache keys
     Array.from(searchParams.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .forEach(([k, v]) => params.push(`${k}=${v}`));
@@ -48,8 +44,6 @@ const invalidateCache = (pattern) => {
     }
   }
 };
-
-const getStorage = () => (localStorage.getItem(REMEMBER_KEY) === 'true' ? localStorage : sessionStorage);
 
 export class ApiError extends Error {
   constructor(message, status, payload) {
@@ -86,8 +80,7 @@ const tryRefreshToken = async () => {
     if (!response.ok) return null;
 
     const data = await response.json();
-    getStorage().setItem(TOKEN_STORAGE_KEY, data.access_token);
-    return data.access_token;
+    return data.access_token ?? null;
   } catch {
     return null;
   }
@@ -103,12 +96,11 @@ const shouldRetry = (response, error) => {
 };
 
 const performRequest = async (endpoint, options) => {
-  const { method = 'GET', body, headers = {}, signal, includeAuth = true, skipCache } = options;
+  const { method = 'GET', body, headers = {}, signal, skipCache } = options;
 
   const isGet = method === 'GET';
   const cacheKey = isGet ? getCacheKey(endpoint) : null;
 
-  // Return cached response for GET requests
   if (isGet && !skipCache) {
     const cached = getCached(cacheKey);
     if (cached !== undefined) {
@@ -117,17 +109,12 @@ const performRequest = async (endpoint, options) => {
   }
 
   const nextHeaders = { ...headers };
-
-  if (includeAuth) {
-    const token = getStorage().getItem(TOKEN_STORAGE_KEY);
-    if (token && !nextHeaders.Authorization) {
-      nextHeaders.Authorization = `Bearer ${token}`;
-    }
-  }
-
   const hasJsonBody = body !== undefined;
   if (hasJsonBody && !nextHeaders['Content-Type']) {
     nextHeaders['Content-Type'] = 'application/json';
+  }
+  if (!nextHeaders['X-Requested-With']) {
+    nextHeaders['X-Requested-With'] = 'XMLHttpRequest';
   }
 
   const MAX_RETRIES = 2;
@@ -156,7 +143,6 @@ const performRequest = async (endpoint, options) => {
 
       const payload = await response.json().catch(() => null);
 
-      // Cache successful GET responses
       if (isGet && payload !== null && response.ok && cacheKey) {
         setCache(cacheKey, payload);
       }
@@ -175,7 +161,6 @@ const performRequest = async (endpoint, options) => {
 };
 
 export const apiRequest = async (endpoint, options = {}) => {
-  // Invalidate cache on mutations
   if (options.method && options.method !== 'GET') {
     invalidateCache(endpoint.split('?')[0]);
   }
@@ -198,10 +183,6 @@ export const apiRequest = async (endpoint, options = {}) => {
     }
 
     if (!newToken || result.response.status === 401) {
-      localStorage.removeItem(TOKEN_STORAGE_KEY);
-      localStorage.removeItem(USER_STORAGE_KEY);
-      sessionStorage.removeItem(TOKEN_STORAGE_KEY);
-      sessionStorage.removeItem(USER_STORAGE_KEY);
       notifyUnauthorized();
     }
   }
@@ -224,13 +205,12 @@ export const apiDelete = async (endpoint, options = {}) => {
 };
 
 export const apiUpload = async (endpoint, file) => {
-  const token = getStorage().getItem(TOKEN_STORAGE_KEY);
   const formData = new FormData();
   formData.append('file', file);
 
   const response = await fetch(buildUrl(endpoint), {
     method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: { 'X-Requested-With': 'XMLHttpRequest' },
     body: formData,
     credentials: 'include',
   });

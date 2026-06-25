@@ -2,7 +2,7 @@ import { useCallback, useMemo, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { ChevronDown, ChevronRight, RefreshCw, Shield } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
-import { apiDelete, apiPatch, apiRequest } from '../api/httpClient';
+import { apiDelete, apiRequest } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage';
 import SuccessMessage from '../components/SuccessMessage';
 import useConfirm from '../components/useConfirm';
@@ -28,13 +28,12 @@ import CreateAbonoCarteraDialog from './admin/components/CreateDialogs/CreateAbo
 const ROLE_GROUPS = [
   {
     role: 'Vendedor',
-      modules: [
-        { id: 'productos', label: 'Productos' },
-        { id: 'proveedores', label: 'Proveedores' },
-        { id: 'facturas_compra', label: 'Facturas compra' },
-        { id: 'gastos', label: 'Gastos' },
-        { id: 'pedidos_proveedor', label: 'Pedidos proveedor' },
-      ],
+    modules: [
+      { id: 'productos', label: 'Productos' },
+      { id: 'proveedores', label: 'Proveedores' },
+      { id: 'gastos', label: 'Gastos' },
+      { id: 'pedidos_proveedor', label: 'Pedidos proveedor' },
+    ],
   },
   {
     role: 'Cartera',
@@ -75,23 +74,6 @@ const MODULE_LABELS = {
   informes: 'Informes',
 };
 
-const ENDPOINTS = {
-  admins: { url: '/api/superadmin/usuarios/admins' },
-  vendedores: { url: '/api/superadmin/usuarios/vendedores' },
-  productos: { url: '/api/productos/paginados?page=1&limit=200' },
-  proveedores: { url: '/api/proveedores/paginados?page=1&limit=200', key: 'data' },
-  clientes_cartera: { url: '/api/clientes' },
-  clientes_tienda: { url: '/api/clientes/tienda-fiado?page=1&limit=200' },
-  clientes_fidelizacion: { url: '/api/fidelizacion/clientes?page=1&limit=200' },
-  ventas: { url: '/api/ventas/paginadas?page=1&limit=200', key: 'data' },
-  pedidos_proveedor: { url: '/api/proveedores/pedidos/paginados?page=1&limit=200', key: 'data' },
-  facturas_compra: { url: '/api/facturas-compra/paginadas?page=1&limit=200', key: 'data' },
-  gastos: { url: '/api/gastos/paginados?page=1&limit=200', key: 'data' },
-  abonos_cartera: { url: '/api/cartera/abonos' },
-  auditorias: { url: '/api/superadmin/auditorias?page=1&limit=200' },
-  informes: { url: '/api/superadmin/informes' },
-};
-
 const CREATE_DIALOGS = {
   admins: 'admins',
   vendedores: 'vendedores',
@@ -110,7 +92,7 @@ const CREATE_DIALOGS = {
 
 const Admin = ({ moduleKey: moduleKeyProp }) => {
   const { moduleKey: moduleKeyParam } = useParams();
-  const moduleKey = (moduleKeyProp ?? moduleKeyParam ?? null)?.replace(/-/g, '_');
+  const moduleKey = moduleKeyProp ?? moduleKeyParam ?? null;
   const { token, isSuperAdmin } = useAuth();
 
   const [activeTab, setActiveTab] = useState(moduleKey ?? 'productos');
@@ -188,57 +170,74 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     });
   }, []);
 
-  const loadModule = useCallback(async (moduleKey, signal) => {
-    const cfg = ENDPOINTS[moduleKey];
-    if (!cfg) return;
+  const loadAll = useCallback(async (signal) => {
+    try {
+      const [
+        proveedoresPayload,
+        productosPayload,
+        vendedoresPayload,
+        adminsPayload,
+        clientesPayload,
+        clientesTiendaPayload,
+        clientesFidelizacionPayload,
+        ventasPayload,
+        pedidosPayload,
+        facturasPayload,
+        gastosPayload,
+        abonosPayload,
+        auditoriasPayload,
+        informesPayload,
+      ] = await Promise.all([
+        request({ endpoint: '/api/superadmin/proveedores', signal }),
+        request({ endpoint: '/api/superadmin/productos', signal }),
+        request({ endpoint: '/api/superadmin/usuarios/vendedores', signal }),
+        request({ endpoint: '/api/superadmin/usuarios/admins', signal }),
+        request({ endpoint: '/api/clientes', signal }),
+        request({ endpoint: '/api/clientes/tienda-fiado', signal }),
+        request({ endpoint: '/api/fidelizacion/clientes', signal }),
+        request({ endpoint: '/api/ventas', signal }),
+        request({ endpoint: '/api/proveedores/pedidos', signal }),
+        request({ endpoint: '/api/facturas-compra', signal }),
+        request({ endpoint: '/api/gastos', signal }),
+        request({ endpoint: '/api/cartera/abonos', signal }),
+        request({ endpoint: '/api/superadmin/auditorias', signal }),
+        request({ endpoint: '/api/superadmin/informes', signal }),
+      ]);
 
-    const payload = await request({ endpoint: cfg.url, signal });
-    const data = cfg.key ? (Array.isArray(payload?.[cfg.key]) ? payload[cfg.key] : []) : (Array.isArray(payload) ? payload : []);
-
-    const setters = {
-      proveedores: setProveedores, productos: setProductos, vendedores: setVendedores,
-      admins: setAdmins, clientes_cartera: setClientesCartera, clientes_tienda: setClientesTienda,
-      clientes_fidelizacion: setClientesFidelizacion, ventas: setVentas, pedidos_proveedor: setPedidosProveedor,
-      facturas_compra: setFacturasCompra, gastos: setGastos, abonos_cartera: setAbonosCartera,
-      auditorias: setAuditorias,
-    };
-    setters[moduleKey]?.(data);
-
-    if (moduleKey === 'informes') {
+      setProveedores(Array.isArray(proveedoresPayload) ? proveedoresPayload : []);
+      setProductos(Array.isArray(productosPayload) ? productosPayload : []);
+      setVendedores(Array.isArray(vendedoresPayload) ? vendedoresPayload : []);
+      setAdmins(Array.isArray(adminsPayload) ? adminsPayload : []);
+      setClientesCartera(Array.isArray(clientesPayload) ? clientesPayload : []);
+      setClientesTienda(Array.isArray(clientesTiendaPayload) ? clientesTiendaPayload : []);
+      setClientesFidelizacion(Array.isArray(clientesFidelizacionPayload) ? clientesFidelizacionPayload : []);
+      setVentas(Array.isArray(ventasPayload) ? ventasPayload : []);
+      setPedidosProveedor(Array.isArray(pedidosPayload) ? pedidosPayload : []);
+      setFacturasCompra(Array.isArray(facturasPayload) ? facturasPayload : []);
+      setGastos(Array.isArray(gastosPayload) ? gastosPayload : []);
+      setAbonosCartera(Array.isArray(abonosPayload) ? abonosPayload : []);
+      setAuditorias(Array.isArray(auditoriasPayload) ? auditoriasPayload : []);
       setInformes({
-        ventas_totales: Number(payload?.ventas_totales || 0),
-        facturacion_total: Number(payload?.facturacion_total || 0),
-        vendedor_mas_vendedor: payload?.vendedor_mas_vendedor || null,
-        vendedores_top: Array.isArray(payload?.vendedores_top) ? payload.vendedores_top : [],
-        producto_mas_vendido: payload?.producto_mas_vendido || null,
-        producto_menos_vendido: payload?.producto_menos_vendido || null,
-        productos_mas_vendidos: Array.isArray(payload?.productos_mas_vendidos) ? payload.productos_mas_vendidos : [],
-        productos_menos_vendidos: Array.isArray(payload?.productos_menos_vendidos) ? payload.productos_menos_vendidos : [],
+        ventas_totales: Number(informesPayload?.ventas_totales || 0),
+        facturacion_total: Number(informesPayload?.facturacion_total || 0),
+        vendedor_mas_vendedor: informesPayload?.vendedor_mas_vendedor || null,
+        vendedores_top: Array.isArray(informesPayload?.vendedores_top) ? informesPayload.vendedores_top : [],
+        producto_mas_vendido: informesPayload?.producto_mas_vendido || null,
+        producto_menos_vendido: informesPayload?.producto_menos_vendido || null,
+        productos_mas_vendidos: Array.isArray(informesPayload?.productos_mas_vendidos) ? informesPayload.productos_mas_vendidos : [],
+        productos_menos_vendidos: Array.isArray(informesPayload?.productos_menos_vendidos) ? informesPayload.productos_menos_vendidos : [],
       });
+    } catch (err) {
+      if (signal?.aborted) return;
+      throw err;
     }
   }, [request]);
 
-  const loadAll = useCallback(async (signal) => {
-    await Promise.all([
-      loadModule(activeTab, signal),
-      loadModule('informes', signal),
-    ]);
-  }, [loadModule, activeTab]);
-
   const handleCreated = useCallback((message) => {
-    loadModule(activeTab);
-    loadModule('informes');
+    loadAll();
     notifySuccess(message);
     closeCreateDialog();
-  }, [loadModule, activeTab, notifySuccess, closeCreateDialog]);
-
-  useEffect(() => {
-    if (!token || !isSuperAdmin) return;
-    const controller = new AbortController();
-    loadModule(activeTab, controller.signal).catch(() => {});
-    loadModule('informes', controller.signal).catch(() => {});
-    return () => controller.abort();
-  }, [token, isSuperAdmin, activeTab, loadModule]);
+  }, [loadAll, notifySuccess, closeCreateDialog]);
 
   useEffect(() => {
     if (!token || !isSuperAdmin) {
@@ -252,8 +251,7 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     const load = async () => {
       try {
         setLoading(true);
-        await loadModule('productos', controller.signal);
-        await loadModule('informes', controller.signal);
+        await loadAll(controller.signal);
       } catch (err) {
         if (!isMounted || controller.signal.aborted) return;
         notifyError(err.message || 'No se pudo cargar el modulo admin');
@@ -269,28 +267,27 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
       isMounted = false;
       controller.abort();
     };
-  }, [token, isSuperAdmin, loadModule, notifyError]);
+  }, [token, isSuperAdmin, loadAll, notifyError]);
 
   const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
-      await loadModule(activeTab);
-      await loadModule('informes');
+      const controller = new AbortController();
+      await loadAll(controller.signal);
       notifySuccess('Datos actualizados');
     } catch (err) {
       notifyError(err.message || 'No se pudo actualizar');
     } finally {
       setRefreshing(false);
     }
-  }, [loadModule, activeTab, notifySuccess, notifyError]);
+  }, [loadAll, notifySuccess, notifyError]);
 
   const runDelete = useCallback(async ({ endpoint, successMessage }) => {
     await apiDelete(endpoint);
 
-    await loadModule(activeTab);
-    await loadModule('informes');
+    await loadAll();
     notifySuccess(successMessage);
-  }, [loadModule, activeTab, notifySuccess]);
+  }, [loadAll, notifySuccess]);
 
   const openEditModal = useCallback((title, fields, initialValues, onSave) => {
     setEditModalTitle(title);
@@ -648,18 +645,17 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     openEditModal(
       'Editar producto',
       [
-      { name: 'nombre', label: 'Nombre', type: 'text', required: true },
-      { name: 'contacto', label: 'Contacto', type: 'text' },
-      { name: 'telefono', label: 'Telefono', type: 'text' },
-      { name: 'activo', label: 'Activo', type: 'checkbox' },
-    ],
-    { nombre: item.nombre, contacto: item.contacto ?? '', telefono: item.telefono ?? '', activo: item.activo ?? true },
-    async (values) => {
-      await request({
-        endpoint: `/api/proveedores/${item.id}`,
-        method: 'PATCH',
-        body: { nombre: values.nombre.trim(), contacto: values.contacto.trim() || null, telefono: values.telefono.trim() || null, activo: values.activo },
-      });
+        { name: 'nombre', label: 'Nombre', type: 'text', required: true },
+        { name: 'precio_venta', label: 'Precio de venta', type: 'number', required: true },
+      ],
+      { nombre: item.nombre, precio_venta: String(item.precio_venta ?? '') },
+      async (values) => {
+        if (Number(values.precio_venta) < 0) { notifyError('El precio de venta no puede ser negativo'); return; }
+        await request({
+          endpoint: `/api/productos/${item.id}`,
+          method: 'PATCH',
+          body: { nombre: values.nombre.trim(), precio_venta: Number(values.precio_venta) },
+        });
         await loadAll();
         notifySuccess('Producto actualizado');
       },
@@ -676,26 +672,6 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
       notifyError(err.message || 'No se pudo eliminar producto');
     }
   }, [confirm, loadAll, notifySuccess, notifyError]);
-
-  const handleToggleProductoActivo = useCallback(async (item) => {
-    try {
-      await apiPatch(`/api/productos/${item.id}`, { activo: !item.activo });
-      await loadAll();
-      notifySuccess(item.activo ? 'Producto desactivado' : 'Producto activado');
-    } catch (err) {
-      notifyError(err.message || 'Error al cambiar estado');
-    }
-  }, [loadAll, notifySuccess, notifyError]);
-
-  const handleToggleProveedorActivo = useCallback(async (item) => {
-    try {
-      await apiRequest(`/api/proveedores/${item.id}/toggle-activo`, { method: 'PUT' });
-      await loadAll();
-      notifySuccess(item.activo ? 'Proveedor desactivado' : 'Proveedor activado');
-    } catch (err) {
-      notifyError(err.message || 'Error al cambiar estado');
-    }
-  }, [loadAll, notifySuccess, notifyError]);
 
   const handleEditProveedor = useCallback((item) => {
     openEditModal(
@@ -718,7 +694,7 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
   }, [openEditModal, request, loadAll, notifySuccess]);
 
   const handleDeleteProveedor = useCallback(async (item) => {
-    const confirmed = await confirm({ title: 'Eliminar proveedor', message: `Eliminar permanentemente ${item.nombre}?` }); if (!confirmed) return;
+    const confirmed = await confirm({ title: 'Eliminar proveedor', message: `Eliminar proveedor ${item.nombre}?` }); if (!confirmed) return;
     try {
       await apiDelete(`/api/proveedores/${item.id}`);
       await loadAll();
@@ -771,17 +747,14 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     { key: 'productos', title: 'Productos', desc: 'Inventario y precios con control visual.', data: productos, createDialog: 'productos',
       columns: [
         { key: 'nombre', label: 'Nombre', mono: true },
-        { key: 'proveedor_nombre', label: 'Proveedor' },
         { key: 'precio_costo', label: 'Costo', align: 'right', render: (i) => formatMoney(i.precio_costo) },
         { key: 'precio_venta', label: 'Venta', align: 'right', render: (i) => formatMoney(i.precio_venta) },
         { key: 'stock_actual', label: 'Stock', align: 'right' }, { key: 'stock_minimo', label: 'Min', align: 'right' },
-        { key: 'activo', label: 'Activo', align: 'right', render: (i) => i.activo ? '✅' : '❌' },
-      ], onEdit: handleEditProducto, onDelete: handleDeleteProducto, onToggle: handleToggleProductoActivo, minWidth: '900px' },
+      ], onEdit: handleEditProducto, onDelete: handleDeleteProducto, minWidth: '900px' },
     { key: 'proveedores', title: 'Proveedores', desc: 'Catálogo de contactos y pedidos.', data: proveedores, createDialog: 'proveedores',
       columns: [
         { key: 'nombre', label: 'Nombre', mono: true }, { key: 'contacto', label: 'Contacto' }, { key: 'telefono', label: 'Telefono' },
-        { key: 'activo', label: 'Activo', align: 'right', render: (i) => i.activo ? '✅' : '❌' },
-      ], onEdit: handleEditProveedor, onDelete: handleDeleteProveedor, onToggle: handleToggleProveedorActivo, minWidth: '760px' },
+      ], onEdit: handleEditProveedor, onDelete: handleDeleteProveedor, minWidth: '760px' },
     { key: 'clientes_cartera', title: 'Clientes cartera', desc: 'Clientes con cupo y deuda.', data: clientesCartera, createDialog: 'clientes_cartera',
       columns: [
         { key: 'id', label: 'ID', mono: true }, { key: 'nombre', label: 'Nombre' }, { key: 'documento', label: 'Documento' },
@@ -817,14 +790,13 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
       ], onEdit: handleEditPedidoProveedor, onDelete: handleDeletePedidoProveedor, minWidth: '900px' },
     { key: 'facturas_compra', title: 'Facturas compra', desc: 'Ingresos de factura con detalle.', data: facturasCompra, createDialog: 'facturas_compra',
       columns: [
-        { key: 'id', label: 'ID', mono: true }, { key: 'numero_factura', label: 'No. Factura' },
-        { key: 'proveedor_nombre', label: 'Proveedor' },
+        { key: 'id', label: 'ID', mono: true }, { key: 'proveedor_nombre', label: 'Proveedor' },
         { key: 'subtotal', label: 'Subtotal', align: 'right', render: (i) => formatMoney(i.subtotal) },
         { key: 'total_iva', label: 'IVA', align: 'right', render: (i) => formatMoney(i.total_iva) },
         { key: 'total_factura', label: 'Total', align: 'right', render: (i) => formatMoney(i.total_factura) },
         { key: 'items', label: 'Items', render: (i) => i.items?.length || 0 },
         { key: 'fecha_creacion', label: 'Fecha', render: (i) => formatDateTime(i.fecha_creacion) },
-      ], onEdit: handleEditFacturaCompra, onDelete: handleDeleteFacturaCompra, minWidth: '1100px' },
+      ], onEdit: handleEditFacturaCompra, onDelete: handleDeleteFacturaCompra, minWidth: '1000px' },
     { key: 'gastos', title: 'Gastos', desc: 'Gastos operativos.', data: gastos, createDialog: 'gastos',
       columns: [
         { key: 'id', label: 'ID', mono: true }, { key: 'categoria', label: 'Categoria' }, { key: 'descripcion', label: 'Descripcion' },
@@ -915,23 +887,7 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
 
       {!moduleKey && (
         <div className="rounded-2xl border border-blush-300 bg-white/80 px-4 py-3 text-xs text-rosewood/80 shadow-sm sm:text-sm">
-          {activeTab === 'productos' && <>Productos: {productos.length}</>}
-          {activeTab === 'proveedores' && <>Proveedores: {proveedores.length}</>}
-          {activeTab === 'ventas' && <>Ventas: {ventas.length}</>}
-          {activeTab === 'gastos' && <>Gastos: {gastos.length}</>}
-          {activeTab === 'clientes_cartera' && <>Clientes cartera: {clientesCartera.length}</>}
-          {activeTab === 'clientes_tienda' && <>Clientes tienda: {clientesTienda.length}</>}
-          {!['productos','proveedores','ventas','gastos','clientes_cartera','clientes_tienda'].includes(activeTab) && (
-            <>{MODULE_LABELS[activeTab] || activeTab}: {{
-              admins: admins.length, vendedores: vendedores.length,
-              clientes_fidelizacion: clientesFidelizacion.length,
-              pedidos_proveedor: pedidosProveedor.length,
-              facturas_compra: facturasCompra.length,
-              abonos_cartera: abonosCartera.length,
-              auditorias: auditorias.length,
-            }[activeTab] ?? 0}</>
-          )}
-          {' · '}Facturación: {formatMoney(informes.facturacion_total)}
+          Resumen: Admins {admins.length} · Vendedores {vendedores.length} · Productos {productos.length} · Proveedores {proveedores.length} · Auditorias {auditorias.length} · Facturacion {formatMoney(informes.facturacion_total)}
         </div>
       )}
 
@@ -994,7 +950,6 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
               data={section.data}
               onEdit={section.onEdit}
               onDelete={section.onDelete}
-              onToggle={section.onToggle}
               minWidth={section.minWidth}
             />
           </AdminSection>

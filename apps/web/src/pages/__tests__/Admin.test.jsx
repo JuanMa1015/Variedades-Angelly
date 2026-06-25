@@ -189,7 +189,7 @@ describe('Admin page', () => {
 
     await waitFor(() => {
       expect(apiRequestMock).toHaveBeenCalledWith(
-        expect.stringContaining('/api/productos/paginados'),
+        '/api/superadmin/productos',
         expect.any(Object),
       );
       expect(apiRequestMock).toHaveBeenCalledWith(
@@ -359,9 +359,9 @@ describe('Admin page', () => {
     render(<Admin />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Productos:/)).toBeInTheDocument();
+      expect(screen.getByText(/Productos /)).toBeInTheDocument();
     });
-    expect(screen.getByText(/Facturación/)).toBeInTheDocument();
+    expect(screen.getByText(/Facturacion/)).toBeInTheDocument();
   });
 
   it('hides role groups and summary when moduleKey prop given', async () => {

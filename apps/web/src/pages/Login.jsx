@@ -53,7 +53,6 @@ const Login = () => {
       const nextUser = await login({
         username: username.trim(),
         password,
-        rememberMe,
       });
 
       if (rememberMe) {

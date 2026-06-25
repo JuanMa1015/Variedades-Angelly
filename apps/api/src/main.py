@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
 import re
 import time
 
-from collections import defaultdict
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, status
@@ -16,34 +15,43 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import ValidationError
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
+from sqlalchemy import inspect, text
+from sqlalchemy.exc import IntegrityError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
+
+from src.api.limiter import limiter
+from src.api.routers.auditorias import router as auditorias_router
+from src.api.routers.auth import router as auth_router
+from src.api.routers.caja import router as caja_router
+from src.api.routers.clientes_cartera_clientes import router as clientes_cartera_clientes_router
+from src.api.routers.clientes_cartera_cobros import router as clientes_cartera_cobros_router
+from src.api.routers.clientes_cartera_ventas import router as clientes_cartera_ventas_router
+from src.api.routers.clientes_tienda_cobros import router as clientes_tienda_cobros_router
+from src.api.routers.clientes_tienda_fiado import router as clientes_tienda_fiado_router
+from src.api.routers.dashboard import router as dashboard_router
+from src.api.routers.export import router as export_router
+from src.api.routers.facturas_compra import router as facturas_compra_router
+from src.api.routers.fidelizacion_clientes import router as fidelizacion_clientes_router
+from src.api.routers.gastos import router as gastos_router
+from src.api.routers.pedidos_proveedor import router as pedidos_proveedor_router
+from src.api.routers.productos import router as productos_router
+from src.api.routers.proveedores import router as proveedores_router
+from src.api.routers.superadmin import router as superadmin_router
+from src.api.routers.upload import router as upload_router
+from src.api.routers.ventas_fidelizacion import router as ventas_fidelizacion_router
+from src.infrastructure.database.connection import engine, get_db
+from src.infrastructure.database.models import Base
 
 
 def _csp_directive(name: str, default: str) -> str:
     raw = os.getenv(f"CSP_{name}", "").strip()
     return raw or default
 
-
-class InMemoryRateLimiter:
-    """Sliding-window rate limiter por IP en memoria."""
-
-    def __init__(self) -> None:
-        self._windows: dict[str, list[float]] = defaultdict(list)
-        self._lock = asyncio.Lock()
-
-    async def check(self, key: str, max_requests: int, window_seconds: int) -> bool:
-        now = time.time()
-        cutoff = now - window_seconds
-        async with self._lock:
-            self._windows[key] = [t for t in self._windows[key] if t > cutoff]
-            if len(self._windows[key]) >= max_requests:
-                return False
-            self._windows[key].append(now)
-            return True
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
@@ -54,50 +62,25 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         connect_src = _csp_directive("CONNECT_SRC", "'self' http://localhost:5173 ws://localhost:5173 http://localhost:5174 ws://localhost:5174")
         img_src = _csp_directive("IMG_SRC", "'self' data: https://*.public.blob.vercel-storage.com")
-        response.headers["Content-Security-Policy"] = (
+        env = os.getenv("APP_ENV", "development").strip().lower()
+        is_prod = env == "production"
+        script_src = "'self'" if is_prod else "'self' 'unsafe-inline' 'unsafe-eval'"
+        csp = (
             f"default-src 'self'; "
             f"img-src {img_src}; "
             f"style-src 'self' 'unsafe-inline'; "
-            f"script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+            f"script-src {script_src}; "
             f"connect-src {connect_src}; "
             f"font-src 'self' data:; "
             f"form-action 'self'"
         )
+        if is_prod:
+            csp += "; upgrade-insecure-requests"
+        response.headers["Content-Security-Policy"] = csp
         return response
-from sqlalchemy.exc import IntegrityError
-from pydantic import ValidationError
 
-from sqlalchemy import text
 
-from src.api.routers.auditorias import router as auditorias_router
-from src.api.routers.caja import router as caja_router
-from src.api.routers.auth import router as auth_router
-from src.api.routers.clientes_cartera_clientes import router as clientes_cartera_clientes_router
-from src.api.routers.clientes_cartera_cobros import router as clientes_cartera_cobros_router
-from src.api.routers.clientes_cartera_ventas import router as clientes_cartera_ventas_router
-from src.api.routers.clientes_tienda_fiado import router as clientes_tienda_fiado_router
-from src.api.routers.clientes_tienda_cobros import router as clientes_tienda_cobros_router
-from src.api.routers.dashboard import router as dashboard_router
-from src.api.routers.fidelizacion_clientes import router as fidelizacion_clientes_router
-from src.api.routers.proveedores import router as proveedores_router
-from src.api.routers.pedidos_proveedor import router as pedidos_proveedor_router
-from src.api.routers.gastos import router as gastos_router
-from src.api.routers.facturas_compra import router as facturas_compra_router
-from src.api.routers.productos import router as productos_router
-from src.api.routers.ventas_fidelizacion import router as ventas_fidelizacion_router
-from src.api.routers.superadmin import router as superadmin_router
-from src.api.routers.export import router as export_router
-from src.api.routers.upload import router as upload_router
-from sqlalchemy import inspect
-
-from src.api.limiter import _get_client_ip, limiter
-from src.infrastructure.database.connection import engine, get_db
-from src.infrastructure.database.models import Base
-
-_rate_limiter = InMemoryRateLimiter()
-
-_RATE_EXEMPT_PREFIXES = ("/health", "/docs", "/openapi.json", "/uploads")
-_RATE_SLOWAPI_PATHS = ("/api/auth/login", "/api/auth/refresh")
+_CSRF_EXEMPT_PREFIXES = ("/api/auth/login", "/api/auth/refresh", "/health", "/docs", "/openapi.json", "/uploads")
 
 logger = logging.getLogger("tienda_angelly")
 logger.setLevel(logging.INFO)
@@ -106,13 +89,14 @@ _handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s
 if not logger.handlers:
     logger.addHandler(_handler)
 
-app = FastAPI(title="Tienda Angelly API", version="0.1.0")
-app.state.limiter = limiter
 
+def _run_startup_tasks():
+    """Sincroniza esquema de BD al arrancar (solo dev/test)."""
+    env = os.getenv("APP_ENV", "development").strip().lower()
+    if env not in ("development", "test"):
+        logger.info("Saltando create_all — APP_ENV=%s", env)
+        return
 
-@app.on_event("startup")
-def on_startup():
-    """Crea tablas faltantes y agrega columnas nuevas a tablas existentes."""
     Base.metadata.create_all(bind=engine)
     inspector = inspect(engine)
     with engine.connect() as conn:
@@ -127,7 +111,6 @@ def on_startup():
                     )
         conn.commit()
 
-        # Fix numero_factura column — exists in DB as NOT NULL but unused
         factura_cols = inspector.get_columns("facturas_compra")
         for c in factura_cols:
             if c["name"] == "numero_factura" and not c["nullable"]:
@@ -137,17 +120,26 @@ def on_startup():
                 conn.commit()
                 break
 
-        # Set NULL deuda_total to 0 for existing tienda clients
         conn.execute(
             text("UPDATE clientes_fiado_tienda SET deuda_total = 0 WHERE deuda_total IS NULL")
         )
         conn.commit()
 
-        # Clean expired refresh token blacklist entries
         conn.execute(
             text("DELETE FROM refresh_token_blacklist WHERE expires_at < NOW()")
         )
         conn.commit()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    _run_startup_tasks()
+    yield
+
+
+app = FastAPI(title="Tienda Angelly API", version="0.1.0", lifespan=lifespan)
+app.state.limiter = limiter
+
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
@@ -170,6 +162,7 @@ def _load_cors_origin_regex() -> str | None:
     raw_regex = os.getenv("CORS_ALLOW_ORIGIN_REGEX", "").strip()
     return raw_regex or None
 
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_load_cors_origins(),
@@ -179,34 +172,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ─── Global Rate Limiting Middleware ───
+# ─── CSRF Protection Middleware ───
 
 @app.middleware("http")
-async def global_rate_limit(request, call_next):
-    # Skip rate limiting in test environment
+async def csrf_protection(request, call_next):
     if os.getenv("APP_ENV", "development").strip().lower() == "test":
         return await call_next(request)
-
-    path = request.url.path
-    if path.startswith(_RATE_EXEMPT_PREFIXES) or path in _RATE_SLOWAPI_PATHS:
+    if request.method in {"GET", "HEAD", "OPTIONS", "TRACE"}:
         return await call_next(request)
-
-    ip = _get_client_ip(request)
-
-    if request.method in {"GET", "HEAD", "OPTIONS"}:
-        allowed = await _rate_limiter.check(ip, 100, 60)
-    elif request.method == "POST":
-        allowed = await _rate_limiter.check(ip, 30, 60)
-    else:
-        allowed = await _rate_limiter.check(ip, 20, 60)
-
-    if not allowed:
+    path = request.url.path
+    if any(path.startswith(prefix) for prefix in _CSRF_EXEMPT_PREFIXES):
+        return await call_next(request)
+    if request.headers.get("x-requested-with") != "XMLHttpRequest":
         return _cors_response(
-            429,
-            {"detail": "Demasiadas solicitudes. Intenta de nuevo en un minuto."},
+            status.HTTP_403_FORBIDDEN,
+            {"detail": "CSRF validation failed: missing X-Requested-With header"},
             request,
         )
-
     return await call_next(request)
 
 
@@ -251,6 +233,7 @@ async def http_exception_handler(request, exc):
         request,
     )
 
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request, exc):
     errors = []
@@ -263,6 +246,7 @@ async def validation_exception_handler(request, exc):
         {"detail": "Error de validación", "errors": errors},
         request,
     )
+
 
 @app.exception_handler(ValidationError)
 async def pydantic_validation_handler(request, exc):
@@ -277,6 +261,7 @@ async def pydantic_validation_handler(request, exc):
         request,
     )
 
+
 @app.exception_handler(IntegrityError)
 async def integrity_error_handler(request, exc):
     logger.error("IntegrityError: %s", str(exc.orig)[:300])
@@ -286,6 +271,7 @@ async def integrity_error_handler(request, exc):
         {"detail": detail},
         request,
     )
+
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
@@ -299,9 +285,9 @@ async def global_exception_handler(request, exc):
         request,
     )
 
+
 def _extract_integrity_detail(error_text: str) -> str:
     error_str = str(error_text)
-    # Check constraint violations — nombres exactos de migracion 683d65d3108c
     constraints = {
         "ck_cliente_limite_credito": "El límite de crédito no puede ser negativo.",
         "ck_cliente_deuda_total": "La deuda total no puede ser negativa.",
@@ -337,16 +323,14 @@ def _extract_integrity_detail(error_text: str) -> str:
     for chk, msg in constraints.items():
         if chk in error_str:
             return msg
-    # Unique constraint
     if "unique constraint" in error_str or "duplicate key" in error_str:
         return "Ya existe un registro con ese valor único."
-    # Foreign key
     if "foreign key constraint" in error_str or "violates foreign key" in error_str:
         return "El registro relacionado no existe o no es válido."
-    # Not null
     if "null value in column" in error_str or "violates not-null constraint" in error_str:
         return "Un campo obligatorio está vacío."
     return f"Error de integridad en la base de datos: {error_str[:200]}"
+
 
 # ─── Static Files (imagenes subidas) ───
 

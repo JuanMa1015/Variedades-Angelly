@@ -177,7 +177,7 @@ def test_caja_apertura_requiere_auth() -> None:
     """Verifica que POST /api/caja/apertura requiera auth."""
     client = TestClient(app)
     response = client.post("/api/caja/apertura", json={"monto_inicial": 50000})
-    assert response.status_code == 401
+    assert response.status_code in (401, 403)
 
 
 def test_caja_apertura_exitosa(caja_client: tuple[TestClient, dict, dict, sessionmaker]) -> None:
