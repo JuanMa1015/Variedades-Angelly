@@ -38,7 +38,7 @@ def _set_access_token_cookie(response: Response, token: str, expires_in: int) ->
         value=token,
         httponly=True,
         samesite="lax",
-        secure=os.getenv("APP_ENV") != "development",
+        secure=os.getenv("APP_ENV", "development") != "development",
         max_age=expires_in,
         path="/",
     )
@@ -127,7 +127,7 @@ def auth_login(
         value=refresh_token,
         httponly=True,
         samesite="lax",
-        secure=os.getenv("APP_ENV") != "development",
+        secure=os.getenv("APP_ENV", "development") != "development",
         max_age=refresh_expires,
         path="/api/auth",
     )
@@ -184,7 +184,7 @@ def auth_refresh(
         value=new_refresh_token,
         httponly=True,
         samesite="strict",
-        secure=os.getenv("APP_ENV") != "development",
+        secure=os.getenv("APP_ENV", "development") != "development",
         max_age=refresh_expires,
         path="/api/auth",
     )
