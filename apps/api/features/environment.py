@@ -1,5 +1,10 @@
 import os
 
+# Debe configurarse ANTES de importar src.main: los decoradores de slowapi
+# evaluan login_rate_limit() una unica vez en tiempo de importacion.
+os.environ.setdefault("APP_ENV", "test")
+os.environ.setdefault("LOGIN_RATE_LIMIT", "10000/minute")
+
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker

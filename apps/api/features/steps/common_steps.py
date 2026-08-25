@@ -42,7 +42,7 @@ def step_autenticado(context, usuario, password):
     _login(context, usuario, password)
 
 
-@given("existen los siguientes productos:")
+@given("existen los siguientes productos")
 def step_existen_productos(context):
     with context.db_session() as session:
         for row in context.table:
@@ -59,7 +59,7 @@ def step_existen_productos(context):
         session.commit()
 
 
-@given("existe un producto:")
+@given("existe un producto")
 def step_existe_producto(context):
     with context.db_session() as session:
         for row in context.table:
@@ -76,7 +76,7 @@ def step_existe_producto(context):
         session.commit()
 
 
-@given("existe un cliente de tienda:")
+@given("existe un cliente de tienda")
 def step_existe_cliente_tienda(context):
     with context.db_session() as session:
         for row in context.table:
@@ -88,7 +88,7 @@ def step_existe_cliente_tienda(context):
         session.commit()
 
 
-@given("existe un cliente de cartera:")
+@given("existe un cliente de cartera")
 def step_existe_cliente_cartera(context):
     with context.db_session() as session:
         for row in context.table:
@@ -123,7 +123,7 @@ def step_get_autenticado(context, endpoint):
     )
 
 
-@when("creo una venta de contado con items:")
+@when("creo una venta de contado con items")
 def step_crear_venta_contado(context):
     items = [{"producto_id": _producto_id(context, r["producto_nombre"]), "cantidad": int(r["cantidad"])} for r in context.table]
     context.response = context.client.post(
@@ -133,7 +133,7 @@ def step_crear_venta_contado(context):
     )
 
 
-@when('creo un fiado de tienda para "{cliente_nombre}" con items:')
+@when('creo un fiado de tienda para "{cliente_nombre}" con items')
 def step_crear_fiado_tienda(context, cliente_nombre):
     with context.db_session() as session:
         cliente = session.execute(
@@ -154,7 +154,7 @@ def step_crear_fiado_tienda(context, cliente_nombre):
     )
 
 
-@when('intento crear un fiado de cartera para "{cliente_nombre}" con items:')
+@when('intento crear un fiado de cartera para "{cliente_nombre}" con items')
 def step_intentar_fiado_cartera(context, cliente_nombre):
     with context.db_session() as session:
         cliente = session.execute(
@@ -175,7 +175,7 @@ def step_intentar_fiado_cartera(context, cliente_nombre):
     )
 
 
-@when('creo un fiado de cartera para "{cliente_nombre}" con items:')
+@when('creo un fiado de cartera para "{cliente_nombre}" con items')
 def step_crear_fiado_cartera(context, cliente_nombre):
     with context.db_session() as session:
         cliente = session.execute(

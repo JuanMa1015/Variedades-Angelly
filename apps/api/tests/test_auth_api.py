@@ -29,6 +29,8 @@ def auth_client() -> Generator[tuple[TestClient, sessionmaker[Session]], None, N
     """Entrega cliente API con BD SQLite aislada para pruebas auth."""
     os.environ["APP_ENV"] = "test"
     os.environ["AUTH_BOOTSTRAP_ENABLED"] = "true"
+    os.environ["AUTH_SUPERADMIN_USERNAME"] = "angelly_superadmin"
+    os.environ["AUTH_SUPERADMIN_PASSWORD"] = "supersecure123"
     os.environ["AUTH_ADMIN_USERNAME"] = "angelly_admin"
     os.environ["AUTH_ADMIN_PASSWORD"] = "cambiame123"
     os.environ["AUTH_SELLER_USERNAME"] = "vendedor1"
@@ -441,3 +443,94 @@ def test_dashboard_resumen_disponible_para_vendedor(
     assert "ventas_diarias" in payload
     assert "ventas_semanales" in payload
     assert "ventas_mensuales" in payload
+
+
+def test_refresh_token_no_autoriza_como_access_token(
+    auth_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    """Un refresh token no debe usarse como Bearer en endpoints protegidos."""
+    client, _ = auth_client
+
+    login_response = client.post(
+        "/api/auth/login",
+        json={"username": "angelly_admin", "password": "cambiame123"},
+    )
+    assert login_response.status_code == 200
+    refresh_value = client.cookies.get("refresh_token")
+    assert refresh_value
+
+    # Sin cookies: solo el Bearer con el refresh token debe autenticar.
+    client.cookies.clear()
+    response = client.get(
+        "/api/clientes/cartera",
+        headers={"Authorization": f"Bearer {refresh_value}"},
+    )
+
+    assert response.status_code == 401
+
+
+def test_logout_revoca_refresh_token_y_bloquea_reuso(
+    auth_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    """Tras logout, el refresh token anterior queda en blacklist (no reutilizable)."""
+    client, _ = auth_client
+
+    login_response = client.post(
+        "/api/auth/login",
+        json={"username": "angelly_admin", "password": "cambiame123"},
+    )
+    assert login_response.status_code == 200
+    refresh_value = client.cookies.get("refresh_token")
+    assert refresh_value
+
+    logout_response = client.post("/api/auth/logout")
+    assert logout_response.status_code == 200
+
+    reuse_response = client.post(
+        "/api/auth/refresh",
+        cookies={"refresh_token": refresh_value},
+    )
+    assert reuse_response.status_code == 401
+    assert reuse_response.json()["detail"] == "Refresh token revocado"
+
+    # El access token viejo ya no sirve como cookie de sesion.
+    me_response = client.get("/api/clientes/cartera")
+    assert me_response.status_code == 401
+
+
+def test_refresh_rota_jti_el_anterior_no_reutilizable(
+    auth_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    """El flujo de rotacion invalida el refresh token consumido."""
+    client, _ = auth_client
+
+    client.post(
+        "/api/auth/login",
+        json={"username": "angelly_admin", "password": "cambiame123"},
+    )
+    primer_refresh = client.cookies.get("refresh_token")
+
+    primera = client.post("/api/auth/refresh")
+    assert primera.status_code == 200
+    segundo_refresh = client.cookies.get("refresh_token")
+    assert segundo_refresh != primer_refresh
+
+    reuso = client.post("/api/auth/refresh", cookies={"refresh_token": primer_refresh})
+    assert reuso.status_code == 401
+
+
+def test_password_corta_rechazada_al_crear_vendedor(
+    auth_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    """La creacion de usuarios exige contrasenas de al menos 8 caracteres."""
+    client, _ = auth_client
+
+    superadmin_token = _login_token(client, "angelly_superadmin", "supersecure123")
+
+    response = client.post(
+        "/api/usuarios/vendedores",
+        headers={"Authorization": f"Bearer {superadmin_token}"},
+        json={"username": "vendedor_nuevo", "password": "corta12"},
+    )
+
+    assert response.status_code == 422
