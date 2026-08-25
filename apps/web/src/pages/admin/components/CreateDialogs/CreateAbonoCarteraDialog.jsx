@@ -32,7 +32,7 @@ const CreateAbonoCarteraDialog = ({ isOpen, onClose, onCreated }) => {
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} variant="admin" maxWidth="max-w-2xl" title="Crear abono cartera" subtitle="Alta rápida desde modal.">
-      {error && <div className="mb-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
+      {error && <div role="alert" className="mb-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
       <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <input type="number" min="1" value={form.cliente_id} onChange={(e) => setForm((c) => ({ ...c, cliente_id: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="ID del cliente" required />
         <input type="number" min="0" step="0.01" value={form.monto} onChange={(e) => setForm((c) => ({ ...c, monto: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Monto" required />

@@ -38,7 +38,7 @@ const CreateFacturaCompraDialog = ({ isOpen, onClose, onCreated }) => {
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} variant="admin" maxWidth="max-w-3xl" title="Crear factura compra" subtitle="Alta rápida desde modal. Items como JSON en 'items'.">
-      {error && <div className="mb-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
+      {error && <div role="alert" className="mb-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
       <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3">
         <input value={form.proveedor_id} onChange={(e) => setForm((c) => ({ ...c, proveedor_id: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="ID del proveedor" required />
         <textarea value={form.items_json} onChange={(e) => setForm((c) => ({ ...c, items_json: e.target.value }))} className="min-h-28 rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder='[{"producto_id":1,"cantidad":2}]' />

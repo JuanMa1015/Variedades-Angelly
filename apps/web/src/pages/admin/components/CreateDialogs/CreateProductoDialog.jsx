@@ -64,7 +64,7 @@ const CreateProductoDialog = ({ isOpen, onClose, onCreated }) => {
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} variant="admin" maxWidth="max-w-4xl" title="Crear producto" subtitle="Alta rápida desde modal.">
-      {error && <div className="mb-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
+      {error && <div role="alert" className="mb-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
       <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <input value={form.nombre} onChange={(e) => setForm((c) => ({ ...c, nombre: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Nombre" required />
         <input value={form.codigo_barras} onChange={(e) => setForm((c) => ({ ...c, codigo_barras: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Código barras" />
@@ -81,7 +81,7 @@ const CreateProductoDialog = ({ isOpen, onClose, onCreated }) => {
         <div className="md:col-span-3">
           {imagePreview ? (
             <div className="relative inline-block">
-              <img src={imagePreview} alt="Preview" className="h-24 w-24 rounded-xl border border-blush-300 object-cover" />
+              <img src={imagePreview} alt="Vista previa de la imagen del producto" className="h-24 w-24 rounded-xl border border-blush-300 object-cover" />
               <button type="button" onClick={clearImage} className="absolute -right-2 -top-2 rounded-full border border-blush-300 bg-white p-0.5 text-gray-500 hover:text-red-600">
                 <X className="h-4 w-4" />
               </button>

@@ -32,7 +32,7 @@ const CreateGastoDialog = ({ isOpen, onClose, onCreated }) => {
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} variant="admin" maxWidth="max-w-2xl" title="Crear gasto" subtitle="Alta rápida desde modal.">
-      {error && <div className="mb-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
+      {error && <div role="alert" className="mb-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
       <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <input value={form.categoria} onChange={(e) => setForm((c) => ({ ...c, categoria: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Categoria" required />
         <input value={form.descripcion} onChange={(e) => setForm((c) => ({ ...c, descripcion: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Descripcion" />
