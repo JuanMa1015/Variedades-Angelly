@@ -17,7 +17,6 @@ from src.api.services.vendedor import (
     list_vendedores as _list_vendedores,
     update_vendedor as _update_vendedor,
 )
-from src.auth.bootstrap import ensure_default_auth_users
 from src.auth.security import (
     create_access_token,
     create_refresh_token,
@@ -25,6 +24,7 @@ from src.auth.security import (
     refresh_expire_days,
     verify_password,
 )
+from src.auth.token_blacklist import blacklist_jti, is_jti_blacklisted
 from src.infrastructure.database.connection import get_db
 from src.infrastructure.database.models import UsuarioModel
 from src.api.limiter import limiter, login_rate_limit
@@ -32,14 +32,17 @@ from src.api.limiter import limiter, login_rate_limit
 router = APIRouter(tags=["auth"])
 
 
+def _is_production() -> bool:
+    return os.getenv("APP_ENV", "development").strip().lower() == "production"
+
+
 def _set_access_token_cookie(response: Response, token: str, expires_in: int) -> None:
-    is_prod = os.getenv("APP_ENV", "development") != "development"
     response.set_cookie(
         key="access_token",
         value=token,
         httponly=True,
-        samesite="none" if is_prod else "lax",
-        secure=is_prod,
+        samesite="none" if _is_production() else "lax",
+        secure=_is_production(),
         max_age=expires_in,
         path="/",
     )
@@ -82,7 +85,7 @@ class VendedorUsuarioCreateRequest(BaseModel):
     """Entrada para crear trabajador/vendedor con credenciales."""
 
     username: Annotated[str, Field(min_length=3, max_length=50)]
-    password: Annotated[str, Field(min_length=6, max_length=128)]
+    password: Annotated[str, Field(min_length=8, max_length=128)]
     rol: Literal["vendedor"] = "vendedor"
 
 
@@ -90,7 +93,7 @@ class VendedorUsuarioUpdateRequest(BaseModel):
     """Entrada para actualizar credenciales de vendedor."""
 
     username: Annotated[str | None, Field(min_length=3, max_length=50)] = None
-    password: Annotated[str | None, Field(min_length=6, max_length=128)] = None
+    password: Annotated[str | None, Field(min_length=8, max_length=128)] = None
 
 
 @router.post("/api/auth/login", response_model=LoginResponse)
@@ -102,8 +105,6 @@ def auth_login(
     db: Session = Depends(get_db),
 ) -> LoginResponse:
     """Autentica credenciales y retorna JWT firmado con rol."""
-    ensure_default_auth_users(db)
-
     usuario = db.execute(
         select(UsuarioModel).where(UsuarioModel.username == payload.username),
     ).scalar_one_or_none()
@@ -123,13 +124,12 @@ def auth_login(
     refresh_token, refresh_expires = create_refresh_token(username=usuario.username, role=role)
 
     _set_access_token_cookie(response, token, expires_in)
-    is_prod = os.getenv("APP_ENV", "development") != "development"
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        samesite="none" if is_prod else "lax",
-        secure=is_prod,
+        samesite="none" if _is_production() else "lax",
+        secure=_is_production(),
         max_age=refresh_expires,
         path="/api/auth",
     )
@@ -147,8 +147,12 @@ def auth_login(
 def auth_refresh(
     request: Request,
     response: Response,
+    db: Session = Depends(get_db),
 ) -> RefreshResponse:
-    """Valida refresh token (desde httpOnly cookie) y emite un nuevo access token."""
+    """Valida refresh token (desde httpOnly cookie) y emite un nuevo access token.
+
+    Rota el refresh token: el JTI usado queda en blacklist (deteccion de reuso).
+    """
     refresh_token = request.cookies.get("refresh_token")
     if not refresh_token:
         raise HTTPException(
@@ -170,6 +174,14 @@ def auth_refresh(
             detail="Tipo de token incorrecto",
         )
 
+    jti = str(decoded.get("jti", "")).strip()
+    expires_at = decoded.get("exp")
+    if jti and is_jti_blacklisted(db, jti):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token revocado",
+        )
+
     username = str(decoded.get("sub", ""))
     role = str(decoded.get("role", ""))
     if not username or not role:
@@ -181,14 +193,16 @@ def auth_refresh(
     new_token, expires_in = create_access_token(username=username, role=role)
     new_refresh_token, refresh_expires = create_refresh_token(username=username, role=role)
 
+    if jti and isinstance(expires_at, int):
+        blacklist_jti(db, jti, expires_at)
+
     _set_access_token_cookie(response, new_token, expires_in)
-    is_prod = os.getenv("APP_ENV", "development") != "development"
     response.set_cookie(
         key="refresh_token",
         value=new_refresh_token,
         httponly=True,
-        samesite="none" if is_prod else "strict",
-        secure=is_prod,
+        samesite="none" if _is_production() else "strict",
+        secure=_is_production(),
         max_age=refresh_expires,
         path="/api/auth",
     )
@@ -196,6 +210,28 @@ def auth_refresh(
         access_token=new_token,
         expires_in=expires_in,
     )
+
+
+@router.post("/api/auth/logout")
+@limiter.limit("20/minute")
+def auth_logout(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    """Revoca el refresh token actual (blacklist por JTI) y limpia cookies."""
+    refresh_token = request.cookies.get("refresh_token")
+    if refresh_token:
+        decoded = decode_access_token(refresh_token)
+        if decoded is not None and str(decoded.get("type", "")).strip() == "refresh":
+            jti = str(decoded.get("jti", "")).strip()
+            expires_at = decoded.get("exp")
+            if jti and isinstance(expires_at, int):
+                blacklist_jti(db, jti, expires_at)
+
+    response.delete_cookie("access_token", path="/")
+    response.delete_cookie("refresh_token", path="/api/auth")
+    return {"detail": "Sesion cerrada"}
 
 
 @router.get("/api/usuarios/vendedores", response_model=list[VendedorUsuarioResponse])
