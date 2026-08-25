@@ -72,7 +72,8 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-100 via-white to-blush-100 flex items-center justify-center px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-100 via-white to-blush-100 flex flex-col px-4 py-6 sm:px-6 sm:py-8">
+      <main className="flex flex-1 items-center justify-center">
       <div className="w-full max-w-md bg-white rounded-3xl shadow-xl border border-gray-200 overflow-hidden">
         <div className="px-8 pt-8 pb-6 text-center border-b border-gray-100">
           <p className="text-xs font-semibold tracking-[0.22em] uppercase text-rosewood">Tienda Angelly</p>
@@ -142,17 +143,26 @@ const Login = () => {
           </div>
         </form>
       </div>
+      </main>
 
-      <footer className="mt-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-gray-500">
-        <Link to="/privacidad" className="transition hover:text-rosewood hover:underline">
-          Politica de Privacidad
-        </Link>
-        <span aria-hidden="true">·</span>
-        <Link to="/terminos" className="transition hover:text-rosewood hover:underline">
-          Terminos y Condiciones
-        </Link>
-        <span aria-hidden="true">·</span>
-        <span>© {new Date().getFullYear()} Variedades Angelly</span>
+      <footer className="mt-auto pt-6 pb-1 sm:pb-2 text-center">
+        <nav aria-label="Enlaces legales" className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs sm:text-sm text-gray-500">
+          <Link
+            to="/privacidad"
+            className="transition hover:text-rosewood hover:underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-rosewood rounded-sm px-0.5"
+          >
+            Política de Privacidad
+          </Link>
+          <Link
+            to="/terminos"
+            className="transition hover:text-rosewood hover:underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-rosewood rounded-sm px-0.5"
+          >
+            Términos y Condiciones
+          </Link>
+        </nav>
+        <p className="mt-2 text-[11px] sm:text-xs text-gray-400">
+          © {new Date().getFullYear()} Variedades Angelly · Todos los derechos reservados
+        </p>
       </footer>
     </div>
   );
