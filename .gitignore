@@ -35,3 +35,6 @@ dist/
 # Reports
 apps/api/reporte.html
 apps/api/resultados.xml
+# User-uploaded content (runtime only)
+apps/api/uploads/*
+!apps/api/uploads/.gitkeep

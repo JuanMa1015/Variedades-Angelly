@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { apiPost } from '../api/httpClient';
+import { apiPost, invalidateCache } from '../api/httpClient';
 
 const AuthContext = createContext(null);
 
@@ -106,6 +106,9 @@ export const AuthProvider = ({ children }) => {
 
   const logout = useCallback(() => {
     if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    // Revoca el refresh token en el servidor (fire-and-forget) y limpia estado local.
+    apiPost('/api/auth/logout', {}, { includeAuth: false }).catch(() => {});
+    invalidateCache();
     clearAuth();
   }, [clearAuth]);
 

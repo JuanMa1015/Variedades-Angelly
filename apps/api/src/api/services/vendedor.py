@@ -8,6 +8,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from src.auth.password_policy import ensure_password_not_pwned
 from src.auth.security import hash_password
 from src.infrastructure.database.models import UsuarioModel
 
@@ -34,6 +35,7 @@ def list_vendedores(db: Session) -> list[dict[str, Any]]:
 
 
 def create_vendedor(username: str, password: str, db: Session) -> dict[str, Any]:
+    ensure_password_not_pwned(password)
     username = username.strip()
     existente = db.execute(
         select(UsuarioModel).where(UsuarioModel.username == username),
@@ -77,6 +79,7 @@ def update_vendedor(
         usuario.username = next_username
 
     if password is not None:
+        ensure_password_not_pwned(password)
         usuario.password_hash = hash_password(password)
 
     db.commit()

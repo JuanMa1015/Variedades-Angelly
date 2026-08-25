@@ -37,13 +37,10 @@ def _normalize_role(role_value: object) -> str:
 
 
 def _extract_token(request: Request, credentials: HTTPAuthorizationCredentials | None) -> str | None:
-    """Intenta leer token de la cookie access_token primero, luego del header Bearer."""
-    cookie_token = request.cookies.get("access_token")
-    if cookie_token:
-        return cookie_token
+    """Prioriza el header Bearer explicito; si no hay, usa la cookie httpOnly."""
     if credentials is not None and credentials.scheme.lower() == "bearer":
         return credentials.credentials
-    return None
+    return request.cookies.get("access_token")
 
 
 def get_current_user(
@@ -63,6 +60,13 @@ def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token invalido o expirado",
+        )
+
+    token_type = str(payload.get("type") or "").strip()
+    if token_type != "access":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Tipo de token invalido",
         )
 
     username = str(payload.get("sub") or "").strip()

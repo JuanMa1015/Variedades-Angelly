@@ -34,6 +34,7 @@ from src.infrastructure.database.models import (
     UsuarioModel,
     VentaModel,
 )
+from src.auth.password_policy import ensure_password_not_pwned
 from src.auth.security import hash_password
 
 router = APIRouter(tags=["superadmin"])
@@ -47,12 +48,12 @@ class UsuarioSchema(BaseModel):
 
 class UsuarioCreate(BaseModel):
     username: Annotated[str, Field(min_length=3, max_length=50)]
-    password: Annotated[str, Field(min_length=6, max_length=128)]
+    password: Annotated[str, Field(min_length=8, max_length=128)]
 
 
 class UsuarioUpdate(BaseModel):
     username: Annotated[str | None, Field(min_length=3, max_length=50)] = None
-    password: Annotated[str | None, Field(min_length=6, max_length=128)] = None
+    password: Annotated[str | None, Field(min_length=8, max_length=128)] = None
 
 
 class ProductoSchema(BaseModel):
@@ -195,6 +196,7 @@ def create_admin(
     db: Session = Depends(get_db),
     _: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> UsuarioSchema:
+    ensure_password_not_pwned(payload.password)
     username = payload.username.strip()
     existente = db.execute(select(UsuarioModel).where(UsuarioModel.username == username)).scalar_one_or_none()
     if existente is not None:
@@ -240,6 +242,7 @@ def update_admin(
         usuario.username = next_username
 
     if payload.password is not None:
+        ensure_password_not_pwned(payload.password)
         usuario.password_hash = hash_password(payload.password)
 
     db.commit()

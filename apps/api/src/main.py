@@ -90,45 +90,64 @@ if not logger.handlers:
     logger.addHandler(_handler)
 
 
+def _seed_auth_users():
+    """Crea usuarios base si AUTH_BOOTSTRAP_ENABLED lo permite.
+
+    Usa el override de get_db cuando existe (pruebas) para sembrar en la BD de test.
+    """
+    from src.auth.bootstrap import ensure_default_auth_users
+
+    db_factory = app.dependency_overrides.get(get_db, get_db)
+    db = next(db_factory())
+    try:
+        ensure_default_auth_users(db)
+    finally:
+        db.close()
+
+
 def _run_startup_tasks():
-    """Sincroniza esquema de BD al arrancar (solo dev/test)."""
     env = os.getenv("APP_ENV", "development").strip().lower()
-    if env not in ("development", "test"):
-        logger.info("Saltando create_all — APP_ENV=%s", env)
-        return
 
-    Base.metadata.create_all(bind=engine)
-    inspector = inspect(engine)
-    with engine.connect() as conn:
-        for table_name in Base.metadata.tables:
-            existing = {c["name"] for c in inspector.get_columns(table_name)}
-            model_table = Base.metadata.tables[table_name]
-            for col in model_table.columns:
-                if col.name not in existing:
-                    col_type = col.type.compile(engine.dialect)
+    if env in ("development", "test"):
+        Base.metadata.create_all(bind=engine)
+        inspector = inspect(engine)
+        with engine.connect() as conn:
+            for table_name in Base.metadata.tables:
+                existing = {c["name"] for c in inspector.get_columns(table_name)}
+                model_table = Base.metadata.tables[table_name]
+                for col in model_table.columns:
+                    if col.name not in existing:
+                        col_type = col.type.compile(engine.dialect)
+                        conn.execute(
+                            text(f"ALTER TABLE {table_name} ADD COLUMN {col.name} {col_type}")
+                        )
+            conn.commit()
+
+            factura_cols = inspector.get_columns("facturas_compra")
+            for c in factura_cols:
+                if c["name"] == "numero_factura" and not c["nullable"]:
                     conn.execute(
-                        text(f"ALTER TABLE {table_name} ADD COLUMN {col.name} {col_type}")
+                        text("ALTER TABLE facturas_compra ALTER COLUMN numero_factura DROP NOT NULL")
                     )
-        conn.commit()
+                    conn.commit()
+                    break
 
-        factura_cols = inspector.get_columns("facturas_compra")
-        for c in factura_cols:
-            if c["name"] == "numero_factura" and not c["nullable"]:
-                conn.execute(
-                    text("ALTER TABLE facturas_compra ALTER COLUMN numero_factura DROP NOT NULL")
-                )
-                conn.commit()
-                break
+            conn.execute(
+                text("UPDATE clientes_fiado_tienda SET deuda_total = 0 WHERE deuda_total IS NULL")
+            )
+            conn.commit()
+    else:
+        logger.info("Saltando create_all — APP_ENV=%s", env)
 
-        conn.execute(
-            text("UPDATE clientes_fiado_tienda SET deuda_total = 0 WHERE deuda_total IS NULL")
-        )
-        conn.commit()
-
+    # Limpieza de refresh tokens revocados ya expirados (todos los entornos).
+    with engine.connect() as conn:
         conn.execute(
             text("DELETE FROM refresh_token_blacklist WHERE expires_at < NOW()")
         )
         conn.commit()
+
+    # Usuarios semilla (auto-guardados por AUTH_BOOTSTRAP_ENABLED).
+    _seed_auth_users()
 
 
 @asynccontextmanager
@@ -329,6 +348,11 @@ def _extract_integrity_detail(error_text: str) -> str:
         return "El registro relacionado no existe o no es válido."
     if "null value in column" in error_str or "violates not-null constraint" in error_str:
         return "Un campo obligatorio está vacío."
+
+    env = os.getenv("APP_ENV", "development").strip().lower()
+    if env != "development":
+        # En produccion no filtramos detalles internos del esquema.
+        return "No se pudo completar la operación por un conflicto de datos."
     return f"Error de integridad en la base de datos: {error_str[:200]}"
 
 
