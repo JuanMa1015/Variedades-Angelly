@@ -82,10 +82,25 @@ const Terminos = () => {
             <p>
               La Tienda puede actualizar estos terminos publicando la version vigente en
               esta pagina. Para cualquier consulta escribenos a{' '}
-              <span className="font-semibold">{CONTACTO.email || 'nuestros canales de contacto'}</span>
+              {CONTACTO.email ? (
+                <a
+                  href={`mailto:${CONTACTO.email}`}
+                  className="font-semibold text-rosewood underline underline-offset-2 hover:text-rosewood/80"
+                >
+                  {CONTACTO.email}
+                </a>
+              ) : (
+                'nuestros canales de contacto'
+              )}
               {CONTACTO.telefono && (
                 <>
-                  {' '}o llamanos al <span className="font-semibold">{CONTACTO.telefono}</span>
+                  {' '}o llamanos al{' '}
+                  <a
+                    href={`tel:${CONTACTO.telefono.replace(/[^\d+]/g, '')}`}
+                    className="font-semibold text-rosewood underline underline-offset-2 hover:text-rosewood/80"
+                  >
+                    {CONTACTO.telefono}
+                  </a>
                 </>
               )}
               .
