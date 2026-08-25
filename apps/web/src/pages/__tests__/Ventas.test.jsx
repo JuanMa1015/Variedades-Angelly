@@ -140,6 +140,7 @@ describe('Ventas page', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('product-selection')).toBeInTheDocument();
+      expect(screen.getByTestId('add-product-1')).toBeInTheDocument();
     });
     expect(screen.getByText('Products: 2')).toBeInTheDocument();
     expect(screen.getByText('Cart: 0')).toBeInTheDocument();
@@ -166,6 +167,7 @@ describe('Ventas page', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('product-selection')).toBeInTheDocument();
+      expect(screen.getByTestId('add-product-1')).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByTestId('add-product-1'));
@@ -181,6 +183,7 @@ describe('Ventas page', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('product-selection')).toBeInTheDocument();
+      expect(screen.getByTestId('add-product-1')).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByTestId('add-product-1'));
@@ -209,6 +212,7 @@ describe('Ventas page', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('product-selection')).toBeInTheDocument();
+      expect(screen.getByTestId('add-product-1')).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByTestId('add-product-1'));
@@ -247,6 +251,7 @@ describe('Ventas page', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('product-selection')).toBeInTheDocument();
+      expect(screen.getByTestId('add-product-1')).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByTestId('set-fiado'));
@@ -290,6 +295,7 @@ describe('Ventas page', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('product-selection')).toBeInTheDocument();
+      expect(screen.getByTestId('add-product-1')).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByTestId('add-product-1'));
@@ -309,6 +315,7 @@ describe('Ventas page', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('product-selection')).toBeInTheDocument();
+      expect(screen.getByTestId('add-product-1')).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByTestId('add-product-1'));
