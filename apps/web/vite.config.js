@@ -1,9 +1,13 @@
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  // Lee el .env de la raiz del monorepo (unico archivo de entorno).
+  // Solo las variables con prefijo VITE_ se exponen al cliente.
+  envDir: fileURLToPath(new URL('../..', import.meta.url)),
   build: {
     rollupOptions: {
       output: {

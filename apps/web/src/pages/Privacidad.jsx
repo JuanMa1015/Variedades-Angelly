@@ -30,12 +30,17 @@ const Privacidad = () => {
               {CONTACTO.email && (
                 <>
                   {' '}y correo de contacto{' '}
-                  <span className="font-semibold">{CONTACTO.email}</span>
+                  <a
+                    href={`mailto:${CONTACTO.email}`}
+                    className="font-semibold text-rosewood underline underline-offset-2 hover:text-rosewood/80"
+                  >
+                    {CONTACTO.email}
+                  </a>
                 </>
               )}
               .
             </p>
-            {!contactoCompleto() && (
+            {!contactoCompleto() && import.meta.env.DEV && (
               <p className="rounded-xl bg-blush-50 px-3 py-2 text-xs text-[#8b5a5f]">
                 (Pendiente: completa VITE_CONTACTO_DIRECCION / TELEFONO / EMAIL en el archivo
                 .env para mostrar la informacion de contacto real.)
@@ -110,6 +115,15 @@ const Privacidad = () => {
             </Link>
             .
           </p>
+
+          <div className="flex justify-center border-t border-blush-300/50 pt-6">
+            <Link
+              to="/"
+              className="inline-flex items-center gap-2 rounded-full bg-blush-300 px-5 py-2.5 text-sm font-semibold text-rosewood transition hover:bg-blush-300/90"
+            >
+              Volver al inicio
+            </Link>
+          </div>
         </div>
       </article>
     </main>
