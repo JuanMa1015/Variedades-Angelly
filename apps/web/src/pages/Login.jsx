@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Lock, UserRound } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
@@ -141,6 +142,18 @@ const Login = () => {
           </div>
         </form>
       </div>
+
+      <footer className="mt-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-gray-500">
+        <Link to="/privacidad" className="transition hover:text-rosewood hover:underline">
+          Politica de Privacidad
+        </Link>
+        <span aria-hidden="true">·</span>
+        <Link to="/terminos" className="transition hover:text-rosewood hover:underline">
+          Terminos y Condiciones
+        </Link>
+        <span aria-hidden="true">·</span>
+        <span>© {new Date().getFullYear()} Variedades Angelly</span>
+      </footer>
     </div>
   );
 };
