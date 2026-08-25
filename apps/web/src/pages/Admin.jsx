@@ -2,6 +2,7 @@ import { useCallback, useMemo, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { ChevronDown, ChevronRight, RefreshCw, Shield } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import usePageTitle from '../hooks/usePageTitle';
 import { apiDelete, apiRequest } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage';
 import SuccessMessage from '../components/SuccessMessage';
@@ -101,6 +102,15 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  const moduleLabel = useMemo(() => {
+    for (const group of ROLE_GROUPS) {
+      const found = group.modules.find((m) => m.id === activeTab);
+      if (found) return found.label;
+    }
+    return null;
+  }, [activeTab]);
+  usePageTitle(moduleLabel ? `Gerencia · ${moduleLabel}` : 'Gerencia');
 
   const { confirm, ConfirmModal } = useConfirm();
 

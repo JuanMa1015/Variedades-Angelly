@@ -10,6 +10,7 @@ uvicorn==0.42.0
 psycopg2-binary==2.9.12
 python-multipart==0.0.31
 alembic==1.14.1
+Pillow==12.3.0
 
 # Tests
 pytest==9.0.3

@@ -488,7 +488,7 @@ const Inventario = () => {
                   {manualImageMode === 'upload' ? (
                     manualImagePreview ? (
                       <div className="relative inline-block">
-                        <img src={manualImagePreview} alt="" className="h-20 w-20 rounded-lg border border-gray-300 object-cover" />
+                        <img src={manualImagePreview} alt="Vista previa de la imagen manual del producto" className="h-20 w-20 rounded-lg border border-gray-300 object-cover" />
                         <button type="button" onClick={() => { setManualImageFile(null); setManualImagePreview(null); setManualImageUrl(''); }} className="absolute -right-2 -top-2 rounded-full border border-gray-300 bg-white p-0.5 text-gray-500 hover:text-red-600"><X className="h-4 w-4" /></button>
                       </div>
                     ) : (
@@ -585,7 +585,7 @@ const Inventario = () => {
                   {barcodeImageMode === 'upload' ? (
                     barcodeImagePreview ? (
                       <div className="relative inline-block">
-                        <img src={barcodeImagePreview} alt="" className="h-20 w-20 rounded-lg border border-gray-300 object-cover" />
+                        <img src={barcodeImagePreview} alt="Vista previa de la imagen del codigo de barras" className="h-20 w-20 rounded-lg border border-gray-300 object-cover" />
                         <button type="button" onClick={() => { setBarcodeImageFile(null); setBarcodeImagePreview(null); setBarcodeImageUrl(''); }} className="absolute -right-2 -top-2 rounded-full border border-gray-300 bg-white p-0.5 text-gray-500 hover:text-red-600"><X className="h-4 w-4" /></button>
                       </div>
                     ) : (
@@ -697,12 +697,12 @@ const Inventario = () => {
                 {editImageMode === 'upload' ? (
                   editImagePreview ? (
                     <div className="relative inline-block">
-                      <img src={editImagePreview} alt="" className="h-20 w-20 rounded-lg border border-gray-300 object-cover" />
+                      <img src={editImagePreview} alt="Vista previa de la nueva imagen del producto" className="h-20 w-20 rounded-lg border border-gray-300 object-cover" />
                       <button type="button" onClick={() => { setEditImageFile(null); setEditImagePreview(null); setEditImageUrl(''); }} className="absolute -right-2 -top-2 rounded-full border border-gray-300 bg-white p-0.5 text-gray-500 hover:text-red-600"><X className="h-4 w-4" /></button>
                     </div>
                   ) : editingProducto?.imagen_url && !editImageUrl ? (
                     <div className="relative inline-block">
-                      <img src={editingProducto.imagen_url.startsWith('http') ? editingProducto.imagen_url : `${import.meta.env.VITE_API_URL ?? ''}${editingProducto.imagen_url}`} alt="" className="h-20 w-20 rounded-lg border border-gray-300 object-cover" />
+                      <img src={editingProducto.imagen_url.startsWith('http') ? editingProducto.imagen_url : `${import.meta.env.VITE_API_URL ?? ''}${editingProducto.imagen_url}`} alt={editingProducto.nombre || 'Imagen del producto'} className="h-20 w-20 rounded-lg border border-gray-300 object-cover" />
                       <button type="button" onClick={() => { setEditImageFile(null); setEditImagePreview(null); setEditImageUrl('__remove__'); }} className="absolute -right-2 -top-2 rounded-full border border-gray-300 bg-white p-0.5 text-gray-500 hover:text-red-600" title="Eliminar imagen"><X className="h-4 w-4" /></button>
                     </div>
                   ) : (
@@ -846,7 +846,7 @@ const Inventario = () => {
                     <td className="px-4 py-3 font-medium text-gray-900">{producto.nombre}</td>
                     <td className="hidden px-4 py-3 md:table-cell">
                       {producto.imagen_url ? (
-                        <img src={producto.imagen_url.startsWith('http') ? producto.imagen_url : `${import.meta.env.VITE_API_URL ?? ''}${producto.imagen_url}`} alt="" className="h-10 w-10 rounded-lg border border-gray-200 object-cover" />
+                        <img src={producto.imagen_url.startsWith('http') ? producto.imagen_url : `${import.meta.env.VITE_API_URL ?? ''}${producto.imagen_url}`} alt={producto.nombre || 'Imagen del producto'} className="h-10 w-10 rounded-lg border border-gray-200 object-cover" />
                       ) : (
                         <span className="text-gray-300">—</span>
                       )}

@@ -8,6 +8,8 @@ import { getDefaultRouteForRole } from './auth/roleRoutes';
 import ErrorBoundary from './components/ErrorBoundary'
 import { ToastProvider, useToast } from './components/ToastContext'
 import ToastContainer from './components/ToastContainer'
+import CookieBanner from './components/CookieBanner'
+import usePageTitle from './hooks/usePageTitle'
 import './App.css';
 
 const Caja = lazy(() => import('./pages/Caja'));
@@ -21,8 +23,13 @@ const Facturas = lazy(() => import('./pages/Facturas'));
 const Fidelizacion = lazy(() => import('./pages/Fidelizacion'));
 const ClientesTienda = lazy(() => import('./pages/ClientesTienda'));
 const Admin = lazy(() => import('./pages/Admin'));
+const Privacidad = lazy(() => import('./pages/Privacidad'));
+const Terminos = lazy(() => import('./pages/Terminos'));
+const Gracias = lazy(() => import('./pages/Gracias'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 
 const LandingRedirect = () => {
+  usePageTitle();
   const { isAuthenticated, user, bootstrapped } = useAuth();
 
   if (!bootstrapped) {
@@ -63,6 +70,11 @@ const spinner = (
   </div>
 );
 
+const Titled = ({ title, children }) => {
+  usePageTitle(title);
+  return children;
+};
+
 function App() {
   return (
     <ToastProvider>
@@ -71,7 +83,20 @@ function App() {
           <Suspense fallback={spinner}>
             <Routes>
               <Route path="/" element={<LandingRedirect />} />
-              <Route path="/login" element={<Login />} />
+              <Route
+                path="/login"
+                element={
+                  <Titled title="Iniciar sesion">
+                    <Login />
+                  </Titled>
+                }
+              />
+
+              {/* Rutas publicas (legales / cliente) */}
+              <Route path="/privacidad" element={<Privacidad />} />
+              <Route path="/terminos" element={<Terminos />} />
+              <Route path="/gracias" element={<Gracias />} />
+              <Route path="*" element={<NotFound />} />
 
               <Route element={<PrivateRoute />}>
                 <Route element={<MainLayout />}>
@@ -82,30 +107,29 @@ function App() {
 
                   <Route element={<PrivateRoute allowedRoles={['admin', 'superadmin']} />}>
                     <Route path="/cartera" element={<Navigate to="/cartera/venta" replace />} />
-                    <Route path="/cartera/dashboard" element={<Cartera />} />
-                    <Route path="/cartera/clientes" element={<Cartera />} />
-                    <Route path="/cartera/venta" element={<Cartera />} />
-                    <Route path="/cartera/productos" element={<Cartera />} />
-                    <Route path="/cartera/cobrar" element={<Cartera />} />
+                    <Route path="/cartera/dashboard" element={<Titled title="Cartera · Dashboard"><Cartera /></Titled>} />
+                    <Route path="/cartera/clientes" element={<Titled title="Cartera · Clientes"><Cartera /></Titled>} />
+                    <Route path="/cartera/venta" element={<Titled title="Cartera · Venta"><Cartera /></Titled>} />
+                    <Route path="/cartera/productos" element={<Titled title="Cartera · Productos"><Cartera /></Titled>} />
+                    <Route path="/cartera/cobrar" element={<Titled title="Cartera · Cobros"><Cartera /></Titled>} />
                   </Route>
 
                   <Route element={<PrivateRoute allowedRoles={['vendedor', 'superadmin']} />}>
-                    <Route path="/caja" element={<Caja />} />
-                    <Route path="/proveedores" element={<Proveedores />} />
-                    <Route path="/inventario" element={<Inventario />} />
-                    <Route path="/fidelizacion" element={<Fidelizacion />} />
-                    <Route path="/ventas" element={<Ventas />} />
-                    <Route path="/clientes" element={<ClientesTienda />} />
-                    <Route path="/facturas" element={<Facturas />} />
-                    <Route path="/gastos" element={<Gastos />} />
-                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/caja" element={<Titled title="Caja"><Caja /></Titled>} />
+                    <Route path="/proveedores" element={<Titled title="Proveedores"><Proveedores /></Titled>} />
+                    <Route path="/inventario" element={<Titled title="Inventario"><Inventario /></Titled>} />
+                    <Route path="/fidelizacion" element={<Titled title="Fidelización"><Fidelizacion /></Titled>} />
+                    <Route path="/ventas" element={<Titled title="Punto de Venta"><Ventas /></Titled>} />
+                    <Route path="/clientes" element={<Titled title="Clientes de tienda"><ClientesTienda /></Titled>} />
+                    <Route path="/facturas" element={<Titled title="Facturas de compra"><Facturas /></Titled>} />
+                    <Route path="/gastos" element={<Titled title="Gastos"><Gastos /></Titled>} />
+                    <Route path="/dashboard" element={<Titled title="Dashboard"><Dashboard /></Titled>} />
                   </Route>
                 </Route>
               </Route>
-
-              <Route path="*" element={<LandingRedirect />} />
             </Routes>
           </Suspense>
+          <CookieBanner />
           <ToastContainerWrapper />
         </ErrorBoundaryWithReset>
       </BrowserRouter>

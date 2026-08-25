@@ -320,14 +320,14 @@ const Cartera = () => {
               <div>
                 {imagePreview ? (
                   <div className="relative inline-block">
-                    <img src={imagePreview} alt="Preview" className="h-24 w-24 rounded-xl border border-gray-300 object-cover" />
+                    <img src={imagePreview} alt="Vista previa de la imagen del producto" className="h-24 w-24 rounded-xl border border-gray-300 object-cover" />
                     <button type="button" onClick={() => { setImageFile(null); setImagePreview(null); }} className="absolute -right-2 -top-2 rounded-full border border-gray-300 bg-white p-0.5 text-gray-500 hover:text-red-600">
                       <X className="h-4 w-4" />
                     </button>
                   </div>
                 ) : productoForm.imagen_url ? (
                   <div className="relative inline-block">
-                    <img src={productoForm.imagen_url?.startsWith('http') ? productoForm.imagen_url : `${import.meta.env.VITE_API_URL ?? ''}${productoForm.imagen_url}`} alt="Producto" className="h-24 w-24 rounded-xl border border-gray-300 object-cover" />
+                    <img src={productoForm.imagen_url?.startsWith('http') ? productoForm.imagen_url : `${import.meta.env.VITE_API_URL ?? ''}${productoForm.imagen_url}`} alt={productoForm.nombre || 'Imagen del producto'} className="h-24 w-24 rounded-xl border border-gray-300 object-cover" />
                   </div>
                 ) : (
                   <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-gray-300 px-3 py-3 text-sm text-gray-500 hover:border-rosewood hover:text-rosewood">
