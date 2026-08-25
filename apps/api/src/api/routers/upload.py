@@ -2,10 +2,14 @@
 
 Usa Vercel Blob Storage cuando BLOB_READ_WRITE_TOKEN esta presente,
 de lo contrario guarda en disco local (desarrollo).
+
+Toda imagen es re-codificada con Pillow: reduce peso, normaliza el formato
+y elimina metadatos (EXIF/GPS) antes de persistirla.
 """
 
 from __future__ import annotations
 
+import io
 import os
 import uuid
 from pathlib import Path
@@ -13,6 +17,7 @@ from pathlib import Path
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from fastapi.responses import JSONResponse
+from PIL import Image
 
 from src.api.dependencies import AuthenticatedUser, require_roles
 
@@ -23,6 +28,9 @@ BLOB_API = "https://api.vercel.com/v1/blob"
 LOCAL_UPLOAD_DIR = Path(__file__).resolve().parents[3] / "uploads"
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 MAX_FILE_SIZE = 5 * 1024 * 1024
+MAX_DIMENSION = 1600
+JPEG_QUALITY = 82
+WEBP_QUALITY = 82
 
 MAGIC_BYTES: dict[bytes, set[str]] = {
     b"\xff\xd8\xff": {".jpg", ".jpeg"},
@@ -45,6 +53,41 @@ def _validate_image(contents: bytes, ext: str) -> None:
     )
 
 
+def _reencode_image(contents: bytes, ext: str) -> tuple[bytes, str]:
+    """Re-codifica la imagen: redimensiona, comprime y borra metadatos.
+
+    Los GIF se conservan tal cual para no perder animaciones.
+    Retorna (bytes_finales, content_type).
+    """
+    if ext == ".gif":
+        return contents, "image/gif"
+
+    try:
+        with Image.open(io.BytesIO(contents)) as img:
+            img = img.convert("RGB") if ext in {".jpg", ".jpeg"} else img.copy()
+            if max(img.size) > MAX_DIMENSION:
+                img.thumbnail((MAX_DIMENSION, MAX_DIMENSION), Image.LANCZOS)
+
+            buffer = io.BytesIO()
+            if ext in {".jpg", ".jpeg"}:
+                img.save(buffer, format="JPEG", quality=JPEG_QUALITY, optimize=True)
+                content_type = "image/jpeg"
+            elif ext == ".png":
+                img.save(buffer, format="PNG", optimize=True)
+                content_type = "image/png"
+            else:  # .webp
+                img.save(buffer, format="WEBP", quality=WEBP_QUALITY, method=5)
+                content_type = "image/webp"
+            return buffer.getvalue(), content_type
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="La imagen esta danada o no se pudo procesar",
+        ) from exc
+
+
 @router.post("/api/upload-imagen")
 async def upload_imagen(
     file: UploadFile,
@@ -62,11 +105,15 @@ async def upload_imagen(
         raise HTTPException(status_code=400, detail="La imagen supera los 5 MB")
 
     _validate_image(contents, ext)
+    contents, content_type = _reencode_image(contents, ext)
+
+    if len(contents) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail="La imagen sigue superando los 5 MB tras optimizarla")
 
     filename = f"{uuid.uuid4().hex}{ext}"
 
     if BLOB_TOKEN:
-        url = await _upload_to_blob(filename, contents, file.content_type or "image/jpeg")
+        url = await _upload_to_blob(filename, contents, content_type)
     else:
         url = await _upload_local(filename, contents)
 
