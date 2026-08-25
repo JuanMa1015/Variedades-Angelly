@@ -53,6 +53,41 @@ def _csp_directive(name: str, default: str) -> str:
     return raw or default
 
 
+def _analytics_csp_hosts() -> dict[str, set[str]]:
+    """Hosts que el CSP debe permitir segun las analiticas configuradas."""
+    hosts: dict[str, set[str]] = {"script": set(), "connect": set(), "img": set(), "frame": set()}
+
+    gtm_or_ga = bool(os.getenv("VITE_GTM_ID")) or bool(os.getenv("VITE_GA_MEASUREMENT_ID"))
+    plausible = bool(os.getenv("VITE_PLAUSIBLE_SCRIPT_ID")) or bool(os.getenv("VITE_PLAUSIBLE_DOMAIN"))
+
+    if gtm_or_ga:
+        hosts["script"].add("https://www.googletagmanager.com")
+        hosts["connect"].update(
+            [
+                "https://www.googletagmanager.com",
+                "https://*.google-analytics.com",
+                "https://*.analytics.google.com",
+            ],
+        )
+        hosts["img"].update(
+            [
+                "https://www.googletagmanager.com",
+                "https://*.google-analytics.com",
+                "https://*.analytics.google.com",
+            ],
+        )
+
+    if os.getenv("VITE_GTM_ID"):
+        # Iframe noscript del contenedor GTM.
+        hosts["frame"].add("https://www.googletagmanager.com")
+
+    if plausible:
+        hosts["script"].add("https://plausible.io")
+        hosts["connect"].add("https://plausible.io")
+
+    return hosts
+
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         response = await call_next(request)
@@ -60,11 +95,25 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-        connect_src = _csp_directive("CONNECT_SRC", "'self' http://localhost:5173 ws://localhost:5173 http://localhost:5174 ws://localhost:5174")
-        img_src = _csp_directive("IMG_SRC", "'self' data: https://*.public.blob.vercel-storage.com")
         env = os.getenv("APP_ENV", "development").strip().lower()
         is_prod = env == "production"
+
+        analytics = _analytics_csp_hosts()
+
+        connect_default = "'self' http://localhost:5173 ws://localhost:5173 http://localhost:5174 ws://localhost:5174"
+        img_default = "'self' data: https://*.public.blob.vercel-storage.com"
+        if analytics["connect"]:
+            connect_default += " " + " ".join(sorted(analytics["connect"]))
+        if analytics["img"]:
+            img_default += " " + " ".join(sorted(analytics["img"]))
+
+        connect_src = _csp_directive("CONNECT_SRC", connect_default)
+        img_src = _csp_directive("IMG_SRC", img_default)
+
         script_src = "'self'" if is_prod else "'self' 'unsafe-inline' 'unsafe-eval'"
+        if analytics["script"]:
+            script_src += " " + " ".join(sorted(analytics["script"]))
+
         csp = (
             f"default-src 'self'; "
             f"img-src {img_src}; "
@@ -74,6 +123,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             f"font-src 'self' data:; "
             f"form-action 'self'"
         )
+        if analytics["frame"]:
+            csp += "; frame-src " + " ".join(sorted(analytics["frame"]))
         if is_prod:
             csp += "; upgrade-insecure-requests"
         response.headers["Content-Security-Policy"] = csp
