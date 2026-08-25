@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom';
-import { Home } from 'lucide-react';
 import usePageTitle from '../hooks/usePageTitle';
 import { CONTACTO, contactoCompleto, SITE } from '../config/site';
 
@@ -122,7 +121,6 @@ const Privacidad = () => {
               to="/"
               className="inline-flex items-center gap-2 rounded-full bg-blush-300 px-5 py-2.5 text-sm font-semibold text-rosewood transition hover:bg-blush-300/90"
             >
-              <Home className="h-4 w-4" aria-hidden="true" />
               Volver al inicio
             </Link>
           </div>
