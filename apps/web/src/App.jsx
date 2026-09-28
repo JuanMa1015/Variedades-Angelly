@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Analytics } from '@vercel/analytics/react';
 import MainLayout from './layouts/MainLayout';
 import PrivateRoute from './auth/PrivateRoute';
 import { useAuth } from './auth/AuthContext';
@@ -97,6 +98,7 @@ function App() {
     <ToastProvider>
       <BrowserRouter>
         <ErrorBoundaryWithReset>
+          <Analytics />
           <PageViewTracker />
           <Suspense fallback={spinner}>
             <Routes>
