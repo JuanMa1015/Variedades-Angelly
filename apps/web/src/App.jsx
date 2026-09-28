@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Analytics } from '@vercel/analytics/react';
 import MainLayout from './layouts/MainLayout';
@@ -11,6 +11,7 @@ import { ToastProvider, useToast } from './components/ToastContext'
 import ToastContainer from './components/ToastContainer'
 import CookieBanner from './components/CookieBanner'
 import usePageTitle from './hooks/usePageTitle'
+import { trackPageview } from './utils/analytics'
 import './App.css';
 
 const Caja = lazy(() => import('./pages/Caja'));
@@ -76,12 +77,29 @@ const Titled = ({ title, children }) => {
   return children;
 };
 
+// Registra pageviews en navegaciones SPA. La vista inicial la cuentan los
+// propios scripts de analitica; aqui solo notificamos cambios de ruta.
+const PageViewTracker = () => {
+  const location = useLocation();
+  const previousPath = useRef(location.pathname);
+
+  useEffect(() => {
+    if (location.pathname !== previousPath.current) {
+      previousPath.current = location.pathname;
+      trackPageview(location.pathname);
+    }
+  }, [location.pathname]);
+
+  return null;
+};
+
 function App() {
   return (
     <ToastProvider>
       <BrowserRouter>
         <ErrorBoundaryWithReset>
           <Analytics />
+          <PageViewTracker />
           <Suspense fallback={spinner}>
             <Routes>
               <Route path="/" element={<LandingRedirect />} />
