@@ -683,4 +683,8 @@ apps\api\.venv\Scripts\python.exe -m alembic -c apps\api\alembic.ini upgrade hea
 - Anulación: tras 5 autorizaciones fallidas en 15 min (por cuenta probada y por quien prueba) responde 429 (en memoria: se reinicia
   con el servidor y no se comparte entre instancias). No se anula un fiado de tienda con abonos posteriores.
 - La migración `a8b9c0d1e2f3` (aún sin aplicar en producción) incluye todas las columnas nuevas de estos puntos.
+- **Migración `b9c0d1e2f3a4`** (idempotente): completa `monto_recibido`, `puntos_canjeados`, `descuento_puntos` y el consentimiento
+  (`acepta_datos`, `acepta_datos_en`) solo si faltan. Existe porque `a8b9c0d1e2f3` se aplicó en producción en su versión corta y luego
+  se amplió: Alembic no la repite aunque `/health` diga `al_dia`. Lección: nunca editar una migración ya aplicada en alguna base;
+  agregar siempre una nueva.
 
