@@ -2,6 +2,13 @@ const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
 
 // ─── Response Cache ───
 
+// Token de acceso en memoria. Se envia como Bearer ademas de la cookie: si el navegador
+// bloquea cookies de terceros (front y API en dominios distintos) la sesion sigue funcionando.
+let authToken = null;
+export const setAuthToken = (token) => {
+  authToken = token || null;
+};
+
 let isRefreshing = false;
 let refreshPromise = null;
 
@@ -116,6 +123,9 @@ const performRequest = async (endpoint, options) => {
   if (!nextHeaders['X-Requested-With']) {
     nextHeaders['X-Requested-With'] = 'XMLHttpRequest';
   }
+  if (authToken && !nextHeaders.Authorization) {
+    nextHeaders.Authorization = `Bearer ${authToken}`;
+  }
 
   // Solo se reintentan lecturas. Reintentar POST/PATCH/DELETE ante un 502 o un corte
   // de red puede duplicar ventas, abonos o gastos que el servidor ya proceso.
@@ -214,7 +224,10 @@ export const apiUpload = async (endpoint, file) => {
 
   const response = await fetch(buildUrl(endpoint), {
     method: 'POST',
-    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    headers: {
+      'X-Requested-With': 'XMLHttpRequest',
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    },
     body: formData,
     credentials: 'include',
   });

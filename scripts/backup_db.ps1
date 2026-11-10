@@ -35,7 +35,8 @@ if (-not $connStr) {
 }
 
 # Parsear connection string: postgresql://user:pass@host:port/db
-$pattern = '^postgresql(?:s|)\://([^:]+):([^@]+)@([^:]+):(\d+)/(.+)$'
+# Acepta el driver (postgresql+psycopg2://), puerto opcional y parametros (?sslmode=require).
+$pattern = '^postgres(?:ql)?(?:\+\w+)?\://([^:]+):([^@]+)@([^:/]+)(?::(\d+))?/([^?]+)(?:\?(.*))?$'
 if ($connStr -notmatch $pattern) {
     Write-Error "No se pudo parsear DATABASE_URL"
     exit 1
@@ -44,8 +45,16 @@ if ($connStr -notmatch $pattern) {
 $user = $matches[1]
 $pass = $matches[2]
 $hostname = $matches[3]
-$port = $matches[4]
+$port = if ($matches[4]) { $matches[4] } else { "5432" }
 $dbname = $matches[5]
+$query = $matches[6]
+
+# Neon (y casi cualquier base en la nube) exige SSL.
+if ($query -match 'sslmode=(\w+)') {
+    $env:PGSSLMODE = $matches[1]
+} elseif ($hostname -like '*neon.tech') {
+    $env:PGSSLMODE = "require"
+}
 
 # Crear directorio de backups si no existe
 if (-not (Test-Path $OutputDir)) {
@@ -55,7 +64,7 @@ if (-not (Test-Path $OutputDir)) {
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $dumpFile = Join-Path $OutputDir "variedades_angelly_$timestamp.dump"
 
-Write-Host "Iniciando backup de $dbname en $hostname:$port ..."
+Write-Host "Iniciando backup de $dbname en ${hostname}:${port} ..."
 
 # Usar formato custom (-Fc) para compresion y restauracion selectiva
 $env:PGPASSWORD = $pass

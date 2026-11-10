@@ -1,337 +1,131 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { apiGet, apiPost } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage';
 import SuccessMessage from '../components/SuccessMessage';
+import useConfirm from '../components/useConfirm';
 import ProductSelectionView from './Ventas/ProductSelectionView';
 import CartPanel from './Ventas/CartPanel';
 import SaleReceiptPanel from './Ventas/SaleReceiptPanel';
+import CajaStatusBanner from './Ventas/CajaStatusBanner';
+import MobileCartBar from './Ventas/MobileCartBar';
+import NewClientModal from './Ventas/NewClientModal';
+import PrintableReceipt from './Ventas/PrintableReceipt';
+import { useVentasData } from './Ventas/useVentasData';
+import { useHeldTickets } from './Ventas/useHeldTickets';
+import { usePosPreferences } from './Ventas/usePosPreferences';
+import { useVentasShortcuts } from './Ventas/useVentasShortcuts';
+import {
+  CATALOGO_ENDPOINT,
+  buildSalePayload,
+  emptyTicket,
+  extractProductos,
+  groupCartItems,
+  looksLikeBarcode,
+  resolvePayment,
+  validateSale,
+} from './Ventas/posHelpers';
 import { formatMoney } from '../utils/format';
-import { CONTACTO, SITE } from '../config/site';
 
-const fetchJson = async ({ endpoint, signal, errorMessage }) => {
-  try {
-    return await apiGet(endpoint, { signal });
-  } catch (error) {
-    throw new Error(error.message || errorMessage);
-  }
-};
-
-const CATALOGO_ENDPOINT = '/api/productos/paginados?catalogo=tienda';
-
-// Une productos traidos por busqueda al catalogo cargado, sin duplicar ids.
-const mergeProductos = (current, incoming) => {
-  const known = new Set(current.map((producto) => Number(producto.id)));
-  const nuevos = incoming.filter((producto) => !known.has(Number(producto.id)));
-  return nuevos.length > 0 ? [...current, ...nuevos] : current;
-};
-
-const extractProductos = (payload) => {
-  if (Array.isArray(payload?.data)) return payload.data;
-  return Array.isArray(payload) ? payload : [];
-};
+const TICKET_FIELDS = Object.keys(emptyTicket());
+const pickTicketFields = (source) => Object.fromEntries(TICKET_FIELDS.map((field) => [field, source[field]]));
 
 const Ventas = () => {
   const { token } = useAuth();
+  const { confirm, ConfirmModal } = useConfirm();
+  const data = useVentasData(token);
+  const { productos, clientesTienda, clientesFidelizacion, fidelizacionConfig, error, setError } = data;
+  const heldTickets = useHeldTickets();
+  const preferences = usePosPreferences();
 
-  const [productos, setProductos] = useState([]);
-  const [clientesTienda, setClientesTienda] = useState([]);
-  const [clientesFidelizacion, setClientesFidelizacion] = useState([]);
-  const [fidelizacionConfig, setFidelizacionConfig] = useState({ pesos_por_punto: 1000 });
-  const [clienteFidelizacionId, setClienteFidelizacionId] = useState('');
-
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-
-  const [submittingVenta, setSubmittingVenta] = useState(false);
-  const [creatingClient, setCreatingClient] = useState(false);
-
-  const [esFiado, setEsFiado] = useState(false);
-  const [clienteTiendaId, setClienteTiendaId] = useState('');
-  const [items, setItems] = useState([]);
-  const [montoPago, setMontoPago] = useState('0');
-  const [abonoInicialFiado, setAbonoInicialFiado] = useState('0');
-  const [metodoPago, setMetodoPago] = useState('efectivo');
-
-  const [newStoreClientName, setNewStoreClientName] = useState('');
-  const [newStoreClientPhone, setNewStoreClientPhone] = useState('');
-  const [isStoreClientModalOpen, setIsStoreClientModalOpen] = useState(false);
+  const [ticket, setTicket] = useState(emptyTicket);
   const [productSearch, setProductSearch] = useState('');
-
+  const [success, setSuccess] = useState('');
+  const [submittingVenta, setSubmittingVenta] = useState(false);
   const [ventaCompletada, setVentaCompletada] = useState(null);
 
-  const loadData = useCallback(
-    async (signal) => {
-      if (!token) return;
+  const [newClient, setNewClient] = useState({ nombre: '', telefono: '' });
+  const [isNewClientOpen, setIsNewClientOpen] = useState(false);
+  const [creatingClient, setCreatingClient] = useState(false);
 
-      const requestList = [
-        fetchJson({
-          endpoint: `${CATALOGO_ENDPOINT}&limit=200`,
-          signal,
-          errorMessage: 'No fue posible cargar productos',
-        }),
-        fetchJson({
-          endpoint: '/api/clientes/tienda-fiado',
-          signal,
-          errorMessage: 'No fue posible cargar clientes de fiado tienda',
-        }),
-        // Fidelizacion es un extra: si falla, la venta sigue funcionando.
-        fetchJson({ endpoint: '/api/fidelizacion/clientes', signal, errorMessage: '' }).catch(() => []),
-        fetchJson({ endpoint: '/api/fidelizacion/config', signal, errorMessage: '' }).catch(() => null),
-      ];
-
-      const [productosPayload, tiendaPayload, fidelizacionPayload, configPayload] = await Promise.all(requestList);
-
-      if (signal?.aborted) return;
-
-      setProductos(Array.isArray(productosPayload?.data) ? productosPayload.data : (Array.isArray(productosPayload) ? productosPayload : []));
-      setClientesTienda(Array.isArray(tiendaPayload) ? tiendaPayload : []);
-      setClientesFidelizacion(Array.isArray(fidelizacionPayload) ? fidelizacionPayload : []);
-      if (configPayload?.pesos_por_punto > 0) setFidelizacionConfig(configPayload);
-    },
-    [token],
-  );
-
-  useEffect(() => {
-    if (!token) {
-      setProductos([]);
-      setClientesTienda([]);
-      setLoading(false);
-      return;
-    }
-
-    const controller = new AbortController();
-
-    const load = async () => {
-      try {
-        setLoading(true);
-        setError('');
-        await loadData(controller.signal);
-      } catch (err) {
-        if (controller.signal.aborted) return;
-        setError(err.message || 'No se pudo cargar el módulo de ventas');
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    load();
-    return () => controller.abort();
-  }, [loadData, token]);
+  const searchInputRef = useRef(null);
+  const patchTicket = useCallback((patch) => setTicket((current) => ({ ...current, ...patch })), []);
 
   const productosById = useMemo(
     () => new Map(productos.map((producto) => [Number(producto.id), producto])),
     [productos],
   );
 
+  const cartItems = useMemo(
+    () => ticket.items.filter((item) => Number(item.producto_id) > 0 && Number(item.cantidad || 0) > 0),
+    [ticket.items],
+  );
+
   const totalEstimado = useMemo(
-    () => items.reduce((acc, item) => {
+    () => ticket.items.reduce((acc, item) => {
       const producto = productosById.get(Number(item.producto_id));
       const cantidad = Number(item.cantidad || 0);
-      if (!producto || cantidad <= 0) return acc;
-      return acc + Number(producto.precio_venta || 0) * cantidad;
+      return producto && cantidad > 0 ? acc + Number(producto.precio_venta || 0) * cantidad : acc;
     }, 0),
-    [items, productosById],
+    [ticket.items, productosById],
   );
 
   const cambioContado = useMemo(() => {
-    const pago = Number(montoPago || 0);
-    if (!Number.isFinite(pago)) return 0;
-    return Math.max(0, pago - totalEstimado);
-  }, [montoPago, totalEstimado]);
+    if (ticket.metodoPago !== 'efectivo') return 0;
+    const pago = Number(ticket.montoPago || 0);
+    return Number.isFinite(pago) ? Math.max(0, pago - totalEstimado) : 0;
+  }, [ticket.metodoPago, ticket.montoPago, totalEstimado]);
 
   const puntosEstimados = useMemo(() => {
-    const cobrado = esFiado ? Number(abonoInicialFiado || 0) : totalEstimado;
+    const cobrado = ticket.esFiado ? Number(ticket.abonoInicialFiado || 0) : totalEstimado;
     return Math.floor(cobrado / (fidelizacionConfig.pesos_por_punto || 1000));
-  }, [esFiado, abonoInicialFiado, totalEstimado, fidelizacionConfig]);
+  }, [ticket.esFiado, ticket.abonoInicialFiado, totalEstimado, fidelizacionConfig]);
+
+  const quickPickProductos = useMemo(
+    () => preferences.quickPickIds.map((id) => productosById.get(id)).filter(Boolean),
+    [preferences.quickPickIds, productosById],
+  );
 
   const cleanMessages = () => {
     setError('');
     setSuccess('');
   };
 
-  const resetVentaForm = () => {
-    setEsFiado(false);
-    setClienteTiendaId('');
-    setItems([]);
-    setMontoPago('0');
-    setAbonoInicialFiado('0');
-    setMetodoPago('efectivo');
-    setClienteFidelizacionId('');
+  // ── Carrito ──
+
+  // `productoConocido` evita depender de `productos` cuando el producto acaba de llegar del servidor.
+  const handleQuickAddProducto = (productoId, productoConocido) => {
+    const producto = productoConocido ?? productosById.get(Number(productoId));
+    const stock = Number(producto?.stock_actual || 0);
+
+    setTicket((current) => {
+      const existing = current.items.find((item) => Number(item.producto_id) === Number(productoId));
+      if (Number(existing?.cantidad || 0) >= stock) return current;
+      const items = existing
+        ? current.items.map((item) => (item === existing ? { ...item, cantidad: Number(item.cantidad || 0) + 1 } : item))
+        : [...current.items, { producto_id: String(productoId), cantidad: 1 }];
+      return { ...current, items };
+    });
+    preferences.registerUse(productoId);
   };
 
-  const handleSubmitVenta = async (event) => {
-    event?.preventDefault?.();
-    cleanMessages();
-
-    const groupedItems = new Map();
-
-    for (const item of items) {
-      const productoId = Number(item.producto_id);
-      const cantidad = Number(item.cantidad);
-      if (!Number.isInteger(productoId) || productoId <= 0) continue;
-      if (!Number.isInteger(cantidad) || cantidad <= 0) continue;
-      groupedItems.set(productoId, (groupedItems.get(productoId) || 0) + cantidad);
-    }
-
-    if (groupedItems.size === 0) {
-      setError('Debes agregar al menos un producto válido a la venta');
-      return;
-    }
-
-    for (const [productoId, cantidad] of groupedItems) {
-      const producto = productos.find((p) => Number(p.id) === Number(productoId));
-      if (!producto) continue;
-      const stock = Number(producto.stock_actual || 0);
-      if (cantidad > stock) {
-        setError(`Stock insuficiente para "${producto.nombre}": solicitaste ${cantidad}, hay ${stock} disponibles.`);
-        return;
-      }
-    }
-
-    if (esFiado && !clienteTiendaId) {
-      setError('Selecciona un cliente de fiado tienda para registrar el fiado');
-      return;
-    }
-
-    const pago = Number(montoPago || 0);
-    const abonoFiado = Number(abonoInicialFiado || 0);
-
-    if (!esFiado) {
-      if (!Number.isFinite(pago) || pago < totalEstimado) {
-        setError('Para contado, el pago debe ser mayor o igual al total');
-        return;
-      }
-    }
-
-    if (esFiado) {
-      if (!Number.isFinite(abonoFiado) || abonoFiado < 0) {
-        setError('El abono inicial debe ser un valor válido');
-        return;
-      }
-      if (abonoFiado > totalEstimado) {
-        setError('El abono inicial no puede superar el total de la venta');
-        return;
-      }
-    }
-
-    const payload = {
-      items: Array.from(groupedItems.entries()).map(([producto_id, cantidad]) => ({
-        producto_id,
-        cantidad,
-      })),
-      es_fiado: esFiado,
-      metodo_pago: metodoPago === 'nequi' || metodoPago === 'tarjeta' ? 'transferencia' : metodoPago,
-    };
-
-    if (clienteFidelizacionId) {
-      payload.cliente_fidelizacion_id = Number(clienteFidelizacionId);
-    }
-
-    if (esFiado) {
-      payload.fiado_origen = 'tienda';
-      payload.cliente_tienda_id = Number(clienteTiendaId);
-      payload.abono_inicial = abonoFiado;
-    }
-
-    try {
-      setSubmittingVenta(true);
-
-      const ventaCreada = await apiPost('/api/ventas', payload);
-
-      const selectedCliente = esFiado && clienteTiendaId
-        ? clientesTienda.find((c) => String(c.id) === String(clienteTiendaId))
-        : null;
-
-      const receiptItems = items.map((item) => {
-        const producto = productosById.get(Number(item.producto_id));
-        const cantidad = Number(item.cantidad || 0);
-        const precio = Number(producto?.precio_venta || 0);
-        return {
-          nombre: producto?.nombre || `#${item.producto_id}`,
-          cantidad,
-          precio,
-          subtotal: cantidad * precio,
-        };
-      });
-
-      setVentaCompletada({
-        items: receiptItems,
-        total: totalEstimado,
-        metodoPago,
-        pago,
-        cambio: cambioContado,
-        esFiado,
-        abono: esFiado ? abonoFiado : 0,
-        puntos: Number(ventaCreada?.puntos_otorgados || 0),
-        cliente: selectedCliente?.nombre || null,
-        timestamp: new Date().toLocaleString('es-CO'),
-      });
-
-      resetVentaForm();
-
-      // La venta ya quedo registrada: si la recarga falla no debe presentarse como
-      // un error de venta (el cajero la repetiria y se duplicaria el cobro).
-      loadData().catch(() => {
-        setSuccess('Venta registrada. No se pudo actualizar el inventario en pantalla; recarga la página.');
-      });
-    } catch (err) {
-      setError(err.message || 'No fue posible registrar la venta');
-    } finally {
-      setSubmittingVenta(false);
-    }
+  const handleRemoveProducto = (productoId) => {
+    setTicket((current) => ({
+      ...current,
+      items: current.items.filter((item) => Number(item.producto_id) !== Number(productoId)),
+    }));
   };
 
-  const handlePrintReceipt = () => {
-    window.print();
+  const handleChangeQty = (index, delta) => {
+    setTicket((current) => ({
+      ...current,
+      items: current.items
+        .map((item, rowIndex) => (rowIndex === index ? { ...item, cantidad: Number(item.cantidad || 0) + delta } : item))
+        .filter((item) => Number(item.cantidad) > 0),
+    }));
   };
 
-  const handleNewSale = () => {
-    setVentaCompletada(null);
-    cleanMessages();
-  };
-
-  const handleCreateStoreClient = async (event) => {
-    event.preventDefault();
-    cleanMessages();
-
-    const nombre = newStoreClientName.trim();
-    const telefono = String(newStoreClientPhone || '').replace(/\D/g, '');
-    const telefonoNormalizado = telefono.length === 10 ? `57${telefono}` : telefono;
-
-    if (!nombre) {
-      setError('Ingresa el nombre del cliente fiado tienda');
-      return;
-    }
-
-    try {
-      setCreatingClient(true);
-      const payload = await apiPost('/api/clientes/tienda-fiado', {
-        nombre,
-        telefono_whatsapp: telefonoNormalizado || null,
-      });
-
-      setClientesTienda((current) => [
-        ...current,
-        payload,
-      ].sort((a, b) => String(a.nombre).localeCompare(String(b.nombre), 'es')));
-
-      setEsFiado(true);
-      setClienteTiendaId(String(payload.id));
-      setNewStoreClientName('');
-      setNewStoreClientPhone('');
-      setIsStoreClientModalOpen(false);
-      setSuccess('Cliente fiado tienda creado correctamente');
-    } catch (err) {
-      setError(err.message || 'No se pudo crear el cliente fiado tienda');
-    } finally {
-      setCreatingClient(false);
-    }
-  };
+  // ── Busqueda y escaneo ──
 
   // El catalogo inicial trae 200 productos: lo que no este se busca en el servidor.
   useEffect(() => {
@@ -341,13 +135,8 @@ const Ventas = () => {
     const controller = new AbortController();
     const timer = setTimeout(async () => {
       try {
-        const payload = await apiGet(
-          `${CATALOGO_ENDPOINT}&limit=50&q=${encodeURIComponent(term)}`,
-          { signal: controller.signal },
-        );
-        if (!controller.signal.aborted) {
-          setProductos((current) => mergeProductos(current, extractProductos(payload)));
-        }
+        const payload = await apiGet(`${CATALOGO_ENDPOINT}&limit=50&q=${encodeURIComponent(term)}`, { signal: controller.signal });
+        if (!controller.signal.aborted) data.addFetchedProductos(extractProductos(payload));
       } catch {
         // La busqueda local sigue funcionando si el servidor no responde.
       }
@@ -357,28 +146,43 @@ const Ventas = () => {
       clearTimeout(timer);
       controller.abort();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productSearch, token]);
 
+  const productosFiltrados = useMemo(() => {
+    const term = productSearch.trim().toLowerCase();
+    if (!term) return productos;
+    return productos.filter((producto) => (
+      producto.nombre.toLowerCase().includes(term) || String(producto.codigo_barras || '').toLowerCase().includes(term)
+    ));
+  }, [productos, productSearch]);
+
+  const findProductByCode = async (code) => {
+    const local = productos.find((producto) => producto.codigo_barras === code);
+    if (local) return local;
+    const payload = await apiGet(`${CATALOGO_ENDPOINT}&limit=5&q=${encodeURIComponent(code)}`);
+    const encontrados = extractProductos(payload);
+    const producto = encontrados.find((item) => item.codigo_barras === code);
+    if (producto) data.addFetchedProductos(encontrados);
+    return producto;
+  };
+
+  // Enter en la barra: agrega el codigo escaneado, o el unico resultado de una busqueda por nombre.
   const handleScanCode = async (rawCode) => {
     const code = String(rawCode || '').trim();
     if (!code) return false;
     cleanMessages();
 
-    let producto = productos.find((p) => p.codigo_barras === code);
-    if (!producto) {
-      try {
-        const payload = await apiGet(`${CATALOGO_ENDPOINT}&limit=5&q=${encodeURIComponent(code)}`);
-        const encontrados = extractProductos(payload);
-        producto = encontrados.find((p) => p.codigo_barras === code);
-        if (producto) setProductos((current) => mergeProductos(current, encontrados));
-      } catch (err) {
-        setError(err.message || 'No se pudo buscar el código de barras');
-        return false;
-      }
+    let producto;
+    try {
+      producto = looksLikeBarcode(code) ? await findProductByCode(code) : (productosFiltrados.length === 1 ? productosFiltrados[0] : null);
+    } catch (err) {
+      setError(err.message || 'No se pudo buscar el código de barras');
+      return false;
     }
 
     if (!producto) {
-      setError(`No existe un producto con el código ${code}`);
+      if (looksLikeBarcode(code)) setError(`No existe un producto con el código ${code}`);
       return false;
     }
     if (Number(producto.stock_actual || 0) <= 0) {
@@ -389,65 +193,148 @@ const Ventas = () => {
     return true;
   };
 
-  const productosFiltrados = useMemo(() => {
-    const term = productSearch.trim().toLowerCase();
-    if (!term) return productos;
-    return productos.filter((producto) => producto.nombre.toLowerCase().includes(term));
-  }, [productos, productSearch]);
+  // ── Venta ──
 
-  // `productoConocido` evita depender de `productos` cuando el producto acaba de llegar del servidor.
-  const handleQuickAddProducto = (productoId, productoConocido) => {
-    setItems((current) => {
-      const qtyInCart = current.find((item) => Number(item.producto_id) === Number(productoId))?.cantidad || 0;
-      const producto = productoConocido ?? productos.find((p) => Number(p.id) === Number(productoId));
-      const stock = Number(producto?.stock_actual || 0);
-      if (qtyInCart >= stock) return current;
+  const handleSubmitVenta = async (event) => {
+    event?.preventDefault?.();
+    cleanMessages();
 
-      const index = current.findIndex((item) => Number(item.producto_id) === Number(productoId));
-      if (index >= 0) {
-        return current.map((item, rowIndex) => (rowIndex === index
-          ? { ...item, cantidad: Number(item.cantidad || 0) + 1 }
-          : item));
-      }
-      return [...current, { producto_id: String(productoId), cantidad: 1 }];
-    });
+    const grouped = groupCartItems(ticket.items);
+    const validationError = validateSale({ grouped, productos, ticket, total: totalEstimado });
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    const pago = resolvePayment({ metodoPago: ticket.metodoPago, montoPago: ticket.montoPago, total: totalEstimado });
+    const abono = Number(ticket.abonoInicialFiado || 0);
+
+    try {
+      setSubmittingVenta(true);
+      const ventaCreada = await apiPost('/api/ventas', buildSalePayload({ grouped, ticket }));
+
+      const selectedCliente = ticket.esFiado
+        ? clientesTienda.find((cliente) => String(cliente.id) === String(ticket.clienteTiendaId))
+        : null;
+      const receiptItems = ticket.items.map((item) => {
+        const producto = productosById.get(Number(item.producto_id));
+        const cantidad = Number(item.cantidad || 0);
+        const precio = Number(producto?.precio_venta || 0);
+        return { nombre: producto?.nombre || `#${item.producto_id}`, cantidad, precio, subtotal: cantidad * precio };
+      });
+
+      setVentaCompletada({
+        items: receiptItems,
+        total: totalEstimado,
+        metodoPago: ticket.metodoPago,
+        pago,
+        cambio: ticket.esFiado ? 0 : Math.max(0, pago - totalEstimado),
+        esFiado: ticket.esFiado,
+        abono: ticket.esFiado ? abono : 0,
+        puntos: Number(ventaCreada?.puntos_otorgados || 0),
+        cliente: selectedCliente?.nombre || null,
+        timestamp: new Date().toLocaleString('es-CO'),
+      });
+      setTicket(emptyTicket());
+
+      // La venta ya quedo registrada: si la recarga falla no debe presentarse como
+      // un error de venta (el cajero la repetiria y se duplicaria el cobro).
+      data.reload().catch(() => {
+        setSuccess('Venta registrada. No se pudo actualizar el inventario en pantalla; recarga la página.');
+      });
+    } catch (err) {
+      setError(err.message || 'No fue posible registrar la venta');
+    } finally {
+      setSubmittingVenta(false);
+    }
   };
 
-  const handleRemoveProducto = (productoId) => {
-    setItems((current) => current.filter((item) => Number(item.producto_id) !== Number(productoId)));
+  const handleNewSale = () => {
+    setVentaCompletada(null);
+    cleanMessages();
   };
 
-  const handleChangeQty = (index, delta) => {
-    setItems((current) => current.reduce((acc, item, rowIndex) => {
-      if (rowIndex !== index) {
-        acc.push(item);
-        return acc;
-      }
+  // ── Tickets en espera ──
 
-      const nextQty = Number(item.cantidad || 0) + delta;
-      if (nextQty <= 0) {
-        return acc;
-      }
-
-      acc.push({ ...item, cantidad: nextQty });
-      return acc;
-    }, []));
+  const handleHold = () => {
+    if (cartItems.length === 0) return;
+    const numero = heldTickets.hold(ticket);
+    setTicket(emptyTicket());
+    setProductSearch('');
+    cleanMessages();
+    setSuccess(`Ticket ${numero} en espera. Recupéralo desde la barra "En espera".`);
   };
 
-  const cartItems = useMemo(
-    () => items.filter((item) => Number(item.producto_id) > 0 && Number(item.cantidad || 0) > 0),
-    [items],
-  );
+  const handleResumeTicket = (id) => {
+    if (cartItems.length > 0) heldTickets.hold(ticket);
+    const held = heldTickets.take(id);
+    if (held) {
+      setTicket({ ...emptyTicket(), ...pickTicketFields(held) });
+      setVentaCompletada(null);
+      cleanMessages();
+    }
+  };
 
-  const printReceipt = ventaCompletada || null;
+  const handleClear = async () => {
+    const ok = await confirm({ title: 'Vaciar ticket', message: '¿Quitar todos los productos del ticket actual?', variant: 'warning' });
+    if (ok) setTicket(emptyTicket());
+  };
+
+  // ── Clientes ──
+
+  const handleCreateStoreClient = async (event) => {
+    event.preventDefault();
+    cleanMessages();
+
+    const nombre = newClient.nombre.trim();
+    const telefono = String(newClient.telefono || '').replace(/\D/g, '');
+    if (!nombre) {
+      setError('Ingresa el nombre del cliente fiado tienda');
+      return;
+    }
+
+    try {
+      setCreatingClient(true);
+      const creado = await apiPost('/api/clientes/tienda-fiado', {
+        nombre,
+        telefono_whatsapp: (telefono.length === 10 ? `57${telefono}` : telefono) || null,
+      });
+      data.setClientesTienda((current) => [...current, creado].sort((a, b) => String(a.nombre).localeCompare(String(b.nombre), 'es')));
+      patchTicket({ esFiado: true, clienteTiendaId: String(creado.id) });
+      setNewClient({ nombre: '', telefono: '' });
+      setIsNewClientOpen(false);
+      setSuccess('Cliente fiado tienda creado correctamente');
+    } catch (err) {
+      setError(err.message || 'No se pudo crear el cliente fiado tienda');
+    } finally {
+      setCreatingClient(false);
+    }
+  };
+
+  // ── Atajos ──
+
+  useVentasShortcuts({
+    enabled: !isNewClientOpen,
+    onFocusSearch: () => {
+      if (ventaCompletada) handleNewSale();
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    },
+    onHold: () => { if (!ventaCompletada) handleHold(); },
+    onCharge: () => {
+      if (!ventaCompletada && cartItems.length > 0 && !submittingVenta) handleSubmitVenta();
+    },
+    onEscape: () => setProductSearch(''),
+  });
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-3 pb-20 lg:h-[calc(100vh-8.75rem)] lg:pb-0">
+      <CajaStatusBanner cajaAbierta={data.cajaAbierta} />
       <ErrorMessage message={error} onDismiss={() => setError('')} />
       <SuccessMessage message={success} onDismiss={() => setSuccess('')} />
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className={`lg:overflow-y-auto lg:max-h-[calc(100vh-8rem)] ${ventaCompletada ? 'pointer-events-none opacity-40' : ''}`}>
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_26rem] xl:grid-cols-[minmax(0,1fr)_28rem]">
+        <div className={`min-h-[30rem] lg:min-h-0 ${ventaCompletada ? 'pointer-events-none opacity-40' : ''}`}>
           <ProductSelectionView
             productos={productosFiltrados}
             searchTerm={productSearch}
@@ -456,16 +343,20 @@ const Ventas = () => {
             onScanCode={handleScanCode}
             cart={cartItems}
             formatMoney={formatMoney}
-            loading={loading}
+            loading={data.loading}
+            searchInputRef={searchInputRef}
+            favorites={preferences.favorites}
+            onToggleFavorite={preferences.toggleFavorite}
+            quickPickProductos={quickPickProductos}
           />
         </div>
 
-        <div className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-6rem)]">
+        <div id="pos-ticket" className="min-h-[34rem] scroll-mt-24 lg:min-h-0">
           {ventaCompletada ? (
             <SaleReceiptPanel
               receipt={ventaCompletada}
               formatMoney={formatMoney}
-              onPrint={handlePrintReceipt}
+              onPrint={() => window.print()}
               onNewSale={handleNewSale}
             />
           ) : (
@@ -476,195 +367,59 @@ const Ventas = () => {
               onChangeQty={handleChangeQty}
               onRemoveItem={handleRemoveProducto}
               formatMoney={formatMoney}
-              esFiado={esFiado}
-              onSetEsFiado={setEsFiado}
-              montoPago={montoPago}
-              onSetMontoPago={setMontoPago}
-              metodoPago={metodoPago}
-              onSetMetodoPago={setMetodoPago}
+              esFiado={ticket.esFiado}
+              onSetEsFiado={(esFiado) => patchTicket({ esFiado })}
+              montoPago={ticket.montoPago}
+              onSetMontoPago={(montoPago) => patchTicket({ montoPago })}
+              metodoPago={ticket.metodoPago}
+              onSetMetodoPago={(metodoPago) => patchTicket({ metodoPago })}
               cambioContado={cambioContado}
               clientesTiendaFiado={clientesTienda}
-              clienteTiendaId={clienteTiendaId}
-              onSetClienteTiendaId={setClienteTiendaId}
+              clienteTiendaId={ticket.clienteTiendaId}
+              onSetClienteTiendaId={(clienteTiendaId) => patchTicket({ clienteTiendaId })}
+              abonoInicialFiado={ticket.abonoInicialFiado}
+              onSetAbonoInicialFiado={(abonoInicialFiado) => patchTicket({ abonoInicialFiado })}
               onCrearCliente={() => {
                 cleanMessages();
-                setIsStoreClientModalOpen(true);
+                setIsNewClientOpen(true);
               }}
               onConfirmar={handleSubmitVenta}
-              clientesFidelizacion={clientesFidelizacion}
-              clienteFidelizacionId={clienteFidelizacionId}
-              onSetClienteFidelizacionId={setClienteFidelizacionId}
-              puntosEstimados={puntosEstimados}
               submittingVenta={submittingVenta}
+              clientesFidelizacion={clientesFidelizacion}
+              clienteFidelizacionId={ticket.clienteFidelizacionId}
+              onSetClienteFidelizacionId={(clienteFidelizacionId) => patchTicket({ clienteFidelizacionId })}
+              puntosEstimados={puntosEstimados}
+              heldTickets={heldTickets.tickets}
+              onHold={handleHold}
+              onClear={handleClear}
+              onResumeTicket={handleResumeTicket}
+              onDiscardTicket={heldTickets.discard}
             />
           )}
         </div>
       </div>
 
-      {isStoreClientModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
-          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
-            <div className="mb-5 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-rosewood">Tienda Angelly</p>
-                <h3 className="mt-1 text-2xl font-bold text-gray-900">Nuevo cliente fiado tienda</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsStoreClientModalOpen(false)}
-                className="rounded-full border border-gray-200 p-2 text-gray-500 transition hover:bg-gray-50 hover:text-gray-700"
-                aria-label="Cerrar modal"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form className="space-y-4" onSubmit={handleCreateStoreClient}>
-              <input
-                type="text"
-                value={newStoreClientName}
-                onChange={(event) => setNewStoreClientName(event.target.value)}
-                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-rosewood focus:outline-none"
-                placeholder="Nombre del cliente"
-                maxLength={120}
-              />
-
-              <input
-                type="text"
-                value={newStoreClientPhone}
-                onChange={(event) => setNewStoreClientPhone(event.target.value)}
-                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-rosewood focus:outline-none"
-                placeholder="WhatsApp (opcional)"
-                maxLength={25}
-              />
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsStoreClientModalOpen(false)}
-                  className="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={creatingClient}
-                  className="flex-1 rounded-xl bg-rosewood px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300"
-                >
-                  {creatingClient ? 'Guardando...' : 'Guardar cliente'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {!ventaCompletada && (
+        <MobileCartBar
+          unidades={cartItems.reduce((acc, item) => acc + Number(item.cantidad || 0), 0)}
+          total={totalEstimado}
+          formatMoney={formatMoney}
+          targetId="pos-ticket"
+        />
       )}
 
-      <style>{`
-        @media print {
-          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          body * { visibility: hidden !important; }
-          #print-receipt, #print-receipt * { visibility: visible !important; }
-          #print-receipt { position: fixed !important; left: 0 !important; top: 0 !important; width: 100% !important; height: 100% !important; display: flex !important; align-items: center !important; justify-content: center !important; background: white !important; z-index: 99999 !important; }
-          #print-receipt > div { width: 80mm !important; max-width: 80mm !important; border: none !important; box-shadow: none !important; padding: 8px 4px !important; }
-          .no-print { display: none !important; }
-        }
-      `}</style>
-
-      <div id="print-receipt" className="hidden print:block">
-        <div className="mx-auto bg-white p-2 text-xs text-gray-800">
-          <div className="mb-3 text-center">
-            <p className="text-base font-bold uppercase tracking-wide">{SITE.name}</p>
-            {CONTACTO.nit && <p className="text-[10px] text-gray-600">NIT: {CONTACTO.nit}</p>}
-            {CONTACTO.direccion && <p className="text-[10px] text-gray-600">{CONTACTO.direccion}</p>}
-            {CONTACTO.telefono && <p className="text-[10px] text-gray-600">Tel: {CONTACTO.telefono}</p>}
-          </div>
-
-          <div className="mb-2 border-t border-dashed border-gray-400" />
-
-          <div className="mb-2 text-center">
-            <p className="text-xs font-bold uppercase tracking-wide">Comprobante de venta</p>
-            <p className="text-[10px] text-gray-500">Documento no válido como factura</p>
-            <p className="text-[10px] text-gray-600">{printReceipt?.timestamp || ''}</p>
-          </div>
-
-          <div className="mb-2 border-t border-dashed border-gray-400" />
-
-          {printReceipt && (
-            <p className="mb-2 text-[10px] text-gray-600">
-              Método de pago: {printReceipt.metodoPago === 'efectivo' ? 'Efectivo' : printReceipt.metodoPago === 'nequi' ? 'Nequi' : 'Tarjeta'}
-            </p>
-          )}
-
-          <table className="w-full text-[10px]">
-            <thead>
-              <tr className="border-b border-dashed border-gray-400 font-semibold">
-                <th className="py-1 text-left">Producto</th>
-                <th className="py-1 text-right">Cant</th>
-                <th className="py-1 text-right">Precio</th>
-                <th className="py-1 text-right">Subtotal</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(printReceipt?.items || []).map((item, idx) => (
-                <tr key={idx}>
-                  <td className="py-1 pr-1">{item.nombre}</td>
-                  <td className="py-1 text-right">{item.cantidad}</td>
-                  <td className="py-1 text-right">{formatMoney(item.precio)}</td>
-                  <td className="py-1 text-right font-medium">{formatMoney(item.subtotal)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <div className="my-2 border-t border-dashed border-gray-400" />
-
-          {printReceipt && (
-            <div className="space-y-0.5 text-[10px]">
-              <div className="flex justify-between font-bold">
-                <span>TOTAL:</span>
-                <span>{formatMoney(printReceipt.total)}</span>
-              </div>
-              {printReceipt.esFiado && (
-                <>
-                  {printReceipt.cliente && (
-                    <div className="flex justify-between">
-                      <span>Cliente:</span>
-                      <span>{printReceipt.cliente}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span>Abono:</span>
-                    <span>{formatMoney(printReceipt.abono || 0)}</span>
-                  </div>
-                  <div className="flex justify-between font-semibold">
-                    <span>Queda fiado:</span>
-                    <span>{formatMoney(Math.max(0, printReceipt.total - (printReceipt.abono || 0)))}</span>
-                  </div>
-                </>
-              )}
-              {!printReceipt.esFiado && (
-                <>
-                  <div className="flex justify-between">
-                    <span>Pago:</span>
-                    <span>{formatMoney(printReceipt.pago)}</span>
-                  </div>
-                  {printReceipt.cambio > 0 && (
-                    <div className="flex justify-between">
-                      <span>Cambio:</span>
-                      <span>{formatMoney(printReceipt.cambio)}</span>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
-          <div className="mt-4 border-t border-dashed border-gray-400" />
-
-          <p className="mt-2 text-center text-[10px] text-gray-500">¡Gracias por su preferencia!</p>
-        </div>
-      </div>
-
+      <NewClientModal
+        isOpen={isNewClientOpen}
+        onClose={() => setIsNewClientOpen(false)}
+        name={newClient.nombre}
+        phone={newClient.telefono}
+        onNameChange={(nombre) => setNewClient((current) => ({ ...current, nombre }))}
+        onPhoneChange={(telefono) => setNewClient((current) => ({ ...current, telefono }))}
+        onSubmit={handleCreateStoreClient}
+        saving={creatingClient}
+      />
+      {ConfirmModal}
+      <PrintableReceipt receipt={ventaCompletada} formatMoney={formatMoney} />
     </div>
   );
 };

@@ -10,6 +10,7 @@ y elimina metadatos (EXIF/GPS) antes de persistirla.
 from __future__ import annotations
 
 import io
+import logging
 import os
 import uuid
 from pathlib import Path
@@ -22,9 +23,14 @@ from PIL import Image
 from src.api.dependencies import AuthenticatedUser, require_roles
 
 router = APIRouter(tags=["upload"])
+logger = logging.getLogger("tienda_angelly")
 
 BLOB_TOKEN = os.environ.get("BLOB_READ_WRITE_TOKEN")
-BLOB_API = "https://api.vercel.com/v1/blob"
+# Contrato verificado contra el codigo del SDK oficial @vercel/blob (v2.9):
+# PUT <api>/?pathname=...  con Bearer, x-api-version y x-vercel-blob-access.
+BLOB_API = os.environ.get("BLOB_API_URL", "https://vercel.com/api/blob").rstrip("/")
+BLOB_API_VERSION = "13"
+BLOB_FOLDER = "productos"
 LOCAL_UPLOAD_DIR = Path(__file__).resolve().parents[3] / "uploads"
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 MAX_FILE_SIZE = 5 * 1024 * 1024
@@ -139,30 +145,41 @@ async def upload_imagen(
     return JSONResponse(content={"url": url})
 
 
+def _cliente_http() -> httpx.AsyncClient:
+    return httpx.AsyncClient(timeout=30.0)
+
+
 async def _upload_to_blob(filename: str, contents: bytes, content_type: str) -> str:
-    async with httpx.AsyncClient() as client:
-        upload_url = f"{BLOB_API}/upload?filename={filename}"
-        response = await client.put(
-            upload_url,
-            headers={
-                "Authorization": f"Bearer {BLOB_TOKEN}",
-                "Content-Type": content_type,
-            },
-            content=contents,
+    """Sube la imagen a Vercel Blob (almacenamiento permanente, publico, con CDN)."""
+    headers = {
+        "authorization": f"Bearer {BLOB_TOKEN}",
+        "x-api-version": BLOB_API_VERSION,
+        "x-vercel-blob-access": "public",
+        "x-content-type": content_type,
+        "x-add-random-suffix": "1",
+    }
+    try:
+        async with _cliente_http() as client:
+            response = await client.put(
+                f"{BLOB_API}/",
+                params={"pathname": f"{BLOB_FOLDER}/{filename}"},
+                headers=headers,
+                content=contents,
+            )
+    except httpx.HTTPError as exc:
+        logger.error("Vercel Blob no respondio: %s", exc)
+        raise HTTPException(status_code=502, detail="No se pudo contactar el almacenamiento de imagenes") from exc
+
+    if response.status_code in (401, 403):
+        logger.error("Vercel Blob rechazo las credenciales (%s): %s", response.status_code, response.text[:200])
+        raise HTTPException(
+            status_code=500,
+            detail="Vercel Blob rechazo las credenciales. Revisa BLOB_READ_WRITE_TOKEN.",
         )
-        if response.status_code == 401:
-            raise HTTPException(
-                status_code=500,
-                detail="Token de Vercel Blob invalido. Configura BLOB_READ_WRITE_TOKEN.",
-            )
-        if response.status_code == 403:
-            raise HTTPException(
-                status_code=500,
-                detail="Sin permisos para escribir en Vercel Blob.",
-            )
-        response.raise_for_status()
-        data = response.json()
-        return str(data["url"])
+    if response.status_code >= 400:
+        logger.error("Vercel Blob fallo (%s): %s", response.status_code, response.text[:200])
+        raise HTTPException(status_code=502, detail="No se pudo guardar la imagen")
+    return str(response.json()["url"])
 
 
 async def _upload_local(filename: str, contents: bytes) -> str:
