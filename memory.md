@@ -620,3 +620,23 @@ apps\api\.venv\Scripts\python.exe -m alembic -c apps\api\alembic.ini upgrade hea
   cerrada, pago en efectivo vacío = exacto, barra fija en móvil. La lógica de validación/payload está en
   `Ventas/posHelpers.js` y los datos en `Ventas/useVentasData.js`.
 
+---
+
+## 15. Turno de caja, tarjeta y huso horario
+
+- **Turno de caja:** `ventas`, `abonos_cartera`, `abonos_tienda` y `gastos` tienen `caja_id` (FK a `cierres_caja`,
+  `ON DELETE SET NULL`). Se asigna solo al insertar (listener `before_insert` al final de `models.py`) si hay una caja
+  abierta y la fecha de la operación no es anterior a su apertura. Lo hecho con la caja cerrada queda sin turno.
+  Los totales del turno salen de `calcular_metricas` (`api/services/caja_calculos.py`) filtrando por `caja_id`,
+  ya no por rango de fechas.
+- **Tarjeta ≠ transferencia:** `MetodoPago = efectivo | transferencia | tarjeta`. Nequi se envía como `transferencia`.
+  `cierres_caja.monto_ventas_tarjeta`; el dashboard devuelve `pagos_tarjeta`. El efectivo esperado sigue siendo
+  base + efectivo − gastos (ni transferencias ni tarjeta están en el cajón).
+- **Dashboard:** los pagos por medio incluyen ahora también los abonos de tienda (antes solo los de cartera).
+- **Huso horario:** la base guarda UTC sin zona. Los cortes de día/semana/mes del dashboard son a medianoche hora de
+  Colombia (`domain/zona_horaria.py`, `APP_UTC_OFFSET_HOURS`, por defecto -5). En el frontend `parseApiDate`
+  (`utils/format.js`) toma como UTC las fechas del servidor sin "Z" antes de mostrarlas.
+- **Saldar deuda de un cliente de tienda** abre el diálogo de abono con el monto completo para elegir el medio de pago.
+- **Comprobante del POS:** se imprime desde un iframe oculto (`Ventas/printReceipt.js` + `receiptHtml.js`), una sola
+  hoja, `@page { margin: 0 }` (sin fecha ni URL del navegador). En contado siempre muestra Pago y Cambio.
+- Migración `f6a7b8c9d0e1` (turno + tarjeta). Asocia a la caja abierta lo hecho desde su apertura.

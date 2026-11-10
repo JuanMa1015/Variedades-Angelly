@@ -7,7 +7,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
-MetodoPago = Literal["efectivo", "transferencia"]
+MetodoPago = Literal["efectivo", "transferencia", "tarjeta"]
 
 
 class ClienteResponse(BaseModel):

@@ -8,6 +8,9 @@ import SuccessMessage from '../components/SuccessMessage';
 import useConfirm from '../components/useConfirm';
 import Skeleton from '../components/Skeleton';
 import Modal from '../components/Modal';
+import MoneyInput from './Ventas/MoneyInput';
+import { PAYMENT_METHODS } from '../utils/paymentMethods';
+import { parseApiDate } from '../utils/format';
 
 const PAGE_SIZE = 10;
 const CLIENTES_PAGE_SIZE = 20;
@@ -287,22 +290,15 @@ const ClientesTienda = () => {
     }
   };
 
-  const handleSaldarDeuda = async (cliente) => {
+  // Saldar toda la deuda abre el mismo dialogo del abono con el monto completo: asi se elige
+  // como pago el cliente (efectivo, transferencia o tarjeta) y la caja queda bien cuadrada.
+  const handleSaldarDeuda = (cliente) => {
     const deuda = Number(cliente.deuda_total || 0);
     if (deuda <= 0) { setError('El cliente no tiene deuda'); return; }
-    const confirmed = await confirm({ title: 'Saldar deuda', message: `¿Saldar toda la deuda de ${cliente.nombre} por ${formatMoney(deuda)}?` });
-    if (!confirmed) return;
-
-    try {
-      setSavingAbono(true);
-      await apiPost(`/api/clientes/tienda/${cliente.id}/abonos`, { monto: deuda, metodo_pago: 'efectivo' });
-      setSuccess(`Deuda de ${cliente.nombre} saldada correctamente`);
-      await Promise.all([loadClientes(), loadResumen(), loadCobroClientes()]);
-    } catch (err) {
-      setError(err.message || 'No fue posible saldar la deuda');
-    } finally {
-      setSavingAbono(false);
-    }
+    setError('');
+    setSelectedClienteAbono(cliente);
+    setAbonoMonto(String(deuda));
+    setAbonoMetodo('efectivo');
   };
 
   const handleVerDetalle = async (cliente) => {
@@ -592,11 +588,11 @@ const ClientesTienda = () => {
               Deuda actual: <span className="font-semibold text-rosewood">{formatMoney(selectedClienteAbono.deuda_total)}</span>
             </p>
             <form className="space-y-4" onSubmit={handleConfirmAbono}>
-              <input type="text" inputMode="numeric" value={abonoMonto} onChange={(e) => setAbonoMonto(e.target.value.replace(/\D/g, ''))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none" placeholder="Monto del abono" />
-              <div className="grid grid-cols-2 gap-2">
-                {['efectivo', 'transferencia'].map((met) => (
-                  <button key={met} type="button" onClick={() => setAbonoMetodo(met)} className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${abonoMetodo === met ? 'border-rosewood bg-rosewood text-white' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}>
-                    {met === 'efectivo' ? '💵 Efectivo' : '📱 Transferencia'}
+              <MoneyInput id="abono-monto" label="Monto del abono" value={Number(abonoMonto || 0)} onChange={(monto) => setAbonoMonto(monto > 0 ? String(monto) : '')} placeholder="Monto del abono" />
+              <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Medio de pago del abono">
+                {PAYMENT_METHODS.map((met) => (
+                  <button key={met.id} type="button" role="radio" aria-checked={abonoMetodo === met.id} onClick={() => setAbonoMetodo(met.id)} className={`rounded-lg border px-2 py-2 text-xs font-semibold transition ${abonoMetodo === met.id ? 'border-rosewood bg-rosewood text-white' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}>
+                    {met.emoji} {met.label}
                   </button>
                 ))}
               </div>
@@ -649,7 +645,7 @@ const ClientesTienda = () => {
                       const isAbono = mov.tipo === 'Abono';
                       return (
                         <tr key={`${mov.tipo}-${mov.id}`} className={`border-b ${isAbono ? 'bg-emerald-50/50' : ''}`}>
-                          <td className="py-2 pr-2 text-gray-600">{new Date(mov.fecha).toLocaleDateString()}</td>
+                          <td className="py-2 pr-2 text-gray-600">{parseApiDate(mov.fecha).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' })}</td>
                           <td className="py-2 pr-2 text-gray-700">{isAbono ? '-' : mov.cantidad}</td>
                           <td className="py-2 pr-2 font-medium text-gray-900">{isAbono ? 'ABONO' : mov.articulo}</td>
                           <td className="py-2 pr-2 text-right text-gray-700">{isAbono ? '-' : formatMoney(mov.precio_unitario || 0)}</td>

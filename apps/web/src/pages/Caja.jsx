@@ -8,6 +8,7 @@ import Skeleton, { SkeletonCard } from '../components/Skeleton'
 import useConfirm from '../components/useConfirm'
 import { formatDateTime, formatMoney } from '../utils/format';
 import Modal from '../components/Modal';
+import PaymentBadge from '../components/PaymentBadge';
 
 // Mensaje al cerrar: aqui el cajero conoce por primera vez cuanto esperaba el sistema.
 const describirCierre = (cierre) => {
@@ -412,6 +413,10 @@ const Caja = () => {
                   <span className="font-semibold text-blue-700">{formatMoney(cajaActual?.monto_ventas_transferencia)}</span>
                 </p>
                 <p className="mb-1 flex justify-between">
+                  <span>Ventas tarjeta:</span>
+                  <span className="font-semibold text-sky-700">{formatMoney(cajaActual?.monto_ventas_tarjeta)}</span>
+                </p>
+                <p className="mb-1 flex justify-between">
                   <span>Gastos:</span>
                   <span className="font-semibold text-red-700">{formatMoney(cajaActual?.monto_gastos)}</span>
                 </p>
@@ -508,13 +513,7 @@ const Caja = () => {
                       <td className="px-4 py-3 font-medium text-rosewood">{venta.venta_id}</td>
                       <td className="px-4 py-3 text-gray-700">{venta.cliente_nombre || 'Mostrador'}</td>
                       <td className="px-4 py-3">
-                        {venta.metodo_pago === 'efectivo' ? (
-                          <span className="rounded-full bg-rosewood/10 px-2.5 py-0.5 text-xs font-semibold text-rosewood">Efectivo</span>
-                        ) : venta.metodo_pago === 'transferencia' ? (
-                          <span className="rounded-full bg-gold-50 px-2.5 py-0.5 text-xs font-semibold text-gold-200">Transferencia</span>
-                        ) : (
-                          <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600">{venta.metodo_pago || '-'}</span>
-                        )}
+                        <PaymentBadge method={venta.metodo_pago} />
                       </td>
                       <td className="px-4 py-3 font-bold text-rosewood">{formatMoney(venta.total)}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-gray-500">{formatDateTime(venta.fecha)}</td>
@@ -553,6 +552,7 @@ const Caja = () => {
                   <th className="px-3 py-3 font-semibold">Inicial</th>
                   <th className="px-3 py-3 font-semibold">V. efectivo</th>
                   <th className="px-3 py-3 font-semibold">V. transf.</th>
+                  <th className="px-3 py-3 font-semibold">V. tarjeta</th>
                   <th className="px-3 py-3 font-semibold">Gastos</th>
                   <th className="px-3 py-3 font-semibold">Esperado</th>
                   <th className="px-3 py-3 font-semibold">Cierre</th>
@@ -584,6 +584,7 @@ const Caja = () => {
                       <td className="px-3 py-3 font-semibold text-rosewood">{formatMoney(caja.monto_inicial)}</td>
                       <td className="px-3 py-3 font-semibold text-rosewood">{formatMoney(caja.monto_ventas_efectivo)}</td>
                       <td className="px-3 py-3 font-semibold text-gold-200">{formatMoney(caja.monto_ventas_transferencia)}</td>
+                      <td className="px-3 py-3 font-semibold text-sky-700">{formatMoney(caja.monto_ventas_tarjeta)}</td>
                       <td className="px-3 py-3 font-semibold text-gold-200">{formatMoney(caja.monto_gastos)}</td>
                       <td className="px-3 py-3 font-bold text-rosewood">
                         {caja.saldo_esperado != null ? formatMoney(caja.saldo_esperado) : '—'}
@@ -663,13 +664,7 @@ const Caja = () => {
                                     <td className="px-2 py-2 text-gray-700">{venta.venta_id}</td>
                                     <td className="px-2 py-2 text-gray-700">{venta.cliente_nombre || 'Mostrador'}</td>
                                     <td className="px-2 py-2">
-                                      {venta.metodo_pago === 'efectivo' ? (
-                                        <span className="rounded-full bg-rosewood/10 px-2 py-0.5 font-semibold text-rosewood">Efectivo</span>
-                                      ) : venta.metodo_pago === 'transferencia' ? (
-                                        <span className="rounded-full bg-gold-50 px-2 py-0.5 font-semibold text-gold-200">Transferencia</span>
-                                      ) : (
-                                        <span className="rounded-full bg-gray-100 px-2 py-0.5 font-semibold text-gray-600">{venta.metodo_pago || '-'}</span>
-                                      )}
+                                      <PaymentBadge method={venta.metodo_pago} compact />
                                     </td>
                                     <td className="px-2 py-2 font-semibold text-rosewood">{formatMoney(venta.total)}</td>
                                     <td className="whitespace-nowrap px-2 py-2 text-gray-500">{formatDateTime(venta.fecha)}</td>

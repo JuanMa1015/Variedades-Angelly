@@ -10,7 +10,8 @@ import SaleReceiptPanel from './Ventas/SaleReceiptPanel';
 import CajaStatusBanner from './Ventas/CajaStatusBanner';
 import MobileCartBar from './Ventas/MobileCartBar';
 import NewClientModal from './Ventas/NewClientModal';
-import PrintableReceipt from './Ventas/PrintableReceipt';
+import { printHtml } from './Ventas/printReceipt';
+import { buildReceiptHtml } from './Ventas/receiptHtml';
 import { useAvailableHeight } from './Ventas/useAvailableHeight';
 import { useVentasData } from './Ventas/useVentasData';
 import { useHeldTickets } from './Ventas/useHeldTickets';
@@ -27,6 +28,7 @@ import {
   validateSale,
 } from './Ventas/posHelpers';
 import { formatMoney } from '../utils/format';
+import { CONTACTO, SITE } from '../config/site';
 
 const TICKET_FIELDS = Object.keys(emptyTicket());
 const pickTicketFields = (source) => Object.fromEntries(TICKET_FIELDS.map((field) => [field, source[field]]));
@@ -360,7 +362,7 @@ const Ventas = () => {
             <SaleReceiptPanel
               receipt={ventaCompletada}
               formatMoney={formatMoney}
-              onPrint={() => window.print()}
+              onPrint={() => printHtml(buildReceiptHtml(ventaCompletada, { formatMoney, site: SITE, contacto: CONTACTO }))}
               onNewSale={handleNewSale}
             />
           ) : (
@@ -424,7 +426,6 @@ const Ventas = () => {
         saving={creatingClient}
       />
       {ConfirmModal}
-      <PrintableReceipt receipt={ventaCompletada} formatMoney={formatMoney} />
     </div>
   );
 };

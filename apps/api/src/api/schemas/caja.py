@@ -37,6 +37,7 @@ class CierreCajaResponse(BaseModel):
     monto_inicial: float
     monto_ventas_efectivo: float
     monto_ventas_transferencia: float
+    monto_ventas_tarjeta: float = 0.0
     monto_gastos: float
     monto_cierre: float | None
     fecha_apertura: datetime
@@ -68,6 +69,7 @@ class CajaHistorialItemResponse(BaseModel):
     monto_inicial: float
     monto_ventas_efectivo: float
     monto_ventas_transferencia: float
+    monto_ventas_tarjeta: float = 0.0
     monto_gastos: float
     monto_cierre: float | None
     saldo_esperado: float | None

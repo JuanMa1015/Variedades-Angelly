@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, Numeric, String, Text, event, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -139,6 +139,13 @@ class VentaModel(Base):
         DateTime(timezone=False),
         nullable=False,
         default=_utcnow_naive,
+    )
+
+    # Turno de caja al que pertenece (se asigna solo al crear si hay una caja abierta).
+    caja_id: Mapped[int | None] = mapped_column(
+        ForeignKey("cierres_caja.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
     def __repr__(self) -> str:
@@ -285,6 +292,13 @@ class GastoModel(Base):
     )
     registrado_por: Mapped[str] = mapped_column(String(50), nullable=False)
 
+    # Turno de caja al que pertenece (se asigna solo al crear si hay una caja abierta).
+    caja_id: Mapped[int | None] = mapped_column(
+        ForeignKey("cierres_caja.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     def __repr__(self) -> str:
         return f"GastoModel(id={self.id!r}, categoria={self.categoria!r})"
 
@@ -306,6 +320,13 @@ class AbonoCarteraModel(Base):
         default=_utcnow_naive,
     )
 
+    # Turno de caja al que pertenece (se asigna solo al crear si hay una caja abierta).
+    caja_id: Mapped[int | None] = mapped_column(
+        ForeignKey("cierres_caja.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     def __repr__(self) -> str:
         return f"AbonoCarteraModel(id={self.id!r}, monto={self.monto!r})"
 
@@ -325,6 +346,13 @@ class AbonoTiendaModel(Base):
         DateTime(timezone=False),
         nullable=False,
         default=_utcnow_naive,
+    )
+
+    # Turno de caja al que pertenece (se asigna solo al crear si hay una caja abierta).
+    caja_id: Mapped[int | None] = mapped_column(
+        ForeignKey("cierres_caja.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
     def __repr__(self) -> str:
@@ -349,6 +377,9 @@ class CierreCajaModel(Base):
     monto_inicial: Mapped[float] = mapped_column(_dinero(), nullable=False)
     monto_ventas_efectivo: Mapped[float] = mapped_column(_dinero(), nullable=False)
     monto_ventas_transferencia: Mapped[float] = mapped_column(_dinero(), nullable=False)
+    monto_ventas_tarjeta: Mapped[float] = mapped_column(
+        _dinero(), nullable=False, default=0.0, server_default="0",
+    )
     monto_gastos: Mapped[float] = mapped_column(_dinero(), nullable=False)
     monto_efectivo_real: Mapped[float | None] = mapped_column(_dinero(), nullable=True)
     esperado_vs_real: Mapped[float | None] = mapped_column(_dinero(), nullable=True)
@@ -399,3 +430,32 @@ class RefreshTokenBlacklistModel(Base):
 
     def __repr__(self) -> str:
         return f"RefreshTokenBlacklistModel(jti={self.jti!r})"
+
+
+def _asignar_turno_abierto(_mapper, connection, target) -> None:
+    """Al crear una venta, abono o gasto lo asocia al turno de caja abierto (si lo hay).
+
+    Lo que ocurre con la caja cerrada queda sin turno, y las operaciones con fecha anterior a la
+    apertura (p. ej. un abono registrado con fecha pasada) tampoco entran al turno actual.
+    """
+    if target.caja_id is not None:
+        return
+    abierta = connection.execute(
+        select(CierreCajaModel.id, CierreCajaModel.fecha_apertura)
+        .where(CierreCajaModel.fecha_cierre.is_(None))
+        .order_by(CierreCajaModel.id.desc())
+        .limit(1),
+    ).first()
+    if abierta is None:
+        return
+    fecha = getattr(target, "fecha", None)
+    if fecha is not None:
+        if fecha.tzinfo is not None:
+            fecha = fecha.astimezone(UTC).replace(tzinfo=None)
+        if fecha < abierta.fecha_apertura:
+            return
+    target.caja_id = abierta.id
+
+
+for _modelo in (VentaModel, AbonoCarteraModel, AbonoTiendaModel, GastoModel):
+    event.listen(_modelo, "before_insert", _asignar_turno_abierto)

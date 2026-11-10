@@ -22,6 +22,7 @@ const cajaAbierta = (saldoEsperado) => ({
   monto_inicial: 5000,
   monto_ventas_efectivo: 2000,
   monto_ventas_transferencia: 1000,
+  monto_ventas_tarjeta: 4000,
   monto_gastos: 0,
   fecha_apertura: '2026-11-09T10:00:00',
   fecha_cierre: null,
@@ -84,5 +85,14 @@ describe('Caja', () => {
     fireEvent.submit(input.closest('form'));
 
     await waitFor(() => expect(apiMocks.abrirCaja).toHaveBeenCalledWith({ monto_inicial: 0 }));
+  });
+
+  it('muestra las ventas por tarjeta separadas de las de transferencia', async () => {
+    apiMocks.fetchCajaEstado.mockResolvedValue({ abierta: true, caja_actual: cajaAbierta(null), ultimo_cierre: null });
+
+    render(<Caja />);
+
+    expect(await screen.findByText('Ventas tarjeta:')).toBeInTheDocument();
+    expect(screen.getByText('Ventas transferencia:')).toBeInTheDocument();
   });
 });

@@ -77,19 +77,53 @@ def test_build_resumen_sin_datos() -> None:
 
 
 def test_build_resumen_fechas_correctas() -> None:
-    """Valida que los cortes temporales sean correctos."""
+    """Los cortes son a medianoche hora de Colombia (UTC-5), entregados en UTC sin zona."""
     reader = MetricsReaderStub()
     service = DashboardService(reader)
 
-    now = datetime(2026, 5, 24, 15, 30, 0, tzinfo=UTC)  # domingo
+    now = datetime(2026, 5, 24, 15, 30, 0, tzinfo=UTC)  # domingo 10:30 en Colombia
     service.build_resumen(now=now)
 
-    # Dia: 2026-05-24 00:00:00
-    assert reader.ventas_calls[0].day == 24
-    assert reader.ventas_calls[0].hour == 0
-    # Semana: lunes = 2026-05-18 (weekday() returns 0 for Monday)
-    assert reader.ventas_calls[1].day == 18
-    assert reader.ventas_calls[1].hour == 0
-    # Mes: 2026-05-01
-    assert reader.ventas_calls[2].day == 1
-    assert reader.ventas_calls[2].month == 5
+    # Dia: 2026-05-24 00:00 Colombia = 05:00 UTC
+    assert reader.ventas_calls[0] == datetime(2026, 5, 24, 5, 0)
+    # Semana: lunes 2026-05-18 00:00 Colombia
+    assert reader.ventas_calls[1] == datetime(2026, 5, 18, 5, 0)
+    # Mes: 2026-05-01 00:00 Colombia
+    assert reader.ventas_calls[2] == datetime(2026, 5, 1, 5, 0)
+
+
+def test_una_venta_de_las_8_pm_en_colombia_cuenta_como_del_mismo_dia() -> None:
+    """01:30 UTC del 25 es 8:30 p. m. del 24 en Colombia: el dia sigue siendo el 24."""
+    reader = MetricsReaderStub()
+    DashboardService(reader).build_resumen(now=datetime(2026, 5, 25, 1, 30, tzinfo=UTC))
+
+    assert reader.ventas_calls[0] == datetime(2026, 5, 24, 5, 0)
+
+
+def test_el_corte_cambia_a_medianoche_local_no_a_medianoche_utc() -> None:
+    """04:59 UTC aun es el dia anterior en Colombia; 05:00 UTC ya es el dia nuevo."""
+    antes, despues = MetricsReaderStub(), MetricsReaderStub()
+
+    DashboardService(antes).build_resumen(now=datetime(2026, 5, 25, 4, 59, tzinfo=UTC))
+    DashboardService(despues).build_resumen(now=datetime(2026, 5, 25, 5, 0, tzinfo=UTC))
+
+    assert antes.ventas_calls[0] == datetime(2026, 5, 24, 5, 0)
+    assert despues.ventas_calls[0] == datetime(2026, 5, 25, 5, 0)
+
+
+def test_el_desfase_horario_se_puede_configurar(monkeypatch) -> None:
+    monkeypatch.setenv("APP_UTC_OFFSET_HOURS", "-6")
+    reader = MetricsReaderStub()
+
+    DashboardService(reader).build_resumen(now=datetime(2026, 5, 24, 15, 30, tzinfo=UTC))
+
+    assert reader.ventas_calls[0] == datetime(2026, 5, 24, 6, 0)
+
+
+def test_desfase_invalido_vuelve_al_de_colombia(monkeypatch) -> None:
+    monkeypatch.setenv("APP_UTC_OFFSET_HOURS", "abc")
+    reader = MetricsReaderStub()
+
+    DashboardService(reader).build_resumen(now=datetime(2026, 5, 24, 15, 30, tzinfo=UTC))
+
+    assert reader.ventas_calls[0] == datetime(2026, 5, 24, 5, 0)

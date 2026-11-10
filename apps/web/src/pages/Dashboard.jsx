@@ -16,6 +16,7 @@ const emptyResumen = {
   transacciones_mensuales: 0,
   pagos_efectivo: 0,
   pagos_transferencia: 0,
+  pagos_tarjeta: 0,
 };
 
 const emptyCarteraResumen = {
@@ -299,7 +300,7 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Dinero en efectivo</p>
               <p className="mt-2 text-3xl font-bold text-gray-900">{formatMoney(resumen.pagos_efectivo)}</p>
@@ -308,6 +309,11 @@ const Dashboard = () => {
             <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Dinero por transferencia</p>
               <p className="mt-2 text-3xl font-bold text-gray-900">{formatMoney(resumen.pagos_transferencia)}</p>
+            </div>
+
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Dinero por tarjeta</p>
+              <p className="mt-2 text-3xl font-bold text-gray-900">{formatMoney(resumen.pagos_tarjeta)}</p>
             </div>
           </div>
 

@@ -22,6 +22,7 @@ class DashboardResumenResponse(BaseModel):
     transacciones_mensuales: int
     pagos_efectivo: float
     pagos_transferencia: float
+    pagos_tarjeta: float = 0.0
 
 
 @router.get("/api/dashboard/resumen", response_model=DashboardResumenResponse)
@@ -40,4 +41,5 @@ def dashboard_resumen(
         transacciones_mensuales=resumen.transacciones_mensuales,
         pagos_efectivo=resumen.pagos_efectivo,
         pagos_transferencia=resumen.pagos_transferencia,
+        pagos_tarjeta=resumen.pagos_tarjeta,
     )

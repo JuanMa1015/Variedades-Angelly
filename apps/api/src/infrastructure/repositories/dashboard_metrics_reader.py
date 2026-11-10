@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import case, func, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from src.application.services.dashboard_service import (
@@ -12,8 +12,8 @@ from src.application.services.dashboard_service import (
     PagosTotalesDTO,
     VentasMetricDTO,
 )
-from src.infrastructure.database.models import AbonoCarteraModel, VentaModel
-from src.infrastructure.repositories.ingresos import cobrado_en_venta
+from src.infrastructure.database.models import VentaModel
+from src.infrastructure.repositories.ingresos import cobros_por_metodo
 
 
 class SqlAlchemyDashboardMetricsReader(DashboardMetricsReader):
@@ -36,57 +36,9 @@ class SqlAlchemyDashboardMetricsReader(DashboardMetricsReader):
         )
 
     def pagos_totales_por_metodo(self) -> PagosTotalesDTO:
-        cobrado = cobrado_en_venta()
-        efectivo_ventas, transferencia_ventas = self._db.execute(
-            select(
-                func.coalesce(
-                    func.sum(
-                        case(
-                            (VentaModel.metodo_pago == "efectivo", cobrado),
-                            else_=0.0,
-                        ),
-                    ),
-                    0.0,
-                ),
-                func.coalesce(
-                    func.sum(
-                        case(
-                            (
-                                VentaModel.metodo_pago == "transferencia",
-                                cobrado,
-                            ),
-                            else_=0.0,
-                        ),
-                    ),
-                    0.0,
-                ),
-            ).where(VentaModel.metodo_pago.is_not(None)),
-        ).one()
-
-        efectivo_abonos, transferencia_abonos = self._db.execute(
-            select(
-                func.coalesce(
-                    func.sum(
-                        case(
-                            (AbonoCarteraModel.metodo_pago == "efectivo", AbonoCarteraModel.monto),
-                            else_=0.0,
-                        ),
-                    ),
-                    0.0,
-                ),
-                func.coalesce(
-                    func.sum(
-                        case(
-                            (AbonoCarteraModel.metodo_pago == "transferencia", AbonoCarteraModel.monto),
-                            else_=0.0,
-                        ),
-                    ),
-                    0.0,
-                ),
-            ).where(AbonoCarteraModel.metodo_pago.is_not(None)),
-        ).one()
-
+        totales = cobros_por_metodo(self._db)
         return PagosTotalesDTO(
-            efectivo=float((efectivo_ventas or 0.0) + (efectivo_abonos or 0.0)),
-            transferencia=float((transferencia_ventas or 0.0) + (transferencia_abonos or 0.0)),
+            efectivo=totales.get("efectivo", 0.0),
+            transferencia=totales.get("transferencia", 0.0),
+            tarjeta=totales.get("tarjeta", 0.0),
         )

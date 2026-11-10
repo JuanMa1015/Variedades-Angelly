@@ -5,10 +5,10 @@ import { apiGet, apiPost } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage'
 import SuccessMessage from '../components/SuccessMessage'
 import Skeleton from '../components/Skeleton'
-import { formatDateTime, formatMoney } from '../utils/format';
+import { formatDateTime, formatMoney, parseApiDate } from '../utils/format';
 
 const isCurrentMonth = (value, referenceDate) => {
-  const date = new Date(value);
+  const date = parseApiDate(value);
   if (Number.isNaN(date.getTime())) return false;
   return (
     date.getMonth() === referenceDate.getMonth()

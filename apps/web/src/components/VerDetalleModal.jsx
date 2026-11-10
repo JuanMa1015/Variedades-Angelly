@@ -4,6 +4,7 @@ import { fetchCarteraMovimientos } from '../api/carteraApi';
 import ErrorMessage from './ErrorMessage';
 import SuccessMessage from './SuccessMessage';
 import Skeleton from './Skeleton';
+import { parseApiDate } from '../utils/format';
 
 const MOVIMIENTOS_PAGE_SIZE = 5;
 
@@ -126,7 +127,7 @@ const VerDetalleModal = ({ cliente, isOpen, onClose }) => {
                   const tipoNormalizado = String(movimiento.tipo || '').toLowerCase();
                   const esAbono = tipoNormalizado.includes('abono');
                   const fecha = movimiento.fecha
-                    ? new Date(movimiento.fecha).toLocaleString('es-CO', {
+                    ? parseApiDate(movimiento.fecha).toLocaleString('es-CO', {
                       year: 'numeric',
                       month: 'short',
                       day: '2-digit',

@@ -101,9 +101,9 @@ describe('buildSalePayload', () => {
     });
   });
 
-  it('Nequi y tarjeta viajan como transferencia', () => {
+  it('Nequi viaja como transferencia y la tarjeta como tarjeta', () => {
     expect(buildSalePayload({ grouped, ticket: ticketCon({ metodoPago: 'nequi' }) }).metodo_pago).toBe('transferencia');
-    expect(buildSalePayload({ grouped, ticket: ticketCon({ metodoPago: 'tarjeta' }) }).metodo_pago).toBe('transferencia');
+    expect(buildSalePayload({ grouped, ticket: ticketCon({ metodoPago: 'tarjeta' }) }).metodo_pago).toBe('tarjeta');
   });
 
   it('fiado de tienda con abono y cliente de fidelizacion', () => {

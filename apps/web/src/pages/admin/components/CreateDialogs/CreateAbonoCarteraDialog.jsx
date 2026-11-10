@@ -39,6 +39,7 @@ const CreateAbonoCarteraDialog = ({ isOpen, onClose, onCreated }) => {
         <select value={form.metodo_pago} onChange={(e) => setForm((c) => ({ ...c, metodo_pago: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none">
           <option value="efectivo">Efectivo</option>
           <option value="transferencia">Transferencia</option>
+          <option value="tarjeta">Tarjeta</option>
         </select>
         <input value={form.referencia} onChange={(e) => setForm((c) => ({ ...c, referencia: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Referencia (opcional)" />
         <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
