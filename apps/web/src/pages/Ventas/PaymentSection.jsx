@@ -1,4 +1,5 @@
 import MethodSelector from './MethodSelector';
+import MoneyInput from './MoneyInput';
 import { suggestedPayments } from './posHelpers';
 
 const ChangeSummary = ({ pago, total, cambio, formatMoney }) => {
@@ -13,19 +14,14 @@ const CashInput = ({ montoPago, total, onSetMontoPago, formatMoney, cambio }) =>
   const pago = Number(montoPago || 0);
   return (
     <div className="space-y-2">
-      <div className="relative">
-        <label htmlFor="pos-recibido" className="sr-only">Monto recibido</label>
-        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-400">$</span>
-        <input
-          id="pos-recibido"
-          type="text"
-          inputMode="numeric"
-          value={pago === 0 ? '' : String(pago)}
-          onChange={(event) => onSetMontoPago(Number.parseInt(event.target.value.replace(/\D/g, ''), 10) || 0)}
-          placeholder="Recibido (vacío = pago exacto)"
-          className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-7 pr-3 text-base font-semibold tabular-nums focus:border-rosewood focus:outline-none focus:ring-2 focus:ring-rosewood/20"
-        />
-      </div>
+      <MoneyInput
+        id="pos-recibido"
+        label="Monto recibido"
+        value={pago}
+        onChange={onSetMontoPago}
+        placeholder="Recibido (vacío = pago exacto)"
+        large
+      />
       {total > 0 && (
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Montos rápidos de pago">
           <button

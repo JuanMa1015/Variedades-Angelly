@@ -1,5 +1,6 @@
 import { Gift, Pause, ShoppingCart, Trash2 } from 'lucide-react';
 import CartLines from './CartLines';
+import ClientCombobox from './ClientCombobox';
 import CreditSection from './CreditSection';
 import HeldTicketsBar from './HeldTicketsBar';
 import PaymentSection from './PaymentSection';
@@ -73,22 +74,21 @@ const LoyaltyRow = ({ clientes, value, onChange, puntosEstimados }) => {
   if (clientes.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5">
-      <Gift className="h-4 w-4 shrink-0 text-violet-700" aria-hidden="true" />
-      <label htmlFor="pos-fidelizacion" className="sr-only">Cliente de fidelización</label>
-      <select
-        id="pos-fidelizacion"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="min-w-0 flex-1 bg-transparent text-sm text-violet-950 focus:outline-none"
-      >
-        <option value="">Sin cliente de fidelización</option>
-        {clientes.map((cliente) => (
-          <option key={cliente.id} value={cliente.id}>{cliente.nombre} — {cliente.puntos_acumulados} pts</option>
-        ))}
-      </select>
+    <div className="flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-2 py-1.5">
+      <Gift className="ml-1 h-4 w-4 shrink-0 text-violet-700" aria-hidden="true" />
+      <div className="min-w-0 flex-1">
+        <ClientCombobox
+          id="pos-fidelizacion"
+          label="Cliente de fidelización"
+          clientes={clientes}
+          value={value}
+          onChange={onChange}
+          placeholder="Cliente de fidelización (opcional)"
+          getHint={(cliente) => `${cliente.puntos_acumulados} pts`}
+        />
+      </div>
       {value && puntosEstimados > 0 && (
-        <span className="shrink-0 text-xs font-semibold text-violet-800">+{puntosEstimados} pts</span>
+        <span className="shrink-0 pr-1 text-xs font-semibold text-violet-800">+{puntosEstimados} pts</span>
       )}
     </div>
   );

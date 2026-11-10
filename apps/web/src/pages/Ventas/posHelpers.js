@@ -97,3 +97,12 @@ export const suggestedPayments = (total) => BILL_STEPS
   .map((step) => Math.ceil(total / step) * step)
   .filter((value, index, all) => value > total && all.indexOf(value) === index)
   .slice(0, 3);
+
+// 5000 -> "5.000": separador de miles con punto, como se muestran todos los montos de la app.
+export const formatThousands = (value) => {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) return '';
+  return String(Math.trunc(amount)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+};
+
+export const parseMoney = (text) => Number.parseInt(String(text).replace(/\D/g, ''), 10) || 0;
