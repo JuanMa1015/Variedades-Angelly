@@ -640,3 +640,17 @@ apps\api\.venv\Scripts\python.exe -m alembic -c apps\api\alembic.ini upgrade hea
 - **Comprobante del POS:** se imprime desde un iframe oculto (`Ventas/printReceipt.js` + `receiptHtml.js`), una sola
   hoja, `@page { margin: 0 }` (sin fecha ni URL del navegador). En contado siempre muestra Pago y Cambio.
 - Migración `f6a7b8c9d0e1` (turno + tarjeta). Asocia a la caja abierta lo hecho desde su apertura.
+
+## 16. Importar imágenes desde una URL
+
+- `POST /api/upload-imagen-url` (`{url}`): el **servidor** descarga la imagen, la valida/optimiza igual que una subida y la
+  guarda en el almacenamiento propio (Blob). Así el producto no depende de que el sitio de origen la conserve.
+  Límite: 20 por minuto por IP (`importar_imagen_rate_limit`).
+- **Protección SSRF** (`api/services/imagen_remota.py`): solo http/https, sin credenciales en la URL, solo puertos 80/443,
+  todas las IP resueltas deben ser públicas (nada privado, loopback, link-local, CGNAT, multicast ni IPv4 mapeado en IPv6),
+  sin redirecciones automáticas (cada salto, máximo 3, se valida de nuevo), tope de 5 MB mientras se descarga, tiempo límite,
+  solo `Content-Type: image/*` y el contenido debe ser JPG/PNG/WEBP/GIF reales (SVG rechazado). No se envían cookies ni
+  autorización. Riesgo residual conocido: la IP se valida al resolver el nombre y la conexión vuelve a resolverlo (ventana
+  mínima de *DNS rebinding*); el endpoint exige sesión y está limitado por IP.
+- Frontend: `api/imagesApi.js`; Inventario importa toda URL http(s) que no sea ya del Blob propio antes de guardar el producto.
+

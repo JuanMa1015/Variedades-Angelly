@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Barcode, ImageUp, Link, Package, Pencil, Plus, RotateCcw, Search, Trash2, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { apiDelete, apiGet, apiPatch, apiPost, apiUpload } from '../api/httpClient';
+import { importImageFromUrl, isRemoteImageUrl } from '../api/imagesApi';
 import ErrorMessage from '../components/ErrorMessage';
 import SuccessMessage from '../components/SuccessMessage';
 import Skeleton, { SkeletonCard } from '../components/Skeleton';
@@ -127,6 +128,8 @@ const Inventario = () => {
       const f = dataUrlToFile(url);
       if (f) return uploadImageAndGetUrl(f);
     }
+    // Una direccion de internet se descarga en el servidor y se guarda como copia propia (permanente).
+    if (isRemoteImageUrl(url)) return importImageFromUrl(url);
     return url || null;
   };
 
@@ -505,7 +508,7 @@ const Inventario = () => {
                       type="text"
                       value={manualImageUrl}
                       onChange={(e) => { setManualImageUrl(e.target.value); setManualImageFile(null); setManualImagePreview(null); }}
-                      placeholder="https://ejemplo.com/imagen.jpg"
+                      placeholder="Pega la dirección de la imagen: se guarda una copia"
                       className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
                     />
                   )}
@@ -602,7 +605,7 @@ const Inventario = () => {
                       type="text"
                       value={barcodeImageUrl}
                       onChange={(e) => { setBarcodeImageUrl(e.target.value); setBarcodeImageFile(null); setBarcodeImagePreview(null); }}
-                      placeholder="https://ejemplo.com/imagen.jpg"
+                      placeholder="Pega la dirección de la imagen: se guarda una copia"
                       className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
                     />
                   )}
