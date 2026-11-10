@@ -22,7 +22,6 @@ from src.auth.security import (
     create_refresh_token,
     decode_access_token,
     hash_password,
-    refresh_expire_days,
     verify_password,
 )
 from src.auth.token_blacklist import blacklist_jti, claim_jti, is_jti_blacklisted
@@ -39,16 +38,26 @@ def _is_production() -> bool:
     return os.getenv("APP_ENV", "development").strip().lower() == "production"
 
 
+def _cookie_samesite() -> str:
+    """SameSite de las cookies de sesion.
+
+    Por defecto ``none`` en produccion (front en otro dominio, p. ej. Vercel) y ``lax`` en
+    desarrollo. Si front y API comparten dominio (nginx) conviene fijar ``COOKIE_SAMESITE=lax``:
+    evita depender de cookies de terceros, que Safari y Chrome bloquean.
+    """
+    configured = os.getenv("COOKIE_SAMESITE", "").strip().lower()
+    if configured in {"lax", "strict", "none"}:
+        return configured
+    return "none" if _is_production() else "lax"
+
+
+def _session_cookie_options() -> dict[str, object]:
+    samesite = _cookie_samesite()
+    return {"httponly": True, "samesite": samesite, "secure": _is_production() or samesite == "none"}
+
+
 def _set_access_token_cookie(response: Response, token: str, expires_in: int) -> None:
-    response.set_cookie(
-        key="access_token",
-        value=token,
-        httponly=True,
-        samesite="none" if _is_production() else "lax",
-        secure=_is_production(),
-        max_age=expires_in,
-        path="/",
-    )
+    response.set_cookie(key="access_token", value=token, max_age=expires_in, path="/", **_session_cookie_options())
 
 
 class LoginRequest(BaseModel):
@@ -136,11 +145,9 @@ def auth_login(
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
-        httponly=True,
-        samesite="none" if _is_production() else "lax",
-        secure=_is_production(),
         max_age=refresh_expires,
         path="/api/auth",
+        **_session_cookie_options(),
     )
 
     return LoginResponse(
@@ -223,11 +230,9 @@ def auth_refresh(
     response.set_cookie(
         key="refresh_token",
         value=new_refresh_token,
-        httponly=True,
-        samesite="none" if _is_production() else "strict",
-        secure=_is_production(),
         max_age=refresh_expires,
         path="/api/auth",
+        **_session_cookie_options(),
     )
     return RefreshResponse(
         access_token=new_token,

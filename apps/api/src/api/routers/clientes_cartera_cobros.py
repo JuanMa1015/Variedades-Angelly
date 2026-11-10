@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, literal, null, or_, select, union
 from sqlalchemy.orm import Session
 
@@ -22,7 +22,6 @@ from src.api.schemas.cartera import (
     AbonoCarteraUpdateRequest,
     CarteraResumenResponse,
     ClienteCarteraPageResponse,
-    ClienteCobroResponse,
     MovimientoClientePageResponse,
     MovimientoClienteResponse,
 )

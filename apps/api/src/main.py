@@ -218,7 +218,17 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Tienda Angelly API", version="0.1.0", lifespan=lifespan)
+_IS_PRODUCTION = os.getenv("APP_ENV", "development").strip().lower() == "production"
+
+# En produccion no se publica la documentacion interactiva ni el esquema OpenAPI.
+app = FastAPI(
+    title="Tienda Angelly API",
+    version="0.1.0",
+    lifespan=lifespan,
+    docs_url=None if _IS_PRODUCTION else "/docs",
+    redoc_url=None if _IS_PRODUCTION else "/redoc",
+    openapi_url=None if _IS_PRODUCTION else "/openapi.json",
+)
 app.state.limiter = limiter
 
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)

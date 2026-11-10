@@ -58,8 +58,8 @@ Definido en `src/infrastructure/database/models.py`. Todas las fechas son
 | `id` | int PK | |
 | `nombre` | str(120) unique not null | |
 | `codigo_barras` | str(64) unique nullable | captura por scanner |
-| `precio_costo` | float not null | |
-| `precio_venta` | float not null | |
+| `precio_costo` | numeric(14,2) not null | |
+| `precio_venta` | numeric(14,2) not null | |
 | `catalogo` | str(20) default `tienda` | `tienda` o `cartera` |
 | `stock_actual` | int default 0 | |
 | `stock_minimo` | int default 0 | `stock_critico` = `stock_actual <= stock_minimo` |
@@ -78,15 +78,15 @@ Definido en `src/infrastructure/database/models.py`. Todas las fechas son
 | `nombre` | str(120) not null | |
 | `documento` | str(30) unique nullable | |
 | `telefono_whatsapp` | str(25) nullable | |
-| `limite_credito` | float not null | cupo máximo |
-| `deuda_total` | float default 0 | saldo vigente |
+| `limite_credito` | numeric(14,2) not null | cupo máximo; un fiado no puede superarlo |
+| `deuda_total` | numeric(14,2) default 0 | saldo vigente |
 | `activo` | bool | |
 
 **B) Fiado de tienda (vendedor) — `clientes_fiado_tienda`**
 | columna | notas |
 |---------|-------|
 | `id`, `nombre`, `telefono_whatsapp` | sin documento, **sin** `limite_credito` |
-| `deuda_total` | float default 0 |
+| `deuda_total` | numeric(14,2) default 0 |
 | `activo` | bool |
 
 > No tiene cupo de crédito: el fiado de tienda es libre y se controla solo con
@@ -112,8 +112,8 @@ Definido en `src/infrastructure/database/models.py`. Todas las fechas son
 | `tipo_fiado` | str(20) nullable — `cartera` o `tienda` |
 | `metodo_pago` | str(20) nullable — `efectivo` / `transferencia` |
 | `es_fiado` | bool default False |
-| `total` | float not null |
-| `saldo_pendiente` | float default 0 |
+| `total` | numeric(14,2) not null |
+| `saldo_pendiente` | numeric(14,2) default 0 | fiado de tienda: saldo de ESA venta (total − abono inicial); cartera: deuda del cliente tras la venta |
 | `fecha` | datetime |
 
 **`detalle_ventas`**: `id`, `venta_id` FK, `producto_id` FK, `nombre_producto`
@@ -179,7 +179,7 @@ esta_abierta    = fecha_cierre is None
 `usuario`, `fecha`.
 
 **`refresh_token_blacklist`**: `jti` (PK, Text), `expires_at` (index),
-`created_at`. Se purga al arrancar: `DELETE WHERE expires_at < NOW()`.
+`created_at`. Se purga al arrancar con una fecha UTC (`expires_at < :ahora`).
 
 ---
 
@@ -206,8 +206,14 @@ Efectos:
 2. Crea `ventas` + `detalle_ventas`, descontando `precio_unitario` **snapshot**.
 3. Decrementa `productos.stock_actual`.
 4. Si `es_fiado`, incrementa `deuda_total` del cliente correspondiente y deja
-   `saldo_pendiente` en la venta.
-5. Si la venta es de un cliente de fidelización, acumula puntos.
+   `saldo_pendiente` en la venta. El fiado de cartera respeta `limite_credito`;
+   productos y clientes desactivados se rechazan; toda venta con cobro exige
+   `metodo_pago`.
+5. Si se envía `cliente_fidelizacion_id`, acumula 1 punto por cada
+   `FIDELIZACION_PESOS_POR_PUNTO` (1000) realmente cobrados (en fiado, solo el
+   abono inicial) y guarda `puntos_otorgados`; al eliminar la venta se revierten.
+6. Editar o eliminar una venta fiada de tienda reajusta la deuda del cliente
+   (`src/api/services/deuda.py`); editar/borrar un abono de cartera también.
 
 ### 3.2 Cartera (admin)
 
@@ -238,6 +244,12 @@ Efectos:
 - `POST /api/caja/apertura` — abre turno
 - `POST /api/caja/cierre` — cierra turno, calcula `esperado_vs_real`
 - `GET /api/caja` — historial
+- **Efectivo esperado** = base + ventas en efectivo − gastos (las transferencias no
+  están en el cajón). Solo cuenta lo cobrado (`infrastructure/repositories/ingresos.py`):
+  un fiado cuenta su abono; las ventas de cartera entran por `abonos_cartera`.
+- **Cierre ciego**: mientras la caja está abierta el vendedor recibe
+  `saldo_esperado = null`; el superadmin sí lo ve. Al cerrar, la respuesta trae el descuadre.
+- Se puede abrir con base $0.
 - La entidad de dominio **rechaza** cerrar dos veces (`ValueError` si
   `fecha_cierre is not None`).
 
@@ -245,9 +257,13 @@ Efectos:
 
 Pedidos: `GET/POST/PATCH/DELETE /api/proveedores/pedidos`
 Facturas: `GET/POST/PATCH/DELETE /api/facturas-compra` (además
-`/api/facturas-compra/paginadas`). Al crear una factura de compra se puede
-actualizar el `precio_venta` del producto y calcular `precio_venta_sugerido` /
-`ganancia_estimada` según `porcentaje_ganancia`.
+`/api/facturas-compra/paginadas`, `/api/facturas-compra/config` con `iva_rate`).
+Al crear una factura de compra: suma el **stock**, deja el **último costo**
+(precio + IVA si aplica) y, solo si la línea trae `actualizar_precio`, cambia el
+`precio_venta` (el enviado o el sugerido). `porcentaje_ganancia` es el factor
+costo/venta (0.70 = 30 % de margen) y el precio sugerido se redondea hacia
+arriba a múltiplos de $50 (`api/services/compras.py`). Eliminar una factura
+resta el stock que sumó (409 si ya se vendió). Solo admin/superadmin.
 
 ### 3.7 Superadmin
 
@@ -270,6 +286,11 @@ superadmin.**
 - Passwords con bcrypt.
 - `src/api/dependencies.py:get_current_user` acepta **Bearer** o **cookie
   httpOnly** `access_token` (prioriza el header Bearer).
+- El usuario, su estado `activo` y su **rol se revalidan en BD en cada request**
+  (el token solo prueba identidad) y en cada refresh; el `jti` del refresh se
+  consume de forma atómica. El login respeta `activo` e iguala tiempos.
+- Cookies: `SameSite` por defecto `none` en producción y `lax` en desarrollo;
+  `COOKIE_SAMESITE` lo fuerza (usar `lax` si front y API comparten dominio).
 - Logout rota el refresh: el `jti` se inserta en `refresh_token_blacklist` y un
   refresh con `jti` revocado se rechaza.
 - `src/auth/password_policy.py` valida contraseñas; `PWNED_PASSWORD_CHECK=true`
@@ -282,13 +303,19 @@ superadmin.**
 ### CSRF
 
 Middleware en `src/main.py`. En peticiones de escritura (`POST`, `PUT`,
-`PATCH`, `DELETE`) exige el header `X-Requested-With: XMLHttpRequest`.
+`PATCH`, `DELETE`):
 
-Exentos (`_CSRF_EXEMPT_PREFIXES`):
+1. **Origin**: si el navegador envía `Origin`, debe ser el propio host o estar en
+   `CORS_ALLOW_ORIGINS` (o casar con `CORS_ALLOW_ORIGIN_REGEX`). Aplica también a
+   login/refresh/logout. Sin `Origin` (clientes que no son navegador) se permite.
+2. Exige el header `X-Requested-With: XMLHttpRequest`.
+
+Exentos del punto 2 (`_CSRF_EXEMPT_PREFIXES`):
 `/api/auth/login`, `/api/auth/refresh`, `/health`, `/docs`, `/openapi.json`,
 `/uploads`.
 
-> En `APP_ENV=test` el middleware se salta por completo.
+> En `APP_ENV=test` solo se salta el punto 2. En `production` `/docs`,
+> `/redoc` y `/openapi.json` no se publican.
 
 El frontend lo cumple solo: `apps/web/src/api/httpClient.js` inyecta el header
 en cada request y en `apiUpload`.
@@ -368,7 +395,12 @@ Plantilla canónica: `.env.example` (raíz). El `.env` real **no** se versiona.
 | `PWNED_PASSWORD_CHECK` | backend | consulta HIBP |
 | `LOGIN_RATE_LIMIT` | backend | default `10/minute` |
 | `CORS_ALLOW_ORIGINS` | backend | lista separada por comas |
-| `CORS_ALLOW_ORIGIN_REGEX` | backend | default `.*\.vercel\.app$` |
+| `CORS_ALLOW_ORIGIN_REGEX` | backend | opcional; **no** usar `*.vercel.app` (cualquiera registra un subdominio) |
+| `COOKIE_SAMESITE` | backend | `lax`/`strict`/`none`; por defecto `none` en producción |
+| `TRUST_PROXY_HEADERS` | backend | `false` si la API no está detrás de nuestro proxy (default `true`) |
+| `FIDELIZACION_UMBRAL_BONO` / `FIDELIZACION_PESOS_POR_PUNTO` | backend | 100 / 1000 |
+| `IVA_RATE` | backend | default `0.19`; el frontend lo lee de `/api/facturas-compra/config` |
+| `VITE_CONTACTO_NIT` | frontend | NIT que se imprime en el comprobante del POS |
 | `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` / `DB_POOL_RECYCLE` | backend | 5 / 10 / 3600 |
 | `CSP_SCRIPT_SRC` / `CSP_CONNECT_SRC` / `CSP_IMG_SRC` | backend | override del CSP |
 | `VITE_API_URL` | frontend | base URL de la API |
@@ -398,7 +430,7 @@ npm run dev
 ```
 
 Frontend en `http://localhost:5173` (proxy `/api` y `/uploads` → `127.0.0.1:8000`),
-API en `http://127.0.0.1:8000`, Swagger en `/docs`.
+API en `http://127.0.0.1:8000`, Swagger en `/docs` (solo fuera de producción).
 
 ### Qué hace el arranque
 
@@ -434,6 +466,8 @@ c9a7e5b2f1d4  vendedor en ventas e informes
 3e51986812ce  numero_factura en ventas
 40e7f89dbe26  numero_factura en facturas_compra
 bef1fe795a51  merge heads
+d4e5f6a7b8c9  dinero a NUMERIC(14,2) (solo PostgreSQL)
+e5f6a7b8c9d0  puntos y cliente de fidelización en ventas
 ```
 
 > Ejecuta `alembic history` para el orden real: los identificadores de revisión
@@ -465,9 +499,10 @@ src/
 
 - Base URL: `import.meta.env.VITE_API_URL ?? ''` (vacío = mismo origen, útil
   detrás del proxy de Vercel o nginx).
-- Cache en memoria de **GETs** con TTL de 10 s; se invalida al hacer cualquier
-  request no-GET.
-- Reintenta hasta 2 veces con backoff en 502/503/504 y errores de red.
+- Cache en memoria de **GETs** con TTL de 10 s; cualquier request no-GET la vacía
+  por completo (una escritura puede cambiar stock, deudas y caja a la vez).
+- Solo los **GET** se reintentan (hasta 2 veces, 502/503/504 y errores de red);
+  POST/PATCH/DELETE nunca, para no duplicar ventas o abonos.
 - Ante un 401 hace un único refresh compartido (`isRefreshing`) y reintenta; si
   falla, dispara el evento `auth:unauthorized` en `window`.
 - Envía `credentials: 'include'` (cookie httpOnly) e inyecta
@@ -537,8 +572,9 @@ react-router-dom) y `ui` (lucide-react). `vercel.json` reescribe todo a
     scripts de debug, no código de la app. No los importes ni los borres sin
     preguntar.
 13. **`docs/INFORME_TESTING.md`** tiene el estado de pruebas del proyecto, pero
-    las cifras citadas en el `README` (37/37, 12/12) están desactualizadas: hoy
-    el frontend tiene 61 tests y el backend corre `pytest` + `behave`.
+    las cifras citadas en el `README` (37/37, 12/12) están desactualizadas: el
+    frontend corre `vitest` y el backend `pytest` + `behave`. Los tests del
+    backend usan SQLite en memoria; la CI también corre `ruff` (F, E9).
 
 ---
 

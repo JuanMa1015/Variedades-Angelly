@@ -15,7 +15,7 @@ import uuid
 from pathlib import Path
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 from PIL import Image
 
@@ -28,6 +28,7 @@ BLOB_API = "https://api.vercel.com/v1/blob"
 LOCAL_UPLOAD_DIR = Path(__file__).resolve().parents[3] / "uploads"
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 MAX_FILE_SIZE = 5 * 1024 * 1024
+MAX_PIXELS = 25_000_000  # 5000 x 5000: protege contra "decompression bombs"
 MAX_DIMENSION = 1600
 JPEG_QUALITY = 82
 WEBP_QUALITY = 82
@@ -38,19 +39,35 @@ MAGIC_BYTES: dict[bytes, set[str]] = {
     b"GIF87a": {".gif"},
     b"GIF89a": {".gif"},
     b"RIFF": {".webp"},
-    b"BM": {".bmp"},
 }
 
 
 def _validate_image(contents: bytes, ext: str) -> None:
     for magic, exts in MAGIC_BYTES.items():
-        if contents.startswith(magic):
-            if ext in exts or (magic == b"RIFF" and ext == ".webp"):
-                return
+        if not contents.startswith(magic) or ext not in exts:
+            continue
+        # RIFF es un contenedor generico (tambien WAV/AVI): un WebP trae "WEBP" en el byte 8.
+        if magic == b"RIFF" and contents[8:12] != b"WEBP":
+            continue
+        return
     raise HTTPException(
         status_code=400,
         detail="El archivo no es una imagen valida o su extension no coincide con el contenido",
     )
+
+
+def _exigir_tamano_razonable(contents: bytes) -> None:
+    """Rechaza imagenes con demasiados pixeles antes de decodificarlas (abrir es perezoso)."""
+    try:
+        with Image.open(io.BytesIO(contents)) as img:
+            ancho, alto = img.size
+    except Exception as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="La imagen esta danada o no se pudo procesar",
+        ) from exc
+    if ancho * alto > MAX_PIXELS:
+        raise HTTPException(status_code=400, detail="La imagen tiene demasiados pixeles (maximo 25 megapixeles)")
 
 
 def _reencode_image(contents: bytes, ext: str) -> tuple[bytes, str]:
@@ -59,6 +76,7 @@ def _reencode_image(contents: bytes, ext: str) -> tuple[bytes, str]:
     Los GIF se conservan tal cual para no perder animaciones.
     Retorna (bytes_finales, content_type).
     """
+    _exigir_tamano_razonable(contents)
     if ext == ".gif":
         return contents, "image/gif"
 
@@ -100,7 +118,8 @@ async def upload_imagen(
             detail=f"Formato no permitido. Extensiones validas: {', '.join(ALLOWED_EXTENSIONS)}",
         )
 
-    contents = await file.read()
+    # Se lee un byte de mas para detectar el exceso sin cargar archivos enormes en memoria.
+    contents = await file.read(MAX_FILE_SIZE + 1)
     if len(contents) > MAX_FILE_SIZE:
         raise HTTPException(status_code=400, detail="La imagen supera los 5 MB")
 

@@ -60,9 +60,13 @@ fidelización, caja y auditoría).
 - Python objetivo: 3.11 (`backend.Dockerfile` y CI). Node: 20 (CI).
 - Roles: `superadmin`, `admin`, `vendedor` (en `src/domain/enums.py` están en
   mayúsculas, pero `src/api/dependencies.py` los normaliza a minúsculas).
-- Seguridad relevante: el CSRF exige el header `X-Requested-With: XMLHttpRequest`
-  en peticiones de escritura (excepto `login`, `refresh`, `health`, `docs`,
-  `openapi.json` y `/uploads`). Auth acepta Bearer o cookie httpOnly.
+- Seguridad relevante: en peticiones de escritura el CSRF valida `Origin` (propio
+  host o `CORS_ALLOW_ORIGINS`) y exige `X-Requested-With: XMLHttpRequest` (excepto
+  `login`, `refresh`, `health`, `docs`, `openapi.json` y `/uploads`). Auth acepta
+  Bearer o cookie httpOnly, y revalida usuario/rol en BD en cada request.
+- Dinero: columnas `NUMERIC(14,2)`; la caja solo cuenta lo cobrado. Tras cambiar
+  ventas, abonos o facturas, revisa que la deuda del cliente y el stock queden
+  consistentes (ver `memory.md` §3).
 - Hay dos flujos de "fiado" distintos: cartera (`clientes` + `abonos_cartera`)
   y tienda (`clientes_fiado_tienda` + `abonos_tienda`). No mezclarlos.
 
