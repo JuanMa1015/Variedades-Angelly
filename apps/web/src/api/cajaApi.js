@@ -1,19 +1,28 @@
 import { apiDelete, apiGet, apiPatch, apiPost } from './httpClient';
 
+// Los datos de la caja cambian con cada venta: siempre se piden al servidor, sin cache.
 export const fetchCajaEstado = ({ signal } = {}) => {
-  return apiGet('/api/caja/estado', { signal });
+  return apiGet('/api/caja/estado', { signal, skipCache: true });
 };
 
 export const abrirCaja = ({ monto_inicial }) => {
   return apiPost('/api/caja/apertura', { monto_inicial });
 };
 
-export const cerrarCaja = ({ monto_cierre }) => {
-  return apiPost('/api/caja/cierre', { monto_cierre });
+// `observaciones` es una nota opcional que explica un descuadre.
+export const cerrarCaja = ({ monto_cierre, observaciones }) => {
+  const body = { monto_cierre };
+  if (observaciones) body.observaciones = observaciones;
+  return apiPost('/api/caja/cierre', body);
 };
 
 export const fetchCajaHistorial = ({ signal } = {}) => {
-  return apiGet('/api/caja', { signal });
+  return apiGet('/api/caja', { signal, skipCache: true });
+};
+
+// Ventas (lo cobrado), abonos y gastos de un turno: lo que explica su efectivo esperado.
+export const fetchCajaMovimientos = (cajaId, { signal } = {}) => {
+  return apiGet(`/api/caja/${cajaId}/movimientos`, { signal, skipCache: true });
 };
 
 export const updateCaja = (cajaId, payload) => {
@@ -22,14 +31,4 @@ export const updateCaja = (cajaId, payload) => {
 
 export const deleteCaja = (cajaId) => {
   return apiDelete(`/api/caja/${cajaId}`);
-};
-
-export const fetchVentasPorRango = ({ fecha_desde, fecha_hasta, signal } = {}) => {
-  const params = new URLSearchParams();
-  if (fecha_desde) params.append('fecha_desde', fecha_desde);
-  if (fecha_hasta) params.append('fecha_hasta', fecha_hasta);
-  const qs = params.toString();
-  // Las ventas anuladas no forman parte del turno: no se muestran como ventas del cuadre.
-  return apiGet(`/api/ventas${qs ? `?${qs}` : ''}`, { signal })
-    .then((ventas) => (Array.isArray(ventas) ? ventas.filter((venta) => !venta.anulada) : ventas));
 };
