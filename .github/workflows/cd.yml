@@ -16,7 +16,12 @@ on:
       - '.github/workflows/cd.yml'
 
 jobs:
+  # No se publican imagenes si la CI (tests, lint, auditorias) falla.
+  ci:
+    uses: ./.github/workflows/backend-ci.yml
+
   publish-images:
+    needs: ci
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -64,6 +69,6 @@ jobs:
           file: infra/frontend.Dockerfile
           push: true
           build-args: |
-            VITE_API_URL=/api
+            VITE_API_URL=
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

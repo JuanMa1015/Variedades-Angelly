@@ -15,7 +15,6 @@ from src.application.services.ventas_service import build_recibo_text
 from src.infrastructure.database.connection import get_db
 from src.infrastructure.database.models import ClienteModel, DetalleVentaModel, ProductoModel, VentaModel, AbonoCarteraModel
 from src.api.schemas.cartera import (
-    AbonoCarteraResponse,
     CarteraVentaCreateRequest,
     CarteraVentaHistorialItemResponse,
     VentaDetalleResponse,

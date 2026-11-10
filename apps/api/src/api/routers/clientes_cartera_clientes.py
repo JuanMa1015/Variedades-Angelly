@@ -8,7 +8,6 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.api.dependencies import AuthenticatedUser, require_roles
-from src.domain.cliente import Cliente
 from src.infrastructure.database.connection import get_db
 from src.infrastructure.database.models import AbonoCarteraModel, ClienteModel, VentaModel
 from src.infrastructure.repositories.sqlalchemy_repository import SqlAlchemyClienteRepository

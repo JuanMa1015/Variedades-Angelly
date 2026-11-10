@@ -16,11 +16,19 @@ from src.infrastructure.database.models import (
     GastoModel,
     ProductoModel,
     VentaModel,
-    DetalleVentaModel,
     ClienteModel,
 )
 
 router = APIRouter(tags=["export"])
+
+
+_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _texto(value: object) -> str:
+    """Neutraliza inyeccion de formulas: Excel ejecuta celdas que empiezan por = + - @."""
+    text = "" if value is None else str(value)
+    return f"'{text}" if text.startswith(_FORMULA_PREFIXES) else text
 
 
 def _csv_response(rows, filename: str) -> StreamingResponse:
@@ -37,7 +45,7 @@ def _csv_response(rows, filename: str) -> StreamingResponse:
     return StreamingResponse(
         generate(),
         media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
@@ -56,8 +64,8 @@ def export_productos(
     for p in productos:
         rows.append([
             str(p.id),
-            p.nombre,
-            p.codigo_barras or "",
+            _texto(p.nombre),
+            _texto(p.codigo_barras),
             p.catalogo,
             str(p.precio_costo),
             str(p.precio_venta),
@@ -98,13 +106,13 @@ def export_ventas(
         rows.append([
             str(v.id),
             str(v.fecha),
-            clientes_map.get(v.cliente_id) or "",
+            _texto(clientes_map.get(v.cliente_id)),
             str(v.total),
             str(v.saldo_pendiente),
             v.metodo_pago or "",
             "Si" if v.es_fiado else "No",
             v.tipo_fiado or "",
-            v.creado_por or "",
+            _texto(v.creado_por),
         ])
 
     return _csv_response(rows, "ventas.csv")
@@ -131,10 +139,10 @@ def export_gastos(
         rows.append([
             str(g.id),
             str(g.fecha),
-            g.categoria,
-            g.descripcion,
+            _texto(g.categoria),
+            _texto(g.descripcion),
             str(g.monto),
-            g.registrado_por,
+            _texto(g.registrado_por),
         ])
 
     return _csv_response(rows, "gastos.csv")

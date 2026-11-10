@@ -10,6 +10,9 @@ services:
       - ../.env.production
     networks:
       - internal
+    volumes:
+      # Imagenes subidas (si no se usa Vercel Blob): sin volumen se pierden al redesplegar.
+      - uploads:/app/uploads
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -51,6 +54,9 @@ services:
           memory: 128M
         reservations:
           memory: 64M
+
+volumes:
+  uploads:
 
 networks:
   internal:

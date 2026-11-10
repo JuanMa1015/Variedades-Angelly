@@ -16,7 +16,7 @@ from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.pagination import PageInfo, build_page, search_filter
 from src.domain.producto import Producto
 from src.infrastructure.database.connection import get_db
-from src.infrastructure.database.models import DetalleVentaModel, ProductoModel, ProveedorModel
+from src.infrastructure.database.models import ProductoModel
 from src.infrastructure.repositories.sqlalchemy_repository import SqlAlchemyProductoRepository
 
 router = APIRouter(tags=["productos"])
