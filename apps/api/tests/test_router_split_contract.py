@@ -84,18 +84,18 @@ def test_dashboard_resumen_incluye_totales_por_metodo(
 
         session.add_all(
             [
+                # Contado en efectivo: entra completo.
                 VentaModel(
-                    cliente_id=cliente.id,
                     es_fiado=False,
                     tipo_fiado=None,
                     metodo_pago="efectivo",
                     total=50000,
                     saldo_pendiente=0,
                 ),
+                # Fiado de tienda con abono inicial: solo entra lo abonado (30000).
                 VentaModel(
-                    cliente_id=cliente.id,
                     es_fiado=True,
-                    tipo_fiado="cartera",
+                    tipo_fiado="tienda",
                     metodo_pago="transferencia",
                     total=40000,
                     saldo_pendiente=10000,

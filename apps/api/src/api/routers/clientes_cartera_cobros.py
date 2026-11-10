@@ -9,6 +9,7 @@ from sqlalchemy import func, literal, null, or_, select, union
 from sqlalchemy.orm import Session
 
 from src.api.services.auditoria import registrar_auditoria
+from src.api.services.deuda import reajustar_deuda_cartera
 from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.pagination import search_filter
 from src.infrastructure.database.connection import get_db
@@ -300,6 +301,7 @@ def update_abono_cartera(
         detalle=f"monto {abono.monto}->{payload.monto}, metodo {abono.metodo_pago}->{payload.metodo_pago}",
     )
     if payload.monto is not None:
+        reajustar_deuda_cartera(db, abono.cliente_id, float(abono.monto) - float(payload.monto))
         abono.monto = payload.monto
     if payload.metodo_pago is not None:
         abono.metodo_pago = payload.metodo_pago
@@ -332,5 +334,6 @@ def delete_abono_cartera(
         entidad_id=abono.id,
         detalle=f"Eliminado abono de {abono.monto} (cliente {abono.cliente_id})",
     )
+    reajustar_deuda_cartera(db, abono.cliente_id, float(abono.monto))
     db.delete(abono)
     db.commit()

@@ -151,8 +151,8 @@ const Caja = () => {
     }
 
     const monto = Number(raw);
-    if (!Number.isFinite(monto) || monto <= 0) {
-      setError('El monto inicial debe ser un número válido mayor a cero');
+    if (!Number.isFinite(monto) || monto < 0) {
+      setError('El monto inicial debe ser un número válido (puede ser cero)');
       return;
     }
 
@@ -239,8 +239,8 @@ const Caja = () => {
 
       if (editForm.monto_inicial !== '') {
         const val = Number(editForm.monto_inicial);
-        if (!Number.isFinite(val) || val <= 0) {
-          setError('El monto inicial debe ser mayor a cero');
+        if (!Number.isFinite(val) || val < 0) {
+          setError('El monto inicial no puede ser negativo');
           setSavingEdit(false);
           return;
         }

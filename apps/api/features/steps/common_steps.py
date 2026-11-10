@@ -129,7 +129,7 @@ def step_crear_venta_contado(context):
     context.response = context.client.post(
         "/api/ventas",
         headers={"Authorization": f"Bearer {context.token}"},
-        json={"items": items, "es_fiado": False},
+        json={"items": items, "es_fiado": False, "metodo_pago": "efectivo"},
     )
 
 

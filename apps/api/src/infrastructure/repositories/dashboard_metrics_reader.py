@@ -13,6 +13,7 @@ from src.application.services.dashboard_service import (
     VentasMetricDTO,
 )
 from src.infrastructure.database.models import AbonoCarteraModel, VentaModel
+from src.infrastructure.repositories.ingresos import cobrado_en_venta
 
 
 class SqlAlchemyDashboardMetricsReader(DashboardMetricsReader):
@@ -35,12 +36,13 @@ class SqlAlchemyDashboardMetricsReader(DashboardMetricsReader):
         )
 
     def pagos_totales_por_metodo(self) -> PagosTotalesDTO:
+        cobrado = cobrado_en_venta()
         efectivo_ventas, transferencia_ventas = self._db.execute(
             select(
                 func.coalesce(
                     func.sum(
                         case(
-                            (VentaModel.metodo_pago == "efectivo", VentaModel.total - VentaModel.saldo_pendiente),
+                            (VentaModel.metodo_pago == "efectivo", cobrado),
                             else_=0.0,
                         ),
                     ),
@@ -51,7 +53,7 @@ class SqlAlchemyDashboardMetricsReader(DashboardMetricsReader):
                         case(
                             (
                                 VentaModel.metodo_pago == "transferencia",
-                                VentaModel.total - VentaModel.saldo_pendiente,
+                                cobrado,
                             ),
                             else_=0.0,
                         ),
