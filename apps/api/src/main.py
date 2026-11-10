@@ -8,6 +8,7 @@ import re
 import time
 
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import FastAPI, status
@@ -189,11 +190,21 @@ def _run_startup_tasks():
             conn.commit()
     else:
         logger.info("Saltando create_all — APP_ENV=%s", env)
+        regex = _load_cors_origin_regex()
+        if env == "production" and regex and "vercel" in regex:
+            logger.warning(
+                "CORS_ALLOW_ORIGIN_REGEX=%s permite a cualquier proyecto de Vercel usar "
+                "credenciales contra esta API. Usa CORS_ALLOW_ORIGINS con el dominio exacto.",
+                regex,
+            )
 
     # Limpieza de refresh tokens revocados ya expirados (todos los entornos).
     with engine.connect() as conn:
+        # expires_at se guarda en UTC naive; se compara contra UTC (no NOW() del motor,
+        # que depende de la zona horaria de la sesion y no existe en SQLite).
         conn.execute(
-            text("DELETE FROM refresh_token_blacklist WHERE expires_at < NOW()")
+            text("DELETE FROM refresh_token_blacklist WHERE expires_at < :ahora"),
+            {"ahora": datetime.now(UTC).replace(tzinfo=None)},
         )
         conn.commit()
 
@@ -244,11 +255,37 @@ app.add_middleware(
 
 # ─── CSRF Protection Middleware ───
 
+def _origin_is_trusted(request) -> bool:
+    """Valida el header Origin de peticiones que modifican datos.
+
+    Sin Origin (clientes no-navegador) se permite: un navegador siempre lo envia en
+    POST/PATCH/PUT/DELETE cross-site, que es el vector CSRF. Con Origin debe ser el
+    propio host (despliegue same-origin) o estar en la lista blanca de CORS.
+    """
+    origin = request.headers.get("origin", "").strip()
+    if not origin:
+        return True
+    if origin in _load_cors_origins():
+        return True
+    regex = _load_cors_origin_regex()
+    if regex and re.fullmatch(regex, origin):
+        return True
+    host = request.headers.get("host", "")
+    return bool(host) and origin.split("://", 1)[-1] == host
+
+
 @app.middleware("http")
 async def csrf_protection(request, call_next):
-    if os.getenv("APP_ENV", "development").strip().lower() == "test":
-        return await call_next(request)
     if request.method in {"GET", "HEAD", "OPTIONS", "TRACE"}:
+        return await call_next(request)
+    # La validacion de Origin aplica tambien a login/refresh/logout (login CSRF).
+    if not _origin_is_trusted(request):
+        return _cors_response(
+            status.HTTP_403_FORBIDDEN,
+            {"detail": "CSRF validation failed: origen no permitido"},
+            request,
+        )
+    if os.getenv("APP_ENV", "development").strip().lower() == "test":
         return await call_next(request)
     path = request.url.path
     if any(path.startswith(prefix) for prefix in _CSRF_EXEMPT_PREFIXES):

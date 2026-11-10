@@ -79,3 +79,15 @@ Severidad: 🔴 crítico · 🟠 alto · 🟡 medio · 🟢 bajo
 ## Siguiente fase propuesta (módulo por módulo)
 
 Revisar a fondo la UI y el flujo de: **POS/Ventas → Caja → Inventario → Proveedores/Facturas → Cartera/ClientesTienda → Fidelización → Gastos → Dashboard → Admin/Superadmin**, ejecutando la app y los tests (lint, vitest, pytest, `npm audit`, `pip-audit`) para validar los hallazgos con evidencia y ampliar con UX real (navegación, móvil, accesibilidad).
+
+---
+
+## Actualización (Bloque 2 aplicado)
+
+- **Corrección al hallazgo S6:** solo `POST /api/superadmin/auditorias` aceptaba el `usuario` del cliente; `/api/auditorias` ya usaba el usuario del token. Ambos usan ahora el token.
+- **S1** CSRF: se valida `Origin` en toda petición que modifica datos (incluido login/refresh/logout); `.env.example` ya no sugiere el regex `*.vercel.app`. **Acción pendiente en producción:** revisar `CORS_ALLOW_ORIGIN_REGEX`/`CORS_ALLOW_ORIGINS` y que contengan solo el dominio propio.
+- **S2/S3/S8** el usuario y su rol se revalidan en BD en cada request y en cada refresh; el JTI se consume de forma atómica; el login iguala el tiempo de respuesta y respeta `activo`.
+- **S5** el vendedor ya no puede desactivar/reactivar productos, borrar proveedores ni editar/borrar facturas de compra; los registros de auditoría solo los edita/borra el superadmin.
+- **S6** auditoría automática (usuario del token) en productos, proveedores, facturas, ventas, abonos de cartera, caja y usuarios vendedor/admin.
+- Dependencias: `Pillow 12.3.0 → 13.0.0` y `PyJWT 2.13.0 → 2.15.1` (`pip-audit`: 54 avisos → 0).
+- Pendiente de fase 1: S4 (límite de login por IP detrás de proxy), S7 (upload), S9 (CSV), S10, S11.

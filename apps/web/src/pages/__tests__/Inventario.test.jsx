@@ -76,7 +76,7 @@ const mockProveedores = [
 describe('Inventario', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useAuthMock.mockReturnValue({ token: 'test-token' });
+    useAuthMock.mockReturnValue({ token: 'test-token', user: { username: 'admin', role: 'admin' } });
     apiGetMock.mockImplementation((endpoint) => {
       if (endpoint.includes('productos/paginados')) {
         return Promise.resolve({ data: mockProductos, total: 2 });
@@ -145,6 +145,18 @@ describe('Inventario', () => {
     await waitFor(() => {
       expect(apiDeleteMock).toHaveBeenCalled();
     });
+  });
+
+  it('oculta el boton de desactivar para el vendedor (el backend lo prohibe)', async () => {
+    useAuthMock.mockReturnValue({ token: 'test-token', user: { username: 'vendedor1', role: 'vendedor' } });
+
+    const Inventario = (await import('../Inventario')).default;
+    render(<Inventario />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Arroz Diana')).toBeTruthy();
+    });
+    expect(screen.queryAllByTitle('Desactivar producto')).toHaveLength(0);
   });
 
   it('muestra skeletons mientras carga', async () => {

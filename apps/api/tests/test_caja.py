@@ -13,7 +13,7 @@ from sqlalchemy.pool import StaticPool
 
 from src.domain.caja import CierreCaja
 from src.infrastructure.database.connection import get_db
-from src.infrastructure.database.models import Base
+from src.infrastructure.database.models import Base, UsuarioModel
 from src.main import app
 
 
@@ -147,6 +147,14 @@ def caja_client() -> Generator[tuple[TestClient, dict[str, str], dict[str, str],
 
     token_sa, _ = create_access_token(username="super_test", role="superadmin")
     headers_sa = {"Authorization": f"Bearer {token_sa}"}
+
+    # La API revalida el usuario en BD en cada request: los tokens forjados necesitan fila.
+    with testing_session_local() as seed:
+        seed.add_all([
+            UsuarioModel(username="vendedor_test", password_hash="x", rol="vendedor"),
+            UsuarioModel(username="super_test", password_hash="x", rol="superadmin"),
+        ])
+        seed.commit()
 
     with TestClient(app) as client:
         yield client, headers, headers_sa, testing_session_local

@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, literal, null, or_, select, union
 from sqlalchemy.orm import Session
 
+from src.api.services.auditoria import registrar_auditoria
 from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.pagination import search_filter
 from src.infrastructure.database.connection import get_db
@@ -281,7 +282,7 @@ def update_abono_cartera(
     abono_id: int,
     payload: AbonoCarteraUpdateRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> AbonoCarteraResponse:
     abono = db.execute(
         select(AbonoCarteraModel).where(AbonoCarteraModel.id == abono_id),
@@ -289,6 +290,15 @@ def update_abono_cartera(
     if abono is None:
         raise HTTPException(status_code=404, detail="Abono no encontrado")
 
+    registrar_auditoria(
+        db,
+        usuario=current_user.username,
+        modulo="cartera",
+        entidad="abono",
+        accion="editar",
+        entidad_id=abono.id,
+        detalle=f"monto {abono.monto}->{payload.monto}, metodo {abono.metodo_pago}->{payload.metodo_pago}",
+    )
     if payload.monto is not None:
         abono.monto = payload.monto
     if payload.metodo_pago is not None:
@@ -305,7 +315,7 @@ def update_abono_cartera(
 def delete_abono_cartera(
     abono_id: int,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> None:
     abono = db.execute(
         select(AbonoCarteraModel).where(AbonoCarteraModel.id == abono_id),
@@ -313,5 +323,14 @@ def delete_abono_cartera(
     if abono is None:
         raise HTTPException(status_code=404, detail="Abono no encontrado")
 
+    registrar_auditoria(
+        db,
+        usuario=current_user.username,
+        modulo="cartera",
+        entidad="abono",
+        accion="eliminar",
+        entidad_id=abono.id,
+        detalle=f"Eliminado abono de {abono.monto} (cliente {abono.cliente_id})",
+    )
     db.delete(abono)
     db.commit()

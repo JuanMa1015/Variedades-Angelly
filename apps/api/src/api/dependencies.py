@@ -5,11 +5,13 @@ from __future__ import annotations
 from fastapi import Depends, HTTPException, Request, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.application.services.dashboard_service import DashboardService
 from src.auth.security import decode_access_token
 from src.infrastructure.database.connection import get_db
+from src.infrastructure.database.models import UsuarioModel
 from src.infrastructure.repositories.dashboard_metrics_reader import (
     SqlAlchemyDashboardMetricsReader,
 )
@@ -46,6 +48,9 @@ def _extract_token(request: Request, credentials: HTTPAuthorizationCredentials |
 def get_current_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Security(security_scheme),
+    # Sesion propia (use_cache=False): la consulta de identidad no debe abrir una
+    # transaccion en la sesion del endpoint, que usa `with db.begin()`.
+    auth_db: Session = Depends(get_db, use_cache=False),
 ) -> AuthenticatedUser:
     """Valida JWT Bearer o cookie httpOnly y retorna usuario autenticado."""
     token = _extract_token(request, credentials)
@@ -78,7 +83,20 @@ def get_current_user(
             detail="Token invalido o incompleto",
         )
 
-    return AuthenticatedUser(username=username, role=role)
+    # El token solo prueba identidad: usuario existente, activo y rol vigente salen de la BD,
+    # para que desactivar, borrar o cambiar de rol a alguien surta efecto de inmediato.
+    usuario = auth_db.execute(
+        select(UsuarioModel.activo, UsuarioModel.rol).where(UsuarioModel.username == username),
+    ).one_or_none()
+    auth_db.rollback()  # termina la transaccion de lectura y libera la conexion
+    current_role = _normalize_role(usuario.rol) if usuario is not None else ""
+    if usuario is None or not usuario.activo or not current_role:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Usuario inactivo o inexistente",
+        )
+
+    return AuthenticatedUser(username=username, role=current_role)
 
 
 def require_roles(*roles: str):

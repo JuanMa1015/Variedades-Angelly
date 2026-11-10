@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.api.schemas.cartera import MetodoPago, VentaItemCreateRequest, VentaDetalleResponse, VentaResponse
+from src.api.services.auditoria import registrar_auditoria
 from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.pagination import PageInfo, build_page
 from src.application.services.ventas_service import (
@@ -386,7 +387,7 @@ def update_venta(
     venta_id: int,
     payload: VentaUpdateRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> VentaResponse:
     campos = payload.model_fields_set
     if not campos:
@@ -464,6 +465,15 @@ def update_venta(
                 else 0.0
             )
 
+        registrar_auditoria(
+            db,
+            usuario=current_user.username,
+            modulo="ventas",
+            entidad="venta",
+            accion="editar",
+            entidad_id=venta.id,
+            detalle=f"total {venta.total}->{total}, saldo {venta.saldo_pendiente}->{saldo_pendiente}, fiado {venta.es_fiado}->{es_fiado}",
+        )
         venta.total = total
         venta.es_fiado = es_fiado
         venta.tipo_fiado = tipo_fiado
@@ -529,7 +539,7 @@ def update_venta(
 def delete_venta(
     venta_id: int,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> Response:
     with db.begin():
         venta = db.execute(
@@ -553,6 +563,15 @@ def delete_venta(
             .with_for_update(),
         ).scalars().all()
 
+        registrar_auditoria(
+            db,
+            usuario=current_user.username,
+            modulo="ventas",
+            entidad="venta",
+            accion="eliminar",
+            entidad_id=venta.id,
+            detalle=f"Eliminada venta total {venta.total} fiado={venta.es_fiado}",
+        )
         for detalle in detalles:
             producto = db.execute(
                 select(ProductoModel)

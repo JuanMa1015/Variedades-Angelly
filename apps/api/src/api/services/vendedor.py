@@ -8,6 +8,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from src.api.services.auditoria import registrar_auditoria
 from src.auth.password_policy import ensure_password_not_pwned
 from src.auth.security import hash_password
 from src.infrastructure.database.models import UsuarioModel
@@ -34,7 +35,7 @@ def list_vendedores(db: Session) -> list[dict[str, Any]]:
     return [{"id": u.id, "username": u.username, "rol": u.rol} for u in usuarios]
 
 
-def create_vendedor(username: str, password: str, db: Session) -> dict[str, Any]:
+def create_vendedor(username: str, password: str, db: Session, actor: str = "sistema") -> dict[str, Any]:
     ensure_password_not_pwned(password)
     username = username.strip()
     existente = db.execute(
@@ -49,6 +50,9 @@ def create_vendedor(username: str, password: str, db: Session) -> dict[str, Any]
         rol="vendedor",
     )
     db.add(usuario)
+    db.flush()
+    registrar_auditoria(db, usuario=actor, modulo="usuarios", entidad="vendedor", accion="crear",
+                        entidad_id=usuario.id, detalle=f"Creado vendedor {usuario.username}")
     db.commit()
     db.refresh(usuario)
     return {"id": usuario.id, "username": usuario.username, "rol": usuario.rol}
@@ -59,6 +63,7 @@ def update_vendedor(
     username: str | None,
     password: str | None,
     db: Session,
+    actor: str = "sistema",
 ) -> dict[str, Any]:
     usuario = _validate_and_find_vendedor(usuario_id, db)
 
@@ -82,12 +87,17 @@ def update_vendedor(
         ensure_password_not_pwned(password)
         usuario.password_hash = hash_password(password)
 
+    registrar_auditoria(db, usuario=actor, modulo="usuarios", entidad="vendedor", accion="editar",
+                        entidad_id=usuario.id,
+                        detalle=f"Editado {usuario.username} (usuario={'si' if username is not None else 'no'}, clave={'si' if password is not None else 'no'})")
     db.commit()
     db.refresh(usuario)
     return {"id": usuario.id, "username": usuario.username, "rol": usuario.rol}
 
 
-def delete_vendedor(usuario_id: int, db: Session) -> None:
+def delete_vendedor(usuario_id: int, db: Session, actor: str = "sistema") -> None:
     usuario = _validate_and_find_vendedor(usuario_id, db)
+    registrar_auditoria(db, usuario=actor, modulo="usuarios", entidad="vendedor", accion="eliminar",
+                        entidad_id=usuario.id, detalle=f"Eliminado vendedor {usuario.username}")
     db.delete(usuario)
     db.commit()

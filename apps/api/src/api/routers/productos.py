@@ -11,6 +11,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from src.api.services.auditoria import registrar_auditoria
 from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.pagination import PageInfo, build_page, search_filter
 from src.domain.producto import Producto
@@ -311,13 +312,22 @@ def update_producto(
 def delete_producto(
     producto_id: int,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> Response:
     """Desactiva un producto (soft-delete)."""
     producto = db.execute(select(ProductoModel).where(ProductoModel.id == producto_id)).scalar_one_or_none()
     if producto is None:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
 
+    registrar_auditoria(
+        db,
+        usuario=current_user.username,
+        modulo="productos",
+        entidad="producto",
+        accion="desactivar",
+        entidad_id=producto.id,
+        detalle=f"Desactivado: {producto.nombre}",
+    )
     producto.activo = False
     producto.proveedor_id = None
     db.commit()
@@ -328,11 +338,20 @@ def delete_producto(
 def reactivar_producto(
     producto_id: int,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> dict:
     producto = db.execute(select(ProductoModel).where(ProductoModel.id == producto_id)).scalar_one_or_none()
     if producto is None:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
+    registrar_auditoria(
+        db,
+        usuario=current_user.username,
+        modulo="productos",
+        entidad="producto",
+        accion="reactivar",
+        entidad_id=producto.id,
+        detalle=f"Reactivado: {producto.nombre}",
+    )
     producto.activo = True
     db.commit()
     return {"message": "Producto reactivado"}
@@ -364,9 +383,18 @@ def patch_producto_precio_venta(
     producto_id: int,
     payload: ProductoPrecioPatchRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> ProductoResponse:
     """Permite editar precio de venta en modo inline desde el dashboard."""
+    registrar_auditoria(
+        db,
+        usuario=current_user.username,
+        modulo="productos",
+        entidad="producto",
+        accion="precio",
+        entidad_id=producto_id,
+        detalle=f"Nuevo precio de venta: {payload.precio_venta}",
+    )
     repository = SqlAlchemyProductoRepository(db)
 
     try:

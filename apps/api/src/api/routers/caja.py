@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from src.api.services.auditoria import registrar_auditoria
 from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.schemas.caja import (
     ActualizarCajaRequest,
@@ -267,6 +268,15 @@ def caja_actualizar(
     if not update_data:
         raise HTTPException(status_code=400, detail="No hay campos para actualizar")
 
+    registrar_auditoria(
+        db,
+        usuario=current_user.username,
+        modulo="caja",
+        entidad="cierre_caja",
+        accion="editar",
+        entidad_id=caja.id,
+        detalle=f"Campos: {update_data}",
+    )
     for key, value in update_data.items():
         setattr(caja, key, value)
 
@@ -279,12 +289,21 @@ def caja_actualizar(
 def caja_eliminar(
     caja_id: int,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> None:
     """Elimina un registro de caja (solo superadmin)."""
     caja = db.get(CierreCajaModel, caja_id)
     if caja is None:
         raise HTTPException(status_code=404, detail="Registro de caja no encontrado")
 
+    registrar_auditoria(
+        db,
+        usuario=current_user.username,
+        modulo="caja",
+        entidad="cierre_caja",
+        accion="eliminar",
+        entidad_id=caja.id,
+        detalle=f"Eliminada caja de {caja.abierto_por}",
+    )
     db.delete(caja)
     db.commit()
