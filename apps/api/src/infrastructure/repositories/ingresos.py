@@ -42,6 +42,8 @@ def cobros_por_metodo(db: Session, caja_id: int | None = None) -> dict[str, floa
         consulta = select(modelo.metodo_pago, func.coalesce(func.sum(monto), 0.0)).where(
             modelo.metodo_pago.is_not(None),
         )
+        if modelo is AbonoTiendaModel:
+            consulta = consulta.where(AbonoTiendaModel.anulado.is_(False))
         if caja_id is not None:
             consulta = consulta.where(modelo.caja_id == caja_id)
         for metodo, total in db.execute(consulta.group_by(modelo.metodo_pago)).all():

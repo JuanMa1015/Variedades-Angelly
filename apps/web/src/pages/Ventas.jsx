@@ -355,10 +355,17 @@ const Ventas = () => {
 
     try {
       setCreatingClient(true);
-      const creado = await apiPost('/api/clientes/tienda-fiado', {
-        nombre,
-        telefono_whatsapp: (telefono.length === 10 ? `57${telefono}` : telefono) || null,
-      });
+      const cuerpo = { nombre, telefono_whatsapp: (telefono.length === 10 ? `57${telefono}` : telefono) || null };
+      let creado;
+      try {
+        creado = await apiPost('/api/clientes/tienda-fiado', cuerpo);
+      } catch (err) {
+        if (err.status !== 409 || !err.payload?.homonimo) throw err;
+        // Mismo nombre que otro cliente: se registra solo si quien atiende confirma que es otra persona.
+        const esOtraPersona = await confirm({ title: '¿Es otra persona?', message: `Ya hay un cliente llamado «${err.payload.coincidencias?.[0]?.nombre ?? nombre}». ¿Es otra persona con el mismo nombre?`, variant: 'primary' });
+        if (!esOtraPersona) throw new Error('No se guardó: ya existe un cliente con ese nombre.');
+        creado = await apiPost('/api/clientes/tienda-fiado', { ...cuerpo, confirmar_homonimo: true });
+      }
       data.setClientesTienda((current) => [...current, creado].sort((a, b) => String(a.nombre).localeCompare(String(b.nombre), 'es')));
       patchTicket({ esFiado: true, clienteTiendaId: String(creado.id) });
       setNewClient({ nombre: '', telefono: '' });

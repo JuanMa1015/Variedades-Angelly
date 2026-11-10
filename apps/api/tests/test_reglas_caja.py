@@ -238,6 +238,7 @@ def test_el_dashboard_separa_tarjeta_transferencia_y_efectivo(auth_client) -> No
 def test_los_abonos_aceptan_tarjeta_pero_no_metodos_inventados(auth_client) -> None:
     client, sf = auth_client
     vendedor = _login_token(client, "vendedor1", "ventas123")
+    _abrir(client, vendedor)
     with sf() as db:
         tienda = ClienteFiadoTiendaModel(nombre="Tienda", deuda_total=5000)
         db.add(tienda)

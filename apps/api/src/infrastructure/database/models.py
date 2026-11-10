@@ -373,6 +373,13 @@ class AbonoTiendaModel(Base):
         index=True,
     )
 
+    # Un abono anulado no se borra: devuelve la deuda y queda con quien, cuando, por que y quien autorizo.
+    anulado: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=expression.false())
+    anulado_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), nullable=True)
+    anulado_por: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    autorizado_por: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    motivo_anulacion: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
     def __repr__(self) -> str:
         return f"AbonoTiendaModel(id={self.id!r}, monto={self.monto!r})"
 

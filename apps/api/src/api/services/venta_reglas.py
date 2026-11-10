@@ -47,7 +47,7 @@ def caja_abierta_id(db: Session) -> int | None:
     ).scalar_one_or_none()
 
 
-def exigir_caja_abierta(db: Session) -> None:
-    """Sin turno abierto el dinero cobrado no entra a ningun cuadre: no se puede vender."""
+def exigir_caja_abierta(db: Session, operacion: str = "registrar ventas") -> None:
+    """Sin turno abierto el dinero cobrado no entra a ningun cuadre: no se puede cobrar."""
     if caja_abierta_id(db) is None:
-        raise HTTPException(status_code=409, detail="La caja esta cerrada. Abre la caja para registrar ventas")
+        raise HTTPException(status_code=409, detail=f"La caja esta cerrada. Abre la caja para {operacion}")

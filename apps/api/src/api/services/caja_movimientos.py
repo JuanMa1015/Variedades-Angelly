@@ -75,7 +75,9 @@ def _abonos(db: Session, caja: CierreCajaModel, hasta: datetime) -> list[Movimie
                 fecha=a.fecha,
                 descripcion=f"Abono · {nombres.get(a.cliente_id, 'cliente')}",
                 metodo_pago=a.metodo_pago,
-                monto=float(a.monto),
+                monto=0.0 if getattr(a, "anulado", False) else float(a.monto),
+                total=float(a.monto) if getattr(a, "anulado", False) else None,
+                anulada=bool(getattr(a, "anulado", False)),
             )
             for a in abonos
         )

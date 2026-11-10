@@ -216,7 +216,8 @@ def test_delete_cliente_tienda_fiado_con_historial_retorna_409(
     )
 
     assert delete_response.status_code == 409
-    assert "historial de ventas" in delete_response.json()["detail"]
+    # El cliente aun debe plata: ese es el motivo mas util para el vendedor (tambien tiene historial).
+    assert "deuda pendiente" in delete_response.json()["detail"]
 
 
 def test_fidelizacion_admin_crud_y_vendedor_sin_alta(
