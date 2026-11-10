@@ -16,11 +16,14 @@ import uuid
 from pathlib import Path
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 from PIL import Image
+from pydantic import BaseModel, Field
 
 from src.api.dependencies import AuthenticatedUser, require_roles
+from src.api.limiter import importar_imagen_rate_limit, limiter
+from src.api.services import imagen_remota
 
 router = APIRouter(tags=["upload"])
 logger = logging.getLogger("tienda_angelly")
@@ -129,6 +132,12 @@ async def upload_imagen(
     if len(contents) > MAX_FILE_SIZE:
         raise HTTPException(status_code=400, detail="La imagen supera los 5 MB")
 
+    url = await _guardar_imagen(contents, ext)
+    return JSONResponse(content={"url": url})
+
+
+async def _guardar_imagen(contents: bytes, ext: str) -> str:
+    """Valida, optimiza y guarda una imagen; retorna su URL permanente."""
     _validate_image(contents, ext)
     contents, content_type = _reencode_image(contents, ext)
 
@@ -138,10 +147,35 @@ async def upload_imagen(
     filename = f"{uuid.uuid4().hex}{ext}"
 
     if BLOB_TOKEN:
-        url = await _upload_to_blob(filename, contents, content_type)
-    else:
-        url = await _upload_local(filename, contents)
+        return await _upload_to_blob(filename, contents, content_type)
+    return await _upload_local(filename, contents)
 
+
+def _extension_desde_contenido(contents: bytes) -> str:
+    """Sin nombre de archivo (viene de una URL) la extension se deduce de los primeros bytes."""
+    for magic, exts in MAGIC_BYTES.items():
+        if not contents.startswith(magic):
+            continue
+        if magic == b"RIFF" and contents[8:12] != b"WEBP":
+            continue
+        return ".jpg" if ".jpg" in exts else sorted(exts)[0]
+    raise HTTPException(status_code=400, detail="Esa direccion no contiene una imagen valida (JPG, PNG, WEBP o GIF).")
+
+
+class ImagenUrlRequest(BaseModel):
+    url: str = Field(min_length=8, max_length=2048)
+
+
+@router.post("/api/upload-imagen-url")
+@limiter.limit(importar_imagen_rate_limit())
+async def importar_imagen_desde_url(
+    request: Request,
+    payload: ImagenUrlRequest,
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+):
+    """Descarga una imagen de internet y la guarda en el almacenamiento propio (permanente)."""
+    contents = await imagen_remota.descargar_imagen(payload.url.strip(), MAX_FILE_SIZE)
+    url = await _guardar_imagen(contents, _extension_desde_contenido(contents))
     return JSONResponse(content={"url": url})
 
 

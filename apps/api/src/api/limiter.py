@@ -40,4 +40,10 @@ def login_rate_limit() -> str:
     return os.getenv("LOGIN_RATE_LIMIT", "10/minute")
 
 
+def importar_imagen_rate_limit() -> str:
+    """Cada importacion hace que el servidor visite un sitio externo: se limita por IP."""
+    env = os.getenv("APP_ENV", "development").strip().lower()
+    return "1000/minute" if env == "test" else "20/minute"
+
+
 limiter = Limiter(key_func=_get_client_ip, default_limits=["100/minute"])

@@ -166,4 +166,62 @@ describe('Inventario', () => {
 
     expect(screen.getAllByTestId('skeleton-card').length).toBeGreaterThan(0);
   });
+
+  const crearProductoConImagen = async (direccion) => {
+    const Inventario = (await import('../Inventario')).default;
+    render(<Inventario />);
+    await waitFor(() => expect(screen.getByText('Arroz Diana')).toBeTruthy());
+
+    fireEvent.click(screen.getByText('Agregar producto'));
+    fireEvent.change(screen.getByPlaceholderText('Nombre'), { target: { value: 'Producto Nuevo' } });
+    fireEvent.change(screen.getByPlaceholderText('Precio costo (ej: 3500)'), { target: { value: '1000' } });
+    fireEvent.change(screen.getByPlaceholderText('Precio venta (ej: 5000)'), { target: { value: '1500' } });
+    fireEvent.click(screen.getAllByText('Pegar URL')[0]);
+    fireEvent.change(screen.getByPlaceholderText('Pega la dirección de la imagen: se guarda una copia'), { target: { value: direccion } });
+    fireEvent.click(screen.getAllByRole('button', { name: /Agregar producto/ }).pop());
+  };
+
+  it('una imagen pegada por URL se importa al almacenamiento propio antes de guardar el producto', async () => {
+    apiPostMock.mockImplementation((endpoint) => {
+      if (endpoint === '/api/upload-imagen-url') {
+        return Promise.resolve({ url: 'https://abc.public.blob.vercel-storage.com/productos/copia.jpg' });
+      }
+      return Promise.resolve({ id: 3 });
+    });
+
+    await crearProductoConImagen('https://sitio-externo.com/foto.jpg');
+
+    await waitFor(() => {
+      expect(apiPostMock).toHaveBeenCalledWith('/api/upload-imagen-url', { url: 'https://sitio-externo.com/foto.jpg' });
+      expect(apiPostMock).toHaveBeenCalledWith('/api/productos', expect.objectContaining({
+        nombre: 'Producto Nuevo',
+        imagen_url: 'https://abc.public.blob.vercel-storage.com/productos/copia.jpg',
+      }));
+    });
+  });
+
+  it('si ya es del almacenamiento propio no se vuelve a importar', async () => {
+    const propia = 'https://abc.public.blob.vercel-storage.com/productos/ya-estaba.jpg';
+
+    await crearProductoConImagen(propia);
+
+    await waitFor(() => {
+      expect(apiPostMock).toHaveBeenCalledWith('/api/productos', expect.objectContaining({ imagen_url: propia }));
+    });
+    expect(apiPostMock).not.toHaveBeenCalledWith('/api/upload-imagen-url', expect.anything());
+  });
+
+  it('si el servidor rechaza la direccion no crea el producto y explica el motivo', async () => {
+    apiPostMock.mockImplementation((endpoint) => {
+      if (endpoint === '/api/upload-imagen-url') {
+        return Promise.reject(new Error('Esa direccion no esta permitida. Descarga la imagen y subela desde tu computador.'));
+      }
+      return Promise.resolve({ id: 3 });
+    });
+
+    await crearProductoConImagen('http://127.0.0.1/a.png');
+
+    expect(await screen.findByText(/no esta permitida/)).toBeTruthy();
+    expect(apiPostMock).not.toHaveBeenCalledWith('/api/productos', expect.anything());
+  });
 });
