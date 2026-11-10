@@ -101,3 +101,11 @@ Revisar a fondo la UI y el flujo de: **POS/Ventas → Caja → Inventario → Pr
 - **D5/D6** caja: solo cuenta dinero cobrado (un fiado no es caja; las ventas de cartera entran por sus abonos, una sola vez); el efectivo esperado ya no suma transferencias; se puede abrir con base $0; toda venta con cobro exige método de pago. El abono inicial de un fiado de cartera hecho por `/api/ventas` ahora se registra como abono.
 - **D7** editar o borrar un abono de cartera reajusta la deuda del cliente.
 - Pendiente: D8–D10, ver Fase 2.
+
+## Actualización (Bloque 4 aplicado)
+
+- **Fidelización:** las ventas acumulan puntos automáticamente (1 punto por cada `FIDELIZACION_PESOS_POR_PUNTO` cobrados, por defecto 1000; un fiado solo cuenta su abono). Al eliminar la venta se revierten. El umbral de canje (`FIDELIZACION_UMBRAL_BONO`, por defecto 100) viene del backend (`GET /api/fidelizacion/config`). Migración `e5f6a7b8c9d0` (columnas `cliente_fidelizacion_id` y `puntos_otorgados` en `ventas`).
+- **POS:** selector de cliente de fidelización; búsqueda por nombre/código en el servidor (ya no depende de los primeros 200 productos) y escaneo de códigos que no estén cargados, con aviso si no existe o no hay stock.
+- **Dashboard:** las ventas recientes usan `/api/ventas/paginadas?limit=8` en vez de descargar todo el historial.
+- **Caja:** cierre ciego. Mientras la caja está abierta el vendedor no ve el efectivo esperado; al cerrar recibe el descuadre. El superadmin sigue viéndolo.
+- **Pendiente de decisión:** que registrar una factura de compra sume stock y actualice el costo.

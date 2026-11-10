@@ -129,10 +129,15 @@ def _to_cierre_caja_response(
     )
 
 
+def _es_cierre_ciego(user: AuthenticatedUser, esta_abierta: bool) -> bool:
+    """El vendedor no ve el efectivo esperado hasta cerrar: cuenta a ciegas y luego se compara."""
+    return user.role == "vendedor" and esta_abierta
+
+
 @router.get("/api/caja/estado", response_model=CajaEstadoResponse)
 def caja_estado(
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> CajaEstadoResponse:
     """Retorna estado actual de la caja y ultimo cierre."""
     caja_abierta = db.execute(
@@ -149,9 +154,13 @@ def caja_estado(
         .limit(1),
     ).scalar_one_or_none()
 
+    caja_actual = _to_cierre_caja_response(caja_abierta, db=db) if caja_abierta is not None else None
+    if caja_actual is not None and _es_cierre_ciego(current_user, caja_actual.esta_abierta):
+        caja_actual = caja_actual.model_copy(update={"saldo_esperado": None, "descuadre": None})
+
     return CajaEstadoResponse(
         abierta=caja_abierta is not None,
-        caja_actual=_to_cierre_caja_response(caja_abierta, db=db) if caja_abierta is not None else None,
+        caja_actual=caja_actual,
         ultimo_cierre=_to_cierre_caja_response(ultimo_cierre) if ultimo_cierre is not None else None,
     )
 
@@ -237,7 +246,7 @@ def caja_cierre(
 @router.get("/api/caja", response_model=list[CajaHistorialItemResponse])
 def caja_listar(
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> list[CajaHistorialItemResponse]:
     """Lista todas las aperturas y cierres de caja."""
     cierres = db.execute(
@@ -256,7 +265,11 @@ def caja_listar(
             monto_ventas_transferencia=float(c.monto_ventas_transferencia),
             monto_gastos=float(c.monto_gastos),
             monto_cierre=float(c.monto_cierre) if c.monto_cierre is not None else None,
-            saldo_esperado=_efectivo_esperado(c.monto_inicial, c.monto_ventas_efectivo, c.monto_gastos),
+            saldo_esperado=(
+                None
+                if _es_cierre_ciego(current_user, c.fecha_cierre is None)
+                else _efectivo_esperado(c.monto_inicial, c.monto_ventas_efectivo, c.monto_gastos)
+            ),
             esta_abierta=c.fecha_cierre is None,
             descuadre=float(c.esperado_vs_real) if c.esperado_vs_real is not None else None,
         )

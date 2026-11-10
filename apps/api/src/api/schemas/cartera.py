@@ -132,6 +132,7 @@ class VentaResponse(BaseModel):
     fecha: datetime
     detalles: list[VentaDetalleResponse]
     resumen_recibo: str
+    puntos_otorgados: int = 0
 
 
 class CarteraVentaHistorialItemResponse(BaseModel):

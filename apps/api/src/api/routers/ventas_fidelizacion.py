@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from src.api.schemas.cartera import MetodoPago, VentaItemCreateRequest, VentaDetalleResponse, VentaResponse
 from src.api.services.auditoria import registrar_auditoria
+from src.api.services.fidelizacion import acumular_puntos, revertir_puntos
 from src.api.services.deuda import SIN_DEUDA, deuda_pendiente_tienda, mover_deuda_tienda
 from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.services.venta_reglas import (
@@ -46,6 +47,7 @@ class VentaCreateRequest(BaseModel):
 
     cliente_id: Annotated[int | None, Field(gt=0)] = None
     cliente_tienda_id: Annotated[int | None, Field(gt=0)] = None
+    cliente_fidelizacion_id: Annotated[int | None, Field(gt=0)] = None
     items: Annotated[list[VentaItemCreateRequest], Field(min_length=1)]
     es_fiado: bool = False
     fiado_origen: str | None = None
@@ -237,6 +239,12 @@ def create_venta(
                 total=total,
                 saldo_pendiente=saldo_pendiente,
             )
+            if payload.cliente_fidelizacion_id is not None:
+                # Los puntos salen del dinero realmente cobrado (un fiado solo cuenta su abono).
+                cobrado = abono_inicial if payload.es_fiado else float(total)
+                venta.cliente_fidelizacion_id = payload.cliente_fidelizacion_id
+                venta.puntos_otorgados = acumular_puntos(db, payload.cliente_fidelizacion_id, cobrado)
+
             db.add(venta)
             db.flush()
 
@@ -292,6 +300,7 @@ def create_venta(
         fecha=venta.fecha,
         detalles=detalle_payload,
         resumen_recibo=resumen,
+        puntos_otorgados=venta.puntos_otorgados,
     )
 
 
@@ -592,6 +601,7 @@ def delete_venta(
             )
 
         mover_deuda_tienda(db, deuda_pendiente_tienda(venta), SIN_DEUDA)
+        revertir_puntos(db, venta.cliente_fidelizacion_id, venta.puntos_otorgados)
 
         detalles = db.execute(
             select(DetalleVentaModel)

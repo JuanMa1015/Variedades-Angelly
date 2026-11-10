@@ -313,7 +313,9 @@ def test_caja_solo_cuenta_el_dinero_cobrado_y_el_efectivo_esperado(auth_client) 
     _vender_contado(client, token, producto, "transferencia")  # +2000 transferencia
     _vender_fiado_tienda(client, token, producto, cliente)  # total 3000, solo 1000 cobrado en efectivo
 
-    caja = client.get("/api/caja/estado", headers=_h(token)).json()["caja_actual"]
+    # El vendedor cuenta a ciegas: el efectivo esperado lo ve el superadmin.
+    superadmin = _login_token(client, "angelly_superadmin", "supersecure123")
+    caja = client.get("/api/caja/estado", headers=_h(superadmin)).json()["caja_actual"]
 
     assert caja["monto_ventas_efectivo"] == 3000
     assert caja["monto_ventas_transferencia"] == 2000

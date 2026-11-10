@@ -43,7 +43,7 @@ class CierreCajaResponse(BaseModel):
     fecha_cierre: datetime | None
     abierto_por: str
     cerrado_por: str | None
-    saldo_esperado: float
+    saldo_esperado: float | None  # None: el cajero cuenta a ciegas mientras la caja esta abierta
     total_ingresos: float
     esta_abierta: bool
     descuadre: float | None = None
@@ -70,6 +70,6 @@ class CajaHistorialItemResponse(BaseModel):
     monto_ventas_transferencia: float
     monto_gastos: float
     monto_cierre: float | None
-    saldo_esperado: float
+    saldo_esperado: float | None
     esta_abierta: bool
     descuadre: float | None = None

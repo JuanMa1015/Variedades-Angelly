@@ -53,7 +53,7 @@ const Dashboard = () => {
 
         const [resumenPayload, ventasPayload, carteraPayload] = await Promise.all([
           apiGet('/api/dashboard/resumen', { signal: controller.signal }),
-          apiGet('/api/ventas', { signal: controller.signal }),
+          apiGet('/api/ventas/paginadas?page=1&limit=8', { signal: controller.signal }),
           isAdmin ? apiGet('/api/clientes', { signal: controller.signal }) : Promise.resolve([]),
         ]);
 
@@ -64,7 +64,7 @@ const Dashboard = () => {
           ...(typeof resumenPayload === 'object' && resumenPayload ? resumenPayload : {}),
         });
 
-        setVentasRecientes(Array.isArray(ventasPayload) ? ventasPayload.slice(0, 8) : []);
+        setVentasRecientes(Array.isArray(ventasPayload?.data) ? ventasPayload.data : []);
 
         if (isAdmin) {
           const clientes = Array.isArray(carteraPayload) ? carteraPayload : [];
