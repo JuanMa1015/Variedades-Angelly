@@ -18,11 +18,28 @@ const fetchJson = async ({ endpoint, signal, errorMessage }) => {
   }
 };
 
+const CATALOGO_ENDPOINT = '/api/productos/paginados?catalogo=tienda';
+
+// Une productos traidos por busqueda al catalogo cargado, sin duplicar ids.
+const mergeProductos = (current, incoming) => {
+  const known = new Set(current.map((producto) => Number(producto.id)));
+  const nuevos = incoming.filter((producto) => !known.has(Number(producto.id)));
+  return nuevos.length > 0 ? [...current, ...nuevos] : current;
+};
+
+const extractProductos = (payload) => {
+  if (Array.isArray(payload?.data)) return payload.data;
+  return Array.isArray(payload) ? payload : [];
+};
+
 const Ventas = () => {
   const { token } = useAuth();
 
   const [productos, setProductos] = useState([]);
   const [clientesTienda, setClientesTienda] = useState([]);
+  const [clientesFidelizacion, setClientesFidelizacion] = useState([]);
+  const [fidelizacionConfig, setFidelizacionConfig] = useState({ pesos_por_punto: 1000 });
+  const [clienteFidelizacionId, setClienteFidelizacionId] = useState('');
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -51,7 +68,7 @@ const Ventas = () => {
 
       const requestList = [
         fetchJson({
-          endpoint: '/api/productos/paginados?catalogo=tienda&limit=200',
+          endpoint: `${CATALOGO_ENDPOINT}&limit=200`,
           signal,
           errorMessage: 'No fue posible cargar productos',
         }),
@@ -60,14 +77,19 @@ const Ventas = () => {
           signal,
           errorMessage: 'No fue posible cargar clientes de fiado tienda',
         }),
+        // Fidelizacion es un extra: si falla, la venta sigue funcionando.
+        fetchJson({ endpoint: '/api/fidelizacion/clientes', signal, errorMessage: '' }).catch(() => []),
+        fetchJson({ endpoint: '/api/fidelizacion/config', signal, errorMessage: '' }).catch(() => null),
       ];
 
-      const [productosPayload, tiendaPayload] = await Promise.all(requestList);
+      const [productosPayload, tiendaPayload, fidelizacionPayload, configPayload] = await Promise.all(requestList);
 
       if (signal?.aborted) return;
 
       setProductos(Array.isArray(productosPayload?.data) ? productosPayload.data : (Array.isArray(productosPayload) ? productosPayload : []));
       setClientesTienda(Array.isArray(tiendaPayload) ? tiendaPayload : []);
+      setClientesFidelizacion(Array.isArray(fidelizacionPayload) ? fidelizacionPayload : []);
+      if (configPayload?.pesos_por_punto > 0) setFidelizacionConfig(configPayload);
     },
     [token],
   );
@@ -122,6 +144,11 @@ const Ventas = () => {
     return Math.max(0, pago - totalEstimado);
   }, [montoPago, totalEstimado]);
 
+  const puntosEstimados = useMemo(() => {
+    const cobrado = esFiado ? Number(abonoInicialFiado || 0) : totalEstimado;
+    return Math.floor(cobrado / (fidelizacionConfig.pesos_por_punto || 1000));
+  }, [esFiado, abonoInicialFiado, totalEstimado, fidelizacionConfig]);
+
   const cleanMessages = () => {
     setError('');
     setSuccess('');
@@ -134,6 +161,7 @@ const Ventas = () => {
     setMontoPago('0');
     setAbonoInicialFiado('0');
     setMetodoPago('efectivo');
+    setClienteFidelizacionId('');
   };
 
   const handleSubmitVenta = async (event) => {
@@ -200,6 +228,10 @@ const Ventas = () => {
       metodo_pago: metodoPago === 'nequi' || metodoPago === 'tarjeta' ? 'transferencia' : metodoPago,
     };
 
+    if (clienteFidelizacionId) {
+      payload.cliente_fidelizacion_id = Number(clienteFidelizacionId);
+    }
+
     if (esFiado) {
       payload.fiado_origen = 'tienda';
       payload.cliente_tienda_id = Number(clienteTiendaId);
@@ -209,7 +241,7 @@ const Ventas = () => {
     try {
       setSubmittingVenta(true);
 
-      await apiPost('/api/ventas', payload);
+      const ventaCreada = await apiPost('/api/ventas', payload);
 
       const selectedCliente = esFiado && clienteTiendaId
         ? clientesTienda.find((c) => String(c.id) === String(clienteTiendaId))
@@ -235,6 +267,7 @@ const Ventas = () => {
         cambio: cambioContado,
         esFiado,
         abono: esFiado ? abonoFiado : 0,
+        puntos: Number(ventaCreada?.puntos_otorgados || 0),
         cliente: selectedCliente?.nombre || null,
         timestamp: new Date().toLocaleString('es-CO'),
       });
@@ -300,16 +333,73 @@ const Ventas = () => {
     }
   };
 
+  // El catalogo inicial trae 200 productos: lo que no este se busca en el servidor.
+  useEffect(() => {
+    const term = productSearch.trim();
+    if (!token || term.length < 2) return undefined;
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const payload = await apiGet(
+          `${CATALOGO_ENDPOINT}&limit=50&q=${encodeURIComponent(term)}`,
+          { signal: controller.signal },
+        );
+        if (!controller.signal.aborted) {
+          setProductos((current) => mergeProductos(current, extractProductos(payload)));
+        }
+      } catch {
+        // La busqueda local sigue funcionando si el servidor no responde.
+      }
+    }, 300);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [productSearch, token]);
+
+  const handleScanCode = async (rawCode) => {
+    const code = String(rawCode || '').trim();
+    if (!code) return false;
+    cleanMessages();
+
+    let producto = productos.find((p) => p.codigo_barras === code);
+    if (!producto) {
+      try {
+        const payload = await apiGet(`${CATALOGO_ENDPOINT}&limit=5&q=${encodeURIComponent(code)}`);
+        const encontrados = extractProductos(payload);
+        producto = encontrados.find((p) => p.codigo_barras === code);
+        if (producto) setProductos((current) => mergeProductos(current, encontrados));
+      } catch (err) {
+        setError(err.message || 'No se pudo buscar el código de barras');
+        return false;
+      }
+    }
+
+    if (!producto) {
+      setError(`No existe un producto con el código ${code}`);
+      return false;
+    }
+    if (Number(producto.stock_actual || 0) <= 0) {
+      setError(`"${producto.nombre}" no tiene stock disponible`);
+      return false;
+    }
+    handleQuickAddProducto(producto.id, producto);
+    return true;
+  };
+
   const productosFiltrados = useMemo(() => {
     const term = productSearch.trim().toLowerCase();
     if (!term) return productos;
     return productos.filter((producto) => producto.nombre.toLowerCase().includes(term));
   }, [productos, productSearch]);
 
-  const handleQuickAddProducto = (productoId) => {
+  // `productoConocido` evita depender de `productos` cuando el producto acaba de llegar del servidor.
+  const handleQuickAddProducto = (productoId, productoConocido) => {
     setItems((current) => {
       const qtyInCart = current.find((item) => Number(item.producto_id) === Number(productoId))?.cantidad || 0;
-      const producto = productos.find((p) => Number(p.id) === Number(productoId));
+      const producto = productoConocido ?? productos.find((p) => Number(p.id) === Number(productoId));
       const stock = Number(producto?.stock_actual || 0);
       if (qtyInCart >= stock) return current;
 
@@ -363,6 +453,7 @@ const Ventas = () => {
             searchTerm={productSearch}
             onSearchChange={setProductSearch}
             onAddItem={handleQuickAddProducto}
+            onScanCode={handleScanCode}
             cart={cartItems}
             formatMoney={formatMoney}
             loading={loading}
@@ -400,6 +491,10 @@ const Ventas = () => {
                 setIsStoreClientModalOpen(true);
               }}
               onConfirmar={handleSubmitVenta}
+              clientesFidelizacion={clientesFidelizacion}
+              clienteFidelizacionId={clienteFidelizacionId}
+              onSetClienteFidelizacionId={setClienteFidelizacionId}
+              puntosEstimados={puntosEstimados}
               submittingVenta={submittingVenta}
             />
           )}

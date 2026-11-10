@@ -45,6 +45,12 @@ const SaleReceiptPanel = ({ receipt, formatMoney, onPrint, onNewSale }) => {
               )}
             </>
           )}
+          {receipt.puntos > 0 && (
+            <div className="flex justify-between text-gray-600">
+              <span>Puntos ganados</span>
+              <span className="font-medium text-violet-700">+{receipt.puntos}</span>
+            </div>
+          )}
           {receipt.esFiado && receipt.cliente && (
             <div className="flex justify-between text-gray-600">
               <span>Cliente</span>

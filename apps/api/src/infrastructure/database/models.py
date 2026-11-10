@@ -126,6 +126,11 @@ class VentaModel(Base):
         nullable=True,
     )
     tipo_fiado: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    cliente_fidelizacion_id: Mapped[int | None] = mapped_column(
+        ForeignKey("clientes_fidelizacion.id"),
+        nullable=True,
+    )
+    puntos_otorgados: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     metodo_pago: Mapped[str | None] = mapped_column(String(20), nullable=True)
     es_fiado: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     total: Mapped[float] = mapped_column(_dinero(), nullable=False)

@@ -5,12 +5,13 @@ import { apiGet, apiRequest } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage'
 import Skeleton from '../components/Skeleton'
 
-const UMBRAL_BONO = 100;
+const UMBRAL_BONO_DEFECTO = 100;
 
 const Fidelizacion = () => {
   const { token } = useAuth();
 
   const [clientes, setClientes] = useState([]);
+  const [umbralBono, setUmbralBono] = useState(UMBRAL_BONO_DEFECTO);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [redeemingClientId, setRedeemingClientId] = useState(null);
@@ -34,6 +35,8 @@ const Fidelizacion = () => {
         setLoading(true);
         setError('');
         await fetchClientes(controller.signal);
+        const config = await apiGet('/api/fidelizacion/config', { signal: controller.signal }).catch(() => null);
+        if (!controller.signal.aborted && config?.umbral_bono > 0) setUmbralBono(config.umbral_bono);
       } catch {
         if (controller.signal.aborted) return;
         setError('No fue posible cargar clientes de fidelización');
@@ -70,8 +73,8 @@ const Fidelizacion = () => {
   };
 
   const clientesConBono = useMemo(
-    () => clientes.filter((item) => Number(item.puntos_acumulados ?? 0) >= UMBRAL_BONO).length,
-    [clientes],
+    () => clientes.filter((item) => Number(item.puntos_acumulados ?? 0) >= umbralBono).length,
+    [clientes, umbralBono],
   );
 
   return (
@@ -98,7 +101,7 @@ const Fidelizacion = () => {
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <p className="text-sm text-gray-500 uppercase">Umbral de Canje</p>
-            <p className="text-3xl font-bold text-gray-900">{UMBRAL_BONO}</p>
+            <p className="text-3xl font-bold text-gray-900">{umbralBono}</p>
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <p className="text-sm text-gray-500 uppercase">Bono Disponible</p>
@@ -139,7 +142,7 @@ const Fidelizacion = () => {
 
               {!loading && clientes.map((cliente) => {
                 const puntos = Number(cliente.puntos_acumulados ?? 0);
-                const habilitado = puntos >= UMBRAL_BONO;
+                const habilitado = puntos >= umbralBono;
                 const canjeando = redeemingClientId === cliente.id;
 
                 return (

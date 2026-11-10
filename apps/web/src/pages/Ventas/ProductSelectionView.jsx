@@ -126,6 +126,7 @@ const ProductSelectionView = ({
   searchTerm,
   onSearchChange,
   onAddItem,
+  onScanCode,
   cart,
   formatMoney,
   loading,
@@ -162,20 +163,12 @@ const ProductSelectionView = ({
             ref={barcodeRef}
             type="text"
             placeholder="Escanear código de barras..."
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                const code = e.target.value.trim();
-                if (!code) return;
-                const product = productos.find((p) => p.codigo_barras === code);
-                if (product) {
-                  const stock = Number(product.stock_actual || 0);
-                  if (stock === 0) return;
-                  const qtyInCart = cartMap.get(Number(product.id)) || 0;
-                  if (qtyInCart >= stock) return;
-                  onAddItem(product.id);
-                  e.target.value = '';
-                }
-              }
+            onKeyDown={async (e) => {
+              if (e.key !== 'Enter') return;
+              e.preventDefault();
+              const input = e.target;
+              const added = await onScanCode?.(input.value);
+              if (added) input.value = '';
             }}
             className="w-full rounded-xl border border-gray-300 bg-white py-2.5 pl-10 pr-4 text-sm focus:border-rosewood focus:outline-none"
           />
@@ -187,7 +180,7 @@ const ProductSelectionView = ({
             value={searchTerm}
             onChange={(event) => onSearchChange(event.target.value)}
             className="w-full rounded-xl border border-gray-300 bg-white py-2.5 pl-10 pr-4 text-sm focus:border-rosewood focus:outline-none"
-            placeholder="Buscar por nombre"
+            placeholder="Buscar por nombre o código"
           />
         </label>
       </div>

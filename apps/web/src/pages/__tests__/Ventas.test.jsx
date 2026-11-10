@@ -15,12 +15,15 @@ vi.mock('../../auth/AuthContext', () => ({
 }));
 
 vi.mock('../Ventas/ProductSelectionView', () => ({
-  default: ({ productos, cart, onAddItem, loading }) => (
+  default: ({ productos, cart, onAddItem, onScanCode, searchTerm, onSearchChange, loading }) => (
     <div data-testid="product-selection">
       <h2>Product Selection</h2>
       <p>Products: {productos.length}</p>
       <p>Cart: {cart.length}</p>
       <p>Loading: {String(loading)}</p>
+      <input data-testid="search" value={searchTerm} onChange={(e) => onSearchChange(e.target.value)} />
+      <button data-testid="scan-remoto" onClick={() => onScanCode('770999')}>scan remoto</button>
+      <button data-testid="scan-inexistente" onClick={() => onScanCode('000')}>scan inexistente</button>
       {productos.map((p) => (
         <button
           key={p.id}
@@ -39,6 +42,7 @@ vi.mock('../Ventas/CartPanel', () => ({
     cart, totalEstimado, esFiado, onSetEsFiado, montoPago, onSetMontoPago,
     clientesTiendaFiado, clienteTiendaId, onSetClienteTiendaId,
     onCrearCliente, onConfirmar, formatMoney, submittingVenta,
+    clientesFidelizacion = [], onSetClienteFidelizacionId = () => {},
   }) => (
     <div data-testid="cart-panel">
       <h2>CartPanel</h2>
@@ -66,6 +70,9 @@ vi.mock('../Ventas/CartPanel', () => ({
           <option key={c.id} value={c.id}>{c.nombre}</option>
         ))}
       </select>
+      <button data-testid="elegir-fidelizacion" onClick={() => onSetClienteFidelizacionId(String(clientesFidelizacion[0]?.id ?? ''))}>
+        fidelizacion
+      </button>
       <button data-testid="create-cliente" onClick={onCrearCliente}>
         + Crear cliente de ventas
       </button>
@@ -109,6 +116,8 @@ const mockApiGet = () => {
   apiGetMock.mockImplementation((endpoint) => {
     if (endpoint.startsWith('/api/productos/paginados?catalogo=tienda')) return Promise.resolve({ data: validProducts });
     if (endpoint === '/api/clientes/tienda-fiado') return Promise.resolve(validClientes);
+    if (endpoint === '/api/fidelizacion/clientes') return Promise.resolve([{ id: 77, nombre: 'Fiel', puntos_acumulados: 10 }]);
+    if (endpoint === '/api/fidelizacion/config') return Promise.resolve({ umbral_bono: 100, pesos_por_punto: 1000 });
     return Promise.resolve([]);
   });
 };
@@ -334,5 +343,77 @@ describe('Ventas page', () => {
     await waitFor(() => {
       expect(screen.getByText('Cart: 0')).toBeInTheDocument();
     });
+  });
+
+  it('busca en el servidor un codigo de barras que no esta en el catalogo cargado', async () => {
+    const remoto = { id: 99, nombre: 'Producto 201', precio_venta: 1000, stock_actual: 5, codigo_barras: '770999' };
+    apiGetMock.mockImplementation((endpoint) => {
+      if (endpoint.includes('q=770999')) return Promise.resolve({ data: [remoto] });
+      if (endpoint.startsWith('/api/productos/paginados?catalogo=tienda')) return Promise.resolve({ data: validProducts });
+      return Promise.resolve([]);
+    });
+    render(<Ventas />);
+    await waitFor(() => expect(screen.getByTestId('add-product-1')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('scan-remoto'));
+
+    await waitFor(() => expect(screen.getByText('Cart: 1')).toBeInTheDocument());
+    expect(screen.getByText('Products: 3')).toBeInTheDocument();
+  });
+
+  it('avisa cuando el codigo escaneado no existe', async () => {
+    render(<Ventas />);
+    await waitFor(() => expect(screen.getByTestId('add-product-1')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('scan-inexistente'));
+
+    await waitFor(() => expect(screen.getByText(/No existe un producto con el código 000/)).toBeInTheDocument());
+    expect(screen.getByText('Cart: 0')).toBeInTheDocument();
+  });
+
+  it('consulta al servidor al buscar por nombre para no depender de los primeros 200 productos', async () => {
+    render(<Ventas />);
+    await waitFor(() => expect(screen.getByTestId('add-product-1')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByTestId('search'), { target: { value: 'arroz' } });
+
+    await waitFor(() => {
+      expect(apiGetMock).toHaveBeenCalledWith(
+        '/api/productos/paginados?catalogo=tienda&limit=50&q=arroz',
+        expect.any(Object),
+      );
+    });
+  });
+
+  it('envia el cliente de fidelizacion elegido al registrar la venta', async () => {
+    apiPostMock.mockResolvedValue({ puntos_otorgados: 3 });
+    render(<Ventas />);
+    await waitFor(() => expect(screen.getByTestId('add-product-1')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('add-product-1'));
+    fireEvent.change(screen.getByTestId('monto-pago'), { target: { value: '10000' } });
+    fireEvent.click(screen.getByTestId('elegir-fidelizacion'));
+    fireEvent.click(screen.getByTestId('confirmar-venta'));
+
+    await waitFor(() => {
+      expect(apiPostMock).toHaveBeenCalledWith(
+        '/api/ventas',
+        expect.objectContaining({ cliente_fidelizacion_id: 77 }),
+      );
+    });
+  });
+
+  it('no reporta error de venta si la recarga posterior falla (la venta ya quedo registrada)', async () => {
+    apiPostMock.mockResolvedValue({});
+    render(<Ventas />);
+    await waitFor(() => expect(screen.getByTestId('add-product-1')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('add-product-1'));
+    fireEvent.change(screen.getByTestId('monto-pago'), { target: { value: '10000' } });
+    apiGetMock.mockRejectedValue(new Error('sin red'));
+
+    fireEvent.click(screen.getByTestId('confirmar-venta'));
+
+    await waitFor(() => expect(screen.getByTestId('sale-receipt')).toBeInTheDocument());
+    expect(screen.queryByText(/No fue posible registrar la venta/)).not.toBeInTheDocument();
   });
 });

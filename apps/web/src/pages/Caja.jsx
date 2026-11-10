@@ -9,6 +9,14 @@ import useConfirm from '../components/useConfirm'
 import { formatDateTime, formatMoney } from '../utils/format';
 import Modal from '../components/Modal';
 
+// Mensaje al cerrar: aqui el cajero conoce por primera vez cuanto esperaba el sistema.
+const describirCierre = (cierre) => {
+  const descuadre = Number(cierre?.descuadre);
+  if (!Number.isFinite(descuadre) || Math.abs(descuadre) < 0.01) return 'Caja cerrada: cuadrada ✓';
+  const detalle = descuadre > 0 ? 'sobran' : 'faltan';
+  return `Caja cerrada con descuadre: ${detalle} ${formatMoney(Math.abs(descuadre))}`;
+};
+
 const Caja = () => {
   const { token, user } = useAuth();
   const { confirm, ConfirmModal } = useConfirm();
@@ -106,8 +114,8 @@ const Caja = () => {
   }, [abierta, cajaActual]);
 
   const saldoEsperado = useMemo(() => {
-    if (!cajaActual) return 0;
-    return Number(cajaActual.saldo_esperado || 0);
+    if (!cajaActual || cajaActual.saldo_esperado == null) return null;
+    return Number(cajaActual.saldo_esperado);
   }, [cajaActual]);
 
   const loadVentasForCaja = async (caja) => {
@@ -191,10 +199,10 @@ const Caja = () => {
     try {
       setSubmitting(true);
 
-      await cerrarCaja({ monto_cierre: monto });
+      const cierre = await cerrarCaja({ monto_cierre: monto });
 
       setMontoCierre('');
-      setSuccess('Caja cerrada correctamente');
+      setSuccess(describirCierre(cierre));
       await loadAll();
     } catch (err) {
       setError(err.message || 'No se pudo cerrar la caja');
@@ -327,9 +335,11 @@ const Caja = () => {
               {cajaActual.abierto_por} — {formatDateTime(cajaActual.fecha_apertura)}
             </span>
             <span className="hidden text-gray-300 sm:inline">|</span>
-            <span className="text-sm font-semibold text-gray-900">
-              Saldo esperado: {formatMoney(saldoEsperado)}
-            </span>
+            {saldoEsperado != null && (
+              <span className="text-sm font-semibold text-gray-900">
+                Saldo esperado: {formatMoney(saldoEsperado)}
+              </span>
+            )}
           </>
         )}
 
@@ -405,11 +415,19 @@ const Caja = () => {
                   <span>Gastos:</span>
                   <span className="font-semibold text-red-700">{formatMoney(cajaActual?.monto_gastos)}</span>
                 </p>
-                <hr className="my-2 border-gray-200" />
-                <p className="flex justify-between text-base">
-                  <span className="font-bold">Saldo esperado:</span>
-                  <span className="font-bold">{formatMoney(saldoEsperado)}</span>
-                </p>
+                {saldoEsperado != null ? (
+                  <>
+                    <hr className="my-2 border-gray-200" />
+                    <p className="flex justify-between text-base">
+                      <span className="font-bold">Saldo esperado:</span>
+                      <span className="font-bold">{formatMoney(saldoEsperado)}</span>
+                    </p>
+                  </>
+                ) : (
+                  <p className="mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-800">
+                    Cuenta el efectivo del cajón y escribe el total. El sistema comparará al cerrar.
+                  </p>
+                )}
               </div>
 
               <form className="space-y-3" onSubmit={handleCerrarCaja}>
@@ -424,7 +442,7 @@ const Caja = () => {
                   required
                 />
 
-                {montoCierre.trim() && (
+                {montoCierre.trim() && saldoEsperado != null && (
                   (() => {
                     const cierre = Number(montoCierre);
                     const diff = cierre - saldoEsperado;
@@ -567,7 +585,9 @@ const Caja = () => {
                       <td className="px-3 py-3 font-semibold text-rosewood">{formatMoney(caja.monto_ventas_efectivo)}</td>
                       <td className="px-3 py-3 font-semibold text-gold-200">{formatMoney(caja.monto_ventas_transferencia)}</td>
                       <td className="px-3 py-3 font-semibold text-gold-200">{formatMoney(caja.monto_gastos)}</td>
-                      <td className="px-3 py-3 font-bold text-rosewood">{formatMoney(caja.saldo_esperado)}</td>
+                      <td className="px-3 py-3 font-bold text-rosewood">
+                        {caja.saldo_esperado != null ? formatMoney(caja.saldo_esperado) : '—'}
+                      </td>
                       <td className="px-3 py-3 font-semibold text-gray-900">{caja.monto_cierre != null ? formatMoney(caja.monto_cierre) : '-'}</td>
                       <td className="px-3 py-3">
                         {caja.descuadre != null ? (

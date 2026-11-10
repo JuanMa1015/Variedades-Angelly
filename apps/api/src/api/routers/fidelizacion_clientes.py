@@ -10,12 +10,25 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.api.dependencies import AuthenticatedUser, require_roles
+from src.api.services.fidelizacion import pesos_por_punto, umbral_bono
 from src.infrastructure.database.connection import get_db
 from src.infrastructure.database.models import ClienteFidelizacionModel
 
 router = APIRouter(tags=["fidelizacion-clientes"])
 
-FIDELIZACION_UMBRAL_BONO = 100
+
+class FidelizacionConfigResponse(BaseModel):
+    """Reglas del programa (fuente unica para el frontend)."""
+
+    umbral_bono: int
+    pesos_por_punto: int
+
+
+@router.get("/api/fidelizacion/config", response_model=FidelizacionConfigResponse)
+def get_fidelizacion_config(
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+) -> FidelizacionConfigResponse:
+    return FidelizacionConfigResponse(umbral_bono=umbral_bono(), pesos_por_punto=pesos_por_punto())
 
 
 class ClienteFidelizacionResponse(BaseModel):
@@ -199,13 +212,14 @@ def canjear_bono_fidelizacion(
     if cliente is None:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
 
-    if cliente.puntos_acumulados < FIDELIZACION_UMBRAL_BONO:
+    umbral = umbral_bono()
+    if cliente.puntos_acumulados < umbral:
         raise HTTPException(
             status_code=400,
             detail="El cliente aun no alcanza el umbral para canjear bono",
         )
 
-    cliente.puntos_acumulados -= FIDELIZACION_UMBRAL_BONO
+    cliente.puntos_acumulados -= umbral
     db.commit()
     db.refresh(cliente)
 
