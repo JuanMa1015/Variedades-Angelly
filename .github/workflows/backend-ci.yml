@@ -80,7 +80,7 @@ jobs:
 
       - name: Lint Python (imports sin usar, errores de sintaxis)
         run: |
-          pip install ruff
+          pip install --only-binary :all: ruff==0.17.4
           ruff check src --select F,E9
 
       - name: Run backend tests

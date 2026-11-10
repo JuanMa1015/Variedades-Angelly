@@ -2,7 +2,6 @@ name: Monorepo CD
 
 permissions:
   contents: read
-  packages: write
 
 on:
   push:
@@ -23,6 +22,9 @@ jobs:
   publish-images:
     needs: ci
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     strategy:
       matrix:
         service:
