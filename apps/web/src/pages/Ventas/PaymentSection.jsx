@@ -21,7 +21,7 @@ const CashInput = ({ montoPago, total, onSetMontoPago, formatMoney, cambio }) =>
           type="text"
           inputMode="numeric"
           value={pago === 0 ? '' : String(pago)}
-          onChange={(event) => onSetMontoPago(parseInt(event.target.value.replace(/\D/g, ''), 10) || 0)}
+          onChange={(event) => onSetMontoPago(Number.parseInt(event.target.value.replace(/\D/g, ''), 10) || 0)}
           placeholder="Recibido (vacío = pago exacto)"
           className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-7 pr-3 text-base font-semibold tabular-nums focus:border-rosewood focus:outline-none focus:ring-2 focus:ring-rosewood/20"
         />

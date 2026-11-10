@@ -1,8 +1,13 @@
+import { useCallback } from 'react';
 import Modal from '../../components/Modal';
 
 const INPUT_CLASS = 'w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-rosewood focus:outline-none focus:ring-2 focus:ring-rosewood/20';
 
-const NewClientModal = ({ isOpen, onClose, name, phone, onNameChange, onPhoneChange, onSubmit, saving }) => (
+const NewClientModal = ({ isOpen, onClose, name, phone, onNameChange, onPhoneChange, onSubmit, saving }) => {
+  // Enfoca el nombre al abrir el dialogo (ref estable: solo se ejecuta al montar el campo).
+  const focusOnMount = useCallback((node) => node?.focus(), []);
+
+  return (
   <Modal isOpen={isOpen} onClose={onClose} title="Nuevo cliente fiado tienda" subtitle="Tienda Angelly">
     <form className="space-y-4" onSubmit={onSubmit}>
       <input
@@ -13,7 +18,7 @@ const NewClientModal = ({ isOpen, onClose, name, phone, onNameChange, onPhoneCha
         placeholder="Nombre del cliente"
         aria-label="Nombre del cliente"
         maxLength={120}
-        autoFocus
+        ref={focusOnMount}
       />
       <input
         type="text"
@@ -42,6 +47,7 @@ const NewClientModal = ({ isOpen, onClose, name, phone, onNameChange, onPhoneCha
       </div>
     </form>
   </Modal>
-);
+  );
+};
 
 export default NewClientModal;

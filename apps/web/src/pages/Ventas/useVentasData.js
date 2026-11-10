@@ -63,7 +63,7 @@ export const useVentasData = (token) => {
         if (!controller.signal.aborted) setLoading(false);
       }
     };
-    load();
+    void load();
     return () => controller.abort();
   }, [reload, token]);
 

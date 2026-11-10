@@ -221,4 +221,15 @@ describe('POS: flujo completo', () => {
     const fila = await screen.findByText('Favoritos y frecuentes');
     expect(within(fila.parentElement).getByText('Arroz Diana')).toBeInTheDocument();
   });
+
+  it('crear cliente desde el fiado abre el dialogo con el foco en el nombre', async () => {
+    await renderPos();
+    agregar('Arroz Diana');
+    fireEvent.click(within(ticket()).getByRole('radio', { name: 'Fiado' }));
+
+    fireEvent.click(within(ticket()).getByRole('button', { name: 'Crear cliente nuevo' }));
+
+    expect(await screen.findByText('Nuevo cliente fiado tienda')).toBeInTheDocument();
+    expect(screen.getByLabelText('Nombre del cliente')).toHaveFocus();
+  });
 });

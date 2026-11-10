@@ -322,7 +322,7 @@ const Ventas = () => {
     },
     onHold: () => { if (!ventaCompletada) handleHold(); },
     onCharge: () => {
-      if (!ventaCompletada && cartItems.length > 0 && !submittingVenta) handleSubmitVenta();
+      if (!ventaCompletada && cartItems.length > 0 && !submittingVenta) void handleSubmitVenta();
     },
     onEscape: () => setProductSearch(''),
   });

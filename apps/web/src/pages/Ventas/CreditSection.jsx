@@ -50,7 +50,7 @@ const CreditSection = ({
           type="text"
           inputMode="numeric"
           value={abono === 0 ? '' : String(abono)}
-          onChange={(event) => onSetAbonoInicialFiado(parseInt(event.target.value.replace(/\D/g, ''), 10) || 0)}
+          onChange={(event) => onSetAbonoInicialFiado(Number.parseInt(event.target.value.replace(/\D/g, ''), 10) || 0)}
           placeholder="Abono inicial (opcional)"
           className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-7 pr-3 text-sm font-semibold tabular-nums focus:border-rosewood focus:outline-none"
         />
