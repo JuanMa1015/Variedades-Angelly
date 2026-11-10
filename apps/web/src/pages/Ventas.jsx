@@ -379,8 +379,9 @@ const Ventas = () => {
               onSetClienteTiendaId={(clienteTiendaId) => patchTicket({ clienteTiendaId })}
               abonoInicialFiado={ticket.abonoInicialFiado}
               onSetAbonoInicialFiado={(abonoInicialFiado) => patchTicket({ abonoInicialFiado })}
-              onCrearCliente={() => {
+              onCrearCliente={(nombre) => {
                 cleanMessages();
+                if (typeof nombre === 'string' && nombre) setNewClient((current) => ({ ...current, nombre }));
                 setIsNewClientOpen(true);
               }}
               onConfirmar={handleSubmitVenta}

@@ -186,7 +186,8 @@ describe('CartPanel', () => {
     );
 
     expect(screen.getByText('+3 pts')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Cliente de fidelización'), { target: { value: '' } });
+    expect(screen.getByRole('combobox', { name: 'Cliente de fidelización' })).toHaveValue('Ana');
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar Ana' }));
     expect(onSetClienteFidelizacionId).toHaveBeenCalledWith('');
   });
 

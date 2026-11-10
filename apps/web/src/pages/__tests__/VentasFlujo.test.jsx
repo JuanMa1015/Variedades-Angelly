@@ -115,7 +115,8 @@ describe('POS: flujo completo', () => {
     apiPostMock.mockResolvedValue({ puntos_otorgados: 3 });
     await renderPos();
     agregar('Arroz Diana');
-    fireEvent.change(within(ticket()).getByLabelText('Cliente de fidelización'), { target: { value: '4' } });
+    fireEvent.focus(within(ticket()).getByRole('combobox', { name: 'Cliente de fidelización' }));
+    fireEvent.click(await screen.findByRole('option', { name: /Ana/ }));
 
     fireEvent.click(within(ticket()).getByRole('button', { name: /^Cobrar/ }));
 
@@ -131,7 +132,9 @@ describe('POS: flujo completo', () => {
     fireEvent.click(within(ticket()).getByRole('button', { name: /^Cobrar/ }));
     expect(await screen.findByText('Selecciona el cliente al que se le fía')).toBeInTheDocument();
 
-    fireEvent.change(within(ticket()).getByLabelText('Cliente que fía'), { target: { value: '10' } });
+    const buscador = within(ticket()).getByRole('combobox', { name: 'Cliente que fía' });
+    fireEvent.change(buscador, { target: { value: 'mar' } }); // busqueda en vivo
+    fireEvent.click(await screen.findByRole('option', { name: /Marta/ }));
     fireEvent.change(within(ticket()).getByLabelText('Abono inicial'), { target: { value: '2000' } });
     fireEvent.click(within(ticket()).getByRole('button', { name: /^Cobrar/ }));
 

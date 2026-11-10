@@ -1,5 +1,7 @@
 import { UserPlus } from 'lucide-react';
+import ClientCombobox from './ClientCombobox';
 import MethodSelector from './MethodSelector';
+import MoneyInput from './MoneyInput';
 
 const CreditSection = ({
   clientesTiendaFiado,
@@ -20,21 +22,21 @@ const CreditSection = ({
   return (
     <div className="space-y-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3">
       <div className="flex gap-2">
-        <label htmlFor="pos-cliente-fiado" className="sr-only">Cliente que fía</label>
-        <select
-          id="pos-cliente-fiado"
-          value={clienteTiendaId}
-          onChange={(event) => onSetClienteTiendaId(event.target.value)}
-          className="h-10 min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 text-sm focus:border-rosewood focus:outline-none"
-        >
-          <option value="">Selecciona el cliente</option>
-          {clientesTiendaFiado.map((item) => (
-            <option key={item.id} value={item.id}>{item.nombre}</option>
-          ))}
-        </select>
+        <div className="min-w-0 flex-1">
+          <ClientCombobox
+            id="pos-cliente-fiado"
+            label="Cliente que fía"
+            clientes={clientesTiendaFiado}
+            value={clienteTiendaId}
+            onChange={onSetClienteTiendaId}
+            onCreate={onCrearCliente}
+            placeholder="Buscar cliente por nombre o teléfono"
+            getHint={(item) => (Number(item.deuda_total) > 0 ? `Debe ${formatMoney(Number(item.deuda_total))}` : '')}
+          />
+        </div>
         <button
           type="button"
-          onClick={onCrearCliente}
+          onClick={() => onCrearCliente()}
           aria-label="Crear cliente nuevo"
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-rosewood text-rosewood transition hover:bg-blush-100"
         >
@@ -42,19 +44,13 @@ const CreditSection = ({
         </button>
       </div>
 
-      <div className="relative">
-        <label htmlFor="pos-abono" className="sr-only">Abono inicial</label>
-        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-400">$</span>
-        <input
-          id="pos-abono"
-          type="text"
-          inputMode="numeric"
-          value={abono === 0 ? '' : String(abono)}
-          onChange={(event) => onSetAbonoInicialFiado(Number.parseInt(event.target.value.replace(/\D/g, ''), 10) || 0)}
-          placeholder="Abono inicial (opcional)"
-          className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-7 pr-3 text-sm font-semibold tabular-nums focus:border-rosewood focus:outline-none"
-        />
-      </div>
+      <MoneyInput
+        id="pos-abono"
+        label="Abono inicial"
+        value={abono}
+        onChange={onSetAbonoInicialFiado}
+        placeholder="Abono inicial (opcional)"
+      />
 
       {abono > 0 && <MethodSelector value={metodoPago} onChange={onSetMetodoPago} />}
 
