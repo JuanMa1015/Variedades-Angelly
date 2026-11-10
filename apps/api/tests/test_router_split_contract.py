@@ -227,16 +227,19 @@ def test_fidelizacion_admin_crud_y_vendedor_sin_alta(
     admin_token = _login_token(client, "angelly_admin", "cambiame123")
     vendedor_token = _login_token(client, "vendedor1", "ventas123")
 
-    forbidden_response = client.post(
+    # El vendedor ya puede inscribir clientes, pero no fijar puntos iniciales.
+    vendedor_response = client.post(
         "/api/fidelizacion/clientes",
         headers={"Authorization": f"Bearer {vendedor_token}"},
         json={
-            "nombre": "Cliente Rechazado",
+            "nombre": "Cliente Del Mostrador",
             "telefono_whatsapp": "3005556666",
             "puntos_acumulados": 5,
+            "acepta_datos": True,
         },
     )
-    assert forbidden_response.status_code == 403
+    assert vendedor_response.status_code == 201
+    assert vendedor_response.json()["puntos_acumulados"] == 0
 
     create_response = client.post(
         "/api/fidelizacion/clientes",
@@ -245,6 +248,7 @@ def test_fidelizacion_admin_crud_y_vendedor_sin_alta(
             "nombre": "Cliente Fidelizacion CRUD",
             "telefono_whatsapp": "3001119998",
             "puntos_acumulados": 20,
+            "acepta_datos": True,
         },
     )
     assert create_response.status_code == 201

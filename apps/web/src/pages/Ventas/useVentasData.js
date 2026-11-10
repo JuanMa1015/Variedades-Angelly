@@ -17,7 +17,7 @@ export const useVentasData = (token) => {
   const [productos, setProductos] = useState([]);
   const [clientesTienda, setClientesTienda] = useState([]);
   const [clientesFidelizacion, setClientesFidelizacion] = useState([]);
-  const [fidelizacionConfig, setFidelizacionConfig] = useState({ pesos_por_punto: 1000 });
+  const [fidelizacionConfig, setFidelizacionConfig] = useState({ pesos_por_punto: 1000, valor_punto: 20, umbral_bono: 100 });
   const [cajaAbierta, setCajaAbierta] = useState(null);
   const [catalogoTotal, setCatalogoTotal] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -78,6 +78,7 @@ export const useVentasData = (token) => {
     clientesTienda,
     setClientesTienda,
     clientesFidelizacion,
+    setClientesFidelizacion,
     fidelizacionConfig,
     cajaAbierta,
     catalogoTotal,

@@ -15,9 +15,16 @@ const CajaGate = ({ onOpened }) => {
     setError('');
     try {
       await abrirCaja({ monto_inicial: monto });
-      await onOpened();
     } catch (err) {
       setError(err.message || 'No fue posible abrir la caja');
+      setSaving(false);
+      return;
+    }
+    // La caja ya quedo abierta: si falla la recarga no se presenta como error de apertura.
+    try {
+      await onOpened();
+    } catch {
+      setError('La caja se abrió, pero no se pudo actualizar la pantalla. Recarga la página.');
     } finally {
       setSaving(false);
     }

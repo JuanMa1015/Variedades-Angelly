@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -10,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.api.dependencies import AuthenticatedUser, require_roles
-from src.api.services.fidelizacion import pesos_por_punto, umbral_bono
+from src.api.services.fidelizacion import pesos_por_punto, umbral_bono, valor_punto
 from src.infrastructure.database.connection import get_db
 from src.infrastructure.database.models import ClienteFidelizacionModel
 
@@ -22,13 +23,18 @@ class FidelizacionConfigResponse(BaseModel):
 
     umbral_bono: int
     pesos_por_punto: int
+    valor_punto: int
 
 
 @router.get("/api/fidelizacion/config", response_model=FidelizacionConfigResponse)
 def get_fidelizacion_config(
     _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> FidelizacionConfigResponse:
-    return FidelizacionConfigResponse(umbral_bono=umbral_bono(), pesos_por_punto=pesos_por_punto())
+    return FidelizacionConfigResponse(
+        umbral_bono=umbral_bono(),
+        pesos_por_punto=pesos_por_punto(),
+        valor_punto=valor_punto(),
+    )
 
 
 class ClienteFidelizacionResponse(BaseModel):
@@ -46,6 +52,8 @@ class ClienteFidelizacionCreateRequest(BaseModel):
     nombre: Annotated[str, Field(min_length=3, max_length=120)]
     telefono_whatsapp: Annotated[str, Field(min_length=7, max_length=25)]
     puntos_acumulados: Annotated[int, Field(ge=0)] = 0
+    # El cliente debe autorizar el uso de sus datos para inscribirlo.
+    acepta_datos: bool = False
 
 
 class ClienteFidelizacionUpdateRequest(BaseModel):
@@ -90,8 +98,12 @@ def list_clientes_fidelizacion(
 def create_cliente_fidelizacion(
     payload: ClienteFidelizacionCreateRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> ClienteFidelizacionResponse:
+    if not payload.acepta_datos:
+        raise HTTPException(status_code=400, detail="El cliente debe autorizar el tratamiento de sus datos")
+    # Solo quien administra puede fijar puntos iniciales; el vendedor inscribe en cero.
+    puntos_iniciales = payload.puntos_acumulados if current_user.role in {"admin", "superadmin"} else 0
     existente = db.execute(
         select(ClienteFidelizacionModel).where(
             ClienteFidelizacionModel.telefono_whatsapp == payload.telefono_whatsapp,
@@ -103,7 +115,9 @@ def create_cliente_fidelizacion(
     cliente = ClienteFidelizacionModel(
         nombre=payload.nombre,
         telefono_whatsapp=payload.telefono_whatsapp,
-        puntos_acumulados=payload.puntos_acumulados,
+        puntos_acumulados=puntos_iniciales,
+        acepta_datos=True,
+        acepta_datos_en=datetime.now(UTC).replace(tzinfo=None),
     )
     db.add(cliente)
     db.commit()
@@ -195,37 +209,3 @@ def reactivar_cliente_fidelizacion(
     cliente.activo = True
     db.commit()
     return {"message": "Cliente reactivado"}
-
-
-@router.post("/api/fidelizacion/clientes/{cliente_id}/canjear-bono", response_model=ClienteFidelizacionResponse)
-def canjear_bono_fidelizacion(
-    cliente_id: int,
-    db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
-) -> ClienteFidelizacionResponse:
-    cliente = db.execute(
-        select(ClienteFidelizacionModel)
-        .where(ClienteFidelizacionModel.id == cliente_id)
-        .with_for_update(),
-    ).scalar_one_or_none()
-
-    if cliente is None:
-        raise HTTPException(status_code=404, detail="Cliente no encontrado")
-
-    umbral = umbral_bono()
-    if cliente.puntos_acumulados < umbral:
-        raise HTTPException(
-            status_code=400,
-            detail="El cliente aun no alcanza el umbral para canjear bono",
-        )
-
-    cliente.puntos_acumulados -= umbral
-    db.commit()
-    db.refresh(cliente)
-
-    return ClienteFidelizacionResponse(
-        id=cliente.id,
-        nombre=cliente.nombre,
-        telefono_whatsapp=cliente.telefono_whatsapp,
-        puntos_acumulados=cliente.puntos_acumulados,
-    )

@@ -670,3 +670,17 @@ apps\api\.venv\Scripts\python.exe -m alembic -c apps\api\alembic.ini upgrade hea
 - Frontend: el POS muestra `CajaGate` (abrir caja con efectivo inicial) en vez de vender sin turno, y un "Historial de ventas"
   con reimprimir y anular. En pruebas `auth_client` abre un turno; las que manejan la caja usan `@pytest.mark.sin_turno`.
 
+## 18. Fidelización: canje de puntos como descuento
+
+- Ganar: 1 punto por cada `FIDELIZACION_PESOS_POR_PUNTO` ($1.000) cobrados. Canjear: 1 punto = `FIDELIZACION_VALOR_PUNTO` ($20, es decir 2%).
+  Mínimo para canjear: `FIDELIZACION_UMBRAL_BONO` (100 puntos). `GET /api/fidelizacion/config` devuelve las tres reglas.
+- `POST /api/ventas` acepta `puntos_a_canjear` (exige `cliente_fidelizacion_id`): el total baja `puntos*valor`, nunca más que el total.
+  La venta guarda `puntos_canjeados` y `descuento_puntos`; los puntos ganados se calculan sobre lo realmente cobrado.
+  Anular o borrar la venta devuelve los puntos canjeados y quita los ganados (`revertir_puntos_de_venta`).
+- `POST /api/fidelizacion/clientes` ahora lo puede usar el vendedor, pero exige `acepta_datos=true` (se guarda `acepta_datos_en`)
+  y un vendedor no puede fijar puntos iniciales. El antiguo "canjear bono" (endpoint y botón) se eliminó: los puntos solo se canjean como descuento en la venta.
+- `ventas.monto_recibido`: efectivo entregado por el cliente; permite reimprimir el comprobante con su cambio real.
+- Anulación: tras 5 autorizaciones fallidas en 15 min (por cuenta probada y por quien prueba) responde 429 (en memoria: se reinicia
+  con el servidor y no se comparte entre instancias). No se anula un fiado de tienda con abonos posteriores.
+- La migración `a8b9c0d1e2f3` (aún sin aplicar en producción) incluye todas las columnas nuevas de estos puntos.
+

@@ -134,22 +134,11 @@ def test_config_de_fidelizacion_usa_el_entorno(auth_client, monkeypatch) -> None
     token = _login_token(client, "vendedor1", "ventas123")
     monkeypatch.setenv("FIDELIZACION_UMBRAL_BONO", "50")
     monkeypatch.setenv("FIDELIZACION_PESOS_POR_PUNTO", "abc")  # invalido: cae al valor por defecto
+    monkeypatch.setenv("FIDELIZACION_VALOR_PUNTO", "25")
 
     config = client.get("/api/fidelizacion/config", headers=_h(token)).json()
 
-    assert config == {"umbral_bono": 50, "pesos_por_punto": 1000}
-
-
-def test_canjear_bono_usa_el_umbral_configurado(auth_client, monkeypatch) -> None:
-    client, sf = auth_client
-    cliente = _cliente_fidelizacion(sf, puntos=60)
-    token = _login_token(client, "vendedor1", "ventas123")
-    monkeypatch.setenv("FIDELIZACION_UMBRAL_BONO", "50")
-
-    respuesta = client.post(f"/api/fidelizacion/clientes/{cliente}/canjear-bono", headers=_h(token))
-
-    assert respuesta.status_code == 200
-    assert _puntos(sf, cliente) == 10
+    assert config == {"umbral_bono": 50, "pesos_por_punto": 1000, "valor_punto": 25}
 
 
 # ── Cierre de caja ciego ──

@@ -315,3 +315,31 @@ def test_el_listado_muestra_las_anuladas_y_el_dashboard_no_las_suma(auth_client)
     with sf() as db:
         metrica = SqlAlchemyDashboardMetricsReader(db).ventas_metric_since(datetime(2000, 1, 1))
     assert metrica.total == 1000.0 and metrica.transacciones == 1
+
+
+def test_una_venta_anulada_no_se_borra_ni_se_edita(auth_client) -> None:
+    client, sf = auth_client
+    producto = _producto(sf)
+    venta = _vender(client, _admin(client), producto, cantidad=3)
+    _anular(client, _admin(client), venta)
+    assert _stock(sf, producto) == 10
+
+    borrar = client.delete(f"/api/ventas/{venta}", headers=_h(_admin(client)))
+    editar = client.patch(f"/api/ventas/{venta}", headers=_h(_admin(client)), json={"total": 1})
+
+    assert borrar.status_code == 409 and editar.status_code == 409
+    assert _stock(sf, producto) == 10  # no se devolvio el stock una segunda vez
+
+
+def test_el_informe_de_productos_no_cuenta_las_ventas_anuladas(auth_client) -> None:
+    client, sf = auth_client
+    producto = _producto(sf)
+    _vender(client, _admin(client), producto, cantidad=1)
+    anulada = _vender(client, _admin(client), producto, cantidad=4)
+    _anular(client, _admin(client), anulada)
+    super_token = _login_token(client, "angelly_superadmin", "supersecure123")
+
+    informe = client.get("/api/superadmin/informes", headers=_h(super_token)).json()
+
+    mas_vendidos = informe["productos_mas_vendidos"]
+    assert [(p["unidades_vendidas"], p["total_vendido"]) for p in mas_vendidos] == [(1, 1000.0)]

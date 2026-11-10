@@ -207,6 +207,7 @@ describe('Ventas page', () => {
         items: [{ producto_id: 1, cantidad: 1 }],
         es_fiado: false,
         metodo_pago: 'efectivo',
+        monto_recibido: 10000,
       });
     });
 

@@ -26,13 +26,13 @@ const productos = [
   { id: 3, nombre: 'Agua Sabor', precio_venta: 1200, stock_actual: 0, codigo_barras: '770103' },
 ];
 
-const mockApi = ({ cajaAbierta = true, remoto = [] } = {}) => {
+const mockApi = ({ cajaAbierta = true, remoto = [], puntosAna = 95, valorPunto } = {}) => {
   apiGetMock.mockImplementation((endpoint) => {
     if (endpoint.includes('&q=')) return Promise.resolve({ data: remoto });
     if (endpoint.startsWith('/api/productos/paginados')) return Promise.resolve({ data: productos });
     if (endpoint === '/api/clientes/tienda-fiado') return Promise.resolve([{ id: 10, nombre: 'Marta', deuda_total: 0 }]);
-    if (endpoint === '/api/fidelizacion/clientes') return Promise.resolve([{ id: 4, nombre: 'Ana', puntos_acumulados: 95 }]);
-    if (endpoint === '/api/fidelizacion/config') return Promise.resolve({ umbral_bono: 100, pesos_por_punto: 1000 });
+    if (endpoint === '/api/fidelizacion/clientes') return Promise.resolve([{ id: 4, nombre: 'Ana', puntos_acumulados: puntosAna }]);
+    if (endpoint === '/api/fidelizacion/config') return Promise.resolve({ umbral_bono: 100, pesos_por_punto: 1000, valor_punto: valorPunto });
     if (endpoint === '/api/caja/estado') return Promise.resolve({ abierta: cajaAbierta });
     return Promise.resolve([]);
   });
@@ -85,6 +85,7 @@ describe('POS: flujo completo', () => {
       items: [{ producto_id: 1, cantidad: 1 }],
       es_fiado: false,
       metodo_pago: 'efectivo',
+      monto_recibido: 3500,
     }));
     expect(await screen.findByText('Venta completada')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Nueva venta/ }));
@@ -125,6 +126,75 @@ describe('POS: flujo completo', () => {
 
     await waitFor(() => expect(apiPostMock).toHaveBeenCalledWith('/api/ventas', expect.objectContaining({ cliente_fidelizacion_id: 4 })));
     expect(await screen.findByText('+3')).toBeInTheDocument();
+  });
+
+  it('usar puntos descuenta del total y viaja en la venta', async () => {
+    apiPostMock.mockResolvedValue({ puntos_otorgados: 0 });
+    await renderPos({ puntosAna: 300, valorPunto: 20 });
+    agregar('Aceite Girasol'); // $9.800
+    agregar('Aceite Girasol'); // $19.600
+    fireEvent.focus(within(ticket()).getByRole('combobox', { name: 'Cliente de fidelización' }));
+    fireEvent.click(await screen.findByRole('option', { name: /Ana/ }));
+
+    fireEvent.click(await within(ticket()).findByRole('checkbox', { name: /Usar 300 puntos/ }));
+
+    expect(within(ticket()).getByText(/Descuento por 300 puntos/)).toBeInTheDocument();
+    fireEvent.click(within(ticket()).getByRole('button', { name: /^Cobrar .*13\.600/ })); // 19.600 - 6.000
+    await waitFor(() => expect(apiPostMock).toHaveBeenCalledWith('/api/ventas', expect.objectContaining({
+      cliente_fidelizacion_id: 4,
+      puntos_a_canjear: 300,
+      monto_recibido: 13600,
+    })));
+  });
+
+  it('el canje nunca supera el total de la venta', async () => {
+    await renderPos({ puntosAna: 900, valorPunto: 20 });
+    agregar('Aceite Girasol'); // $9.800 -> maximo 490 puntos
+    fireEvent.focus(within(ticket()).getByRole('combobox', { name: 'Cliente de fidelización' }));
+    fireEvent.click(await screen.findByRole('option', { name: /Ana/ }));
+
+    expect(await within(ticket()).findByRole('checkbox', { name: /Usar 490 puntos/ })).toBeInTheDocument();
+  });
+
+  it('con menos puntos del minimo no ofrece canjear', async () => {
+    await renderPos({ puntosAna: 95, valorPunto: 20 });
+    agregar('Arroz Diana');
+    fireEvent.focus(within(ticket()).getByRole('combobox', { name: 'Cliente de fidelización' }));
+    fireEvent.click(await screen.findByRole('option', { name: /Ana/ }));
+
+    expect(within(ticket()).queryByRole('checkbox', { name: /Usar/ })).not.toBeInTheDocument();
+  });
+
+  it('inscribir un cliente desde el mostrador exige autorizar sus datos y lo deja seleccionado', async () => {
+    apiPostMock.mockResolvedValue({ id: 8, nombre: 'Maria Perez', telefono_whatsapp: '3104445566', puntos_acumulados: 0 });
+    await renderPos();
+
+    fireEvent.click(within(ticket()).getByRole('button', { name: 'Inscribir cliente de fidelización' }));
+    fireEvent.change(screen.getByLabelText('Nombre del cliente de fidelización'), { target: { value: 'Maria Perez' } });
+    fireEvent.change(screen.getByLabelText('WhatsApp del cliente de fidelización'), { target: { value: '310 444 5566' } });
+    const guardar = screen.getByRole('button', { name: 'Inscribir cliente' });
+    expect(guardar).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(guardar);
+
+    await waitFor(() => expect(apiPostMock).toHaveBeenCalledWith('/api/fidelizacion/clientes', {
+      nombre: 'Maria Perez',
+      telefono_whatsapp: '3104445566',
+      acepta_datos: true,
+    }));
+    expect(await screen.findByText(/Maria Perez quedó inscrito/)).toBeInTheDocument();
+  });
+
+  it('si otra pestaña cerró la caja, el cobro rechazado vuelve a mostrar la apertura', async () => {
+    apiPostMock.mockRejectedValue(Object.assign(new Error('La caja esta cerrada. Abre la caja para registrar ventas'), { status: 409 }));
+    await renderPos();
+    agregar('Arroz Diana');
+    mockApi({ cajaAbierta: false });
+
+    fireEvent.click(within(ticket()).getByRole('button', { name: /^Cobrar/ }));
+
+    expect(await screen.findByRole('button', { name: 'Abrir caja y vender' })).toBeInTheDocument();
   });
 
   it('fiado: pide cliente y envia abono', async () => {
@@ -225,6 +295,18 @@ describe('POS: flujo completo', () => {
 
     await waitFor(() => expect(abrirCajaMock).toHaveBeenCalledWith({ monto_inicial: 50000 }));
     expect(await screen.findByRole('button', { name: 'Agregar Arroz Diana' })).toBeInTheDocument();
+  });
+
+  it('si la recarga falla tras abrir la caja no lo presenta como error de apertura', async () => {
+    abrirCajaMock.mockResolvedValue({ id: 1 });
+    await renderPos({ cajaAbierta: false });
+    await screen.findByText(/La caja está cerrada/);
+
+    apiGetMock.mockRejectedValue(new Error('Sin red'));
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir caja y vender' }));
+
+    expect(await screen.findByText(/La caja se abrió, pero no se pudo actualizar/)).toBeInTheDocument();
+    expect(screen.queryByText('No fue posible abrir la caja')).not.toBeInTheDocument();
   });
 
   it('el historial de ventas se abre desde el punto de venta', async () => {

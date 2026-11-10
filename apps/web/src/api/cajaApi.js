@@ -29,5 +29,7 @@ export const fetchVentasPorRango = ({ fecha_desde, fecha_hasta, signal } = {}) =
   if (fecha_desde) params.append('fecha_desde', fecha_desde);
   if (fecha_hasta) params.append('fecha_hasta', fecha_hasta);
   const qs = params.toString();
-  return apiGet(`/api/ventas${qs ? `?${qs}` : ''}`, { signal });
+  // Las ventas anuladas no forman parte del turno: no se muestran como ventas del cuadre.
+  return apiGet(`/api/ventas${qs ? `?${qs}` : ''}`, { signal })
+    .then((ventas) => (Array.isArray(ventas) ? ventas.filter((venta) => !venta.anulada) : ventas));
 };

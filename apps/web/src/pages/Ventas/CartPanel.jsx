@@ -70,9 +70,19 @@ const ModeToggle = ({ esFiado, onSetEsFiado }) => (
   </div>
 );
 
-const LoyaltyRow = ({ clientes, value, onChange, puntosEstimados }) => {
-  if (clientes.length === 0) return null;
+const RedeemRow = ({ redencion, valorPunto, usarPuntos, onToggle, formatMoney }) => {
+  if (redencion.maxPuntos <= 0) return null;
+  return (
+    <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-violet-200 bg-white px-3 py-1.5 text-sm text-violet-900">
+      <input type="checkbox" checked={usarPuntos} onChange={(event) => onToggle(event.target.checked)} />
+      <span>
+        Usar {redencion.maxPuntos} puntos: <strong>−{formatMoney(redencion.maxPuntos * valorPunto)}</strong>
+      </span>
+    </label>
+  );
+};
 
+const LoyaltyRow = ({ clientes, value, onChange, puntosEstimados, onCreate }) => {
   return (
     <div className="flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-2 py-1.5">
       <Gift className="ml-1 h-4 w-4 shrink-0 text-violet-700" aria-hidden="true" />
@@ -90,6 +100,14 @@ const LoyaltyRow = ({ clientes, value, onChange, puntosEstimados }) => {
       {value && puntosEstimados > 0 && (
         <span className="shrink-0 pr-1 text-xs font-semibold text-violet-800">+{puntosEstimados} pts</span>
       )}
+      <button
+        type="button"
+        onClick={onCreate}
+        aria-label="Inscribir cliente de fidelización"
+        className="shrink-0 rounded-md bg-violet-700 px-2 py-1 text-xs font-bold text-white transition hover:bg-violet-800"
+      >
+        + Nuevo
+      </button>
     </div>
   );
 };
@@ -110,6 +128,11 @@ const CartPanel = (props) => {
     clienteFidelizacionId = '',
     onSetClienteFidelizacionId = () => {},
     puntosEstimados = 0,
+    onCreateFidelizacion = () => {},
+    redencion = { maxPuntos: 0, puntos: 0, descuento: 0 },
+    valorPunto = 0,
+    usarPuntos = false,
+    onSetUsarPuntos = () => {},
     heldTickets = [],
     onHold = () => {},
     onClear = () => {},
@@ -143,10 +166,24 @@ const CartPanel = (props) => {
             value={clienteFidelizacionId}
             onChange={onSetClienteFidelizacionId}
             puntosEstimados={puntosEstimados}
+            onCreate={onCreateFidelizacion}
+          />
+          <RedeemRow
+            redencion={redencion}
+            valorPunto={valorPunto}
+            usarPuntos={usarPuntos}
+            onToggle={onSetUsarPuntos}
+            formatMoney={formatMoney}
           />
         </div>
 
         <div className="shrink-0 space-y-2 border-t border-gray-200 bg-white p-4 pt-3">
+          {redencion.descuento > 0 && (
+            <div className="flex justify-between text-sm font-semibold text-violet-700">
+              <span>Descuento por {redencion.puntos} puntos</span>
+              <span>−{formatMoney(redencion.descuento)}</span>
+            </div>
+          )}
           <div className="flex items-end justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Total a cobrar</p>

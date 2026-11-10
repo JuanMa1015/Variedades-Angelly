@@ -12,6 +12,8 @@ from src.infrastructure.database.models import ClienteFidelizacionModel
 
 UMBRAL_BONO_DEFECTO = 100
 PESOS_POR_PUNTO_DEFECTO = 1000
+# 1 punto = $20: con 1 punto por cada $1.000 gastados, la devolucion es del 2%.
+VALOR_PUNTO_DEFECTO = 20
 
 
 def _entero_desde_entorno(nombre: str, defecto: int) -> int:
@@ -28,6 +30,11 @@ def umbral_bono() -> int:
 
 def pesos_por_punto() -> int:
     return _entero_desde_entorno("FIDELIZACION_PESOS_POR_PUNTO", PESOS_POR_PUNTO_DEFECTO)
+
+
+def valor_punto() -> int:
+    """Pesos de descuento que vale cada punto al canjearlo."""
+    return _entero_desde_entorno("FIDELIZACION_VALOR_PUNTO", VALOR_PUNTO_DEFECTO)
 
 
 def puntos_por_monto(monto_cobrado: float) -> int:
@@ -58,3 +65,28 @@ def revertir_puntos(db: Session, cliente_id: int | None, puntos: int) -> None:
     cliente = _cliente_bloqueado(db, cliente_id)
     if cliente is not None:
         cliente.puntos_acumulados = max(0, int(cliente.puntos_acumulados) - puntos)
+
+
+def canjear_puntos(db: Session, cliente_id: int, puntos: int) -> float:
+    """Descuenta puntos del cliente y retorna el descuento en pesos que valen."""
+    cliente = _cliente_bloqueado(db, cliente_id)
+    if cliente is None or not cliente.activo:
+        raise HTTPException(status_code=400, detail="El cliente de fidelizacion no existe o esta desactivado")
+    if int(cliente.puntos_acumulados) < umbral_bono():
+        raise HTTPException(status_code=400, detail="El cliente aun no alcanza los puntos minimos para canjear")
+    if puntos > int(cliente.puntos_acumulados):
+        raise HTTPException(status_code=400, detail="El cliente no tiene tantos puntos")
+    cliente.puntos_acumulados = int(cliente.puntos_acumulados) - puntos
+    return float(puntos * valor_punto())
+
+
+def revertir_puntos_de_venta(db: Session, venta) -> None:
+    """Deshace los puntos de una venta: quita los ganados y devuelve los canjeados (sin bajar de cero)."""
+    if venta.cliente_fidelizacion_id is None:
+        return
+    delta = int(venta.puntos_canjeados or 0) - int(venta.puntos_otorgados or 0)
+    if delta == 0:
+        return
+    cliente = _cliente_bloqueado(db, venta.cliente_fidelizacion_id)
+    if cliente is not None:
+        cliente.puntos_acumulados = max(0, int(cliente.puntos_acumulados) + delta)

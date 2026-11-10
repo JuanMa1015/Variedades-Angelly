@@ -69,6 +69,11 @@ class ClienteFidelizacionModel(Base):
     telefono_whatsapp: Mapped[str] = mapped_column(String(25), nullable=False, unique=True)
     puntos_acumulados: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Autorizacion para tratar sus datos (Ley 1581 de 2012): se pide al inscribirlo.
+    acepta_datos: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=expression.false(),
+    )
+    acepta_datos_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), nullable=True)
 
     def __repr__(self) -> str:
         return (
@@ -155,6 +160,11 @@ class VentaModel(Base):
     anulada_por: Mapped[str | None] = mapped_column(String(50), nullable=True)
     autorizada_por: Mapped[str | None] = mapped_column(String(50), nullable=True)
     motivo_anulacion: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Efectivo (o monto) que entrego el cliente: permite reimprimir el comprobante con su cambio real.
+    monto_recibido: Mapped[float | None] = mapped_column(_dinero(), nullable=True)
+    # Puntos de fidelizacion usados como descuento en esta venta y su valor en pesos.
+    puntos_canjeados: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    descuento_puntos: Mapped[float] = mapped_column(_dinero(), nullable=False, default=0.0, server_default="0")
 
     def __repr__(self) -> str:
         return f"VentaModel(id={self.id!r}, total={self.total!r})"

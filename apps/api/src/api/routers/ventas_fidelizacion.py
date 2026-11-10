@@ -15,7 +15,7 @@ from src.api.schemas.cartera import MetodoPago, VentaItemCreateRequest, VentaDet
 from src.api.limiter import limiter, login_rate_limit
 from src.api.services.anulacion import anular_venta, quien_autoriza
 from src.api.services.auditoria import registrar_auditoria
-from src.api.services.fidelizacion import acumular_puntos, revertir_puntos
+from src.api.services.fidelizacion import acumular_puntos, canjear_puntos, revertir_puntos_de_venta
 from src.api.services.deuda import SIN_DEUDA, deuda_pendiente_tienda, mover_deuda_tienda
 from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.services.venta_reglas import (
@@ -56,6 +56,8 @@ class VentaCreateRequest(BaseModel):
     fiado_origen: str | None = None
     abono_inicial: Annotated[float, Field(ge=0)] = 0
     metodo_pago: MetodoPago | None = None
+    monto_recibido: Annotated[float | None, Field(ge=0)] = None
+    puntos_a_canjear: Annotated[int, Field(ge=0)] = 0
 
 
 class VentaUpdateRequest(BaseModel):
@@ -94,6 +96,18 @@ def _to_detalle_response(detalle: DetalleVentaModel) -> VentaDetalleResponse:
     )
 
 
+def _aplicar_canje(db: Session, payload: VentaCreateRequest, total: float) -> float:
+    """Descuento en pesos por los puntos que el cliente usa en esta venta (0 si no canjea)."""
+    if payload.puntos_a_canjear <= 0:
+        return 0.0
+    if payload.cliente_fidelizacion_id is None:
+        raise HTTPException(status_code=400, detail="Para usar puntos debes elegir el cliente de fidelizacion")
+    descuento = canjear_puntos(db, payload.cliente_fidelizacion_id, payload.puntos_a_canjear)
+    if descuento > total:
+        raise HTTPException(status_code=400, detail="El descuento por puntos supera el total de la venta")
+    return descuento
+
+
 def _respuesta_venta(
     venta: VentaModel,
     detalles: list[VentaDetalleResponse],
@@ -119,6 +133,9 @@ def _respuesta_venta(
             cliente_nombre=cliente_nombre,
         ),
         puntos_otorgados=venta.puntos_otorgados,
+        puntos_canjeados=int(venta.puntos_canjeados or 0),
+        descuento_puntos=float(venta.descuento_puntos or 0.0),
+        monto_recibido=venta.monto_recibido,
         anulada=bool(venta.anulada),
         anulada_en=venta.anulada_en,
         anulada_por=venta.anulada_por,
@@ -245,6 +262,9 @@ def create_venta(
                     ),
                 )
 
+            descuento = _aplicar_canje(db, payload, total)
+            total = total - descuento
+
             if payload.es_fiado:
                 if abono_inicial > total:
                     raise HTTPException(
@@ -283,6 +303,9 @@ def create_venta(
                 es_fiado=payload.es_fiado,
                 total=total,
                 saldo_pendiente=saldo_pendiente,
+                monto_recibido=payload.monto_recibido,
+                puntos_canjeados=payload.puntos_a_canjear if descuento else 0,
+                descuento_puntos=descuento,
             )
             if payload.cliente_fidelizacion_id is not None:
                 # Los puntos salen del dinero realmente cobrado (un fiado solo cuenta su abono).
@@ -443,6 +466,9 @@ def update_venta(
 
         if venta is None:
             raise HTTPException(status_code=404, detail="Venta no encontrada")
+
+        if venta.anulada:
+            raise HTTPException(status_code=409, detail="La venta esta anulada y ya no se puede modificar")
 
         if venta.tipo_fiado == FIADO_ORIGEN_CARTERA:
             raise HTTPException(
@@ -607,6 +633,9 @@ def delete_venta(
         if venta is None:
             raise HTTPException(status_code=404, detail="Venta no encontrada")
 
+        if venta.anulada:
+            raise HTTPException(status_code=409, detail="La venta esta anulada y ya no se puede modificar")
+
         if venta.tipo_fiado == FIADO_ORIGEN_CARTERA:
             raise HTTPException(
                 status_code=409,
@@ -614,7 +643,7 @@ def delete_venta(
             )
 
         mover_deuda_tienda(db, deuda_pendiente_tienda(venta), SIN_DEUDA)
-        revertir_puntos(db, venta.cliente_fidelizacion_id, venta.puntos_otorgados)
+        revertir_puntos_de_venta(db, venta)
 
         detalles = db.execute(
             select(DetalleVentaModel)
