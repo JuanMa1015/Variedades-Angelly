@@ -66,11 +66,13 @@ class LoginResponse(BaseModel):
 
 
 class RefreshResponse(BaseModel):
-    """Respuesta con nuevo access token."""
+    """Respuesta con nuevo access token e identidad del usuario (restaura sesion al recargar)."""
 
     access_token: str
     token_type: str = "bearer"
     expires_in: int
+    role: str
+    username: str
 
 
 class VendedorUsuarioResponse(BaseModel):
@@ -209,6 +211,8 @@ def auth_refresh(
     return RefreshResponse(
         access_token=new_token,
         expires_in=expires_in,
+        role=role,
+        username=username,
     )
 
 

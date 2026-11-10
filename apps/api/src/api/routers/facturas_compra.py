@@ -37,7 +37,7 @@ class FacturaCompraCreateRequest(BaseModel):
     proveedor_id: Annotated[int, Field(gt=0)]
     items: Annotated[list[FacturaDetalleCreateRequest], Field(min_length=1)]
     encomienda: Annotated[float, Field(ge=0)] = 0.0
-    porcentaje_ganancia: Annotated[float, Field(gt=0, le=1)] = 0.70
+    porcentaje_ganancia: Annotated[float, Field(ge=0.05, le=0.95)] = 0.70
     numero_factura: Annotated[str | None, Field(max_length=20)] = None
 
 
@@ -107,6 +107,14 @@ def _to_factura_response(
             for item in items
         ],
     )
+
+
+@router.get("/api/facturas-compra/config")
+def get_facturas_config(
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+) -> dict[str, float]:
+    """Parametros que el frontend necesita para previsualizar totales (fuente unica: backend)."""
+    return {"iva_rate": IVA_RATE}
 
 
 @router.get("/api/facturas-compra", response_model=list[FacturaCompraResponse])

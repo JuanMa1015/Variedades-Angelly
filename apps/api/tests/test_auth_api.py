@@ -512,6 +512,9 @@ def test_refresh_rota_jti_el_anterior_no_reutilizable(
 
     primera = client.post("/api/auth/refresh")
     assert primera.status_code == 200
+    # El front restaura la sesion al recargar a partir de estos campos.
+    assert primera.json()["username"] == "angelly_admin"
+    assert primera.json()["role"] == "admin"
     segundo_refresh = client.cookies.get("refresh_token")
     assert segundo_refresh != primer_refresh
 

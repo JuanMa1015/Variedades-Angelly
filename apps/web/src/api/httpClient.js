@@ -117,7 +117,9 @@ const performRequest = async (endpoint, options) => {
     nextHeaders['X-Requested-With'] = 'XMLHttpRequest';
   }
 
-  const MAX_RETRIES = 2;
+  // Solo se reintentan lecturas. Reintentar POST/PATCH/DELETE ante un 502 o un corte
+  // de red puede duplicar ventas, abonos o gastos que el servidor ya proceso.
+  const MAX_RETRIES = isGet ? 2 : 0;
   let lastError = null;
   let lastResponse = null;
 
@@ -162,7 +164,9 @@ const performRequest = async (endpoint, options) => {
 
 export const apiRequest = async (endpoint, options = {}) => {
   if (options.method && options.method !== 'GET') {
-    invalidateCache(endpoint.split('?')[0]);
+    // Una escritura puede cambiar stock, deudas, caja y dashboard a la vez:
+    // se descarta todo el cache de lecturas (vive solo 10 s) para no mostrar datos viejos.
+    invalidateCache();
   }
 
   let result = await performRequest(endpoint, options);

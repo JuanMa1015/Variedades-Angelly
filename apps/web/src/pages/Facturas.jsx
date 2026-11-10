@@ -45,7 +45,13 @@ const Facturas = () => {
   const [proveedorId, setProveedorId] = useState('');
   const [numeroFactura, setNumeroFactura] = useState('');
   const [encomienda, setEncomienda] = useState('');
-  const [porcentajeGanancia, setPorcentajeGanancia] = useState(String(PORCENTAJE_DEFAULT));
+  // El usuario piensa en "margen" (30 % sobre el precio de venta); la API guarda el
+  // factor costo/venta (0.70). Se convierte aqui para no confundir 70 % con ganancia.
+  const [margenPct, setMargenPct] = useState(String(Math.round((1 - PORCENTAJE_DEFAULT) * 100)));
+  const [ivaRate, setIvaRate] = useState(0.19);
+  const margenNum = Number(margenPct);
+  const margenValido = Number.isFinite(margenNum) && margenNum >= 5 && margenNum <= 95;
+  const porcentajeGanancia = String(margenValido ? Number((1 - margenNum / 100).toFixed(4)) : PORCENTAJE_DEFAULT);
   const [items, setItems] = useState([{ ...EMPTY_ITEM }]);
 
   const [loading, setLoading] = useState(true);
@@ -81,6 +87,11 @@ const Facturas = () => {
 
         const proveedoresList = Array.isArray(proveedoresPayload) ? proveedoresPayload : [];
         setProveedores(proveedoresList);
+        // La tasa de IVA la define el backend (IVA_RATE); si falla se conserva 19 %.
+        apiGet('/api/facturas-compra/config', { signal: controller.signal })
+          .then((cfg) => { if (Number(cfg?.iva_rate) >= 0) setIvaRate(Number(cfg.iva_rate)); })
+          .catch(() => {});
+
         setProductos(Array.isArray(productosPayload) ? productosPayload : []);
         setFacturas(Array.isArray(facturasPayload) ? facturasPayload : []);
 
@@ -95,7 +106,10 @@ const Facturas = () => {
           if (draft.proveedorId) setProveedorId(draft.proveedorId);
           if (draft.numeroFactura !== undefined) setNumeroFactura(draft.numeroFactura);
           if (draft.encomienda !== undefined) setEncomienda(draft.encomienda);
-          if (draft.porcentajeGanancia) setPorcentajeGanancia(draft.porcentajeGanancia);
+          if (draft.porcentajeGanancia) {
+            const factor = Number(draft.porcentajeGanancia);
+            if (factor > 0 && factor < 1) setMargenPct(String(Math.round((1 - factor) * 100)));
+          }
           if (Array.isArray(draft.items) && draft.items.length > 0) {
             setItems(draft.items.map((item) => ({ ...EMPTY_ITEM, ...item, search: '' })));
           }
@@ -140,8 +154,8 @@ const Facturas = () => {
       if (cantidad <= 0 || precio <= 0) continue;
       const base = cantidad * precio;
       subtotal += base;
-      if (item.aplica_iva) totalIva += base * 0.19;
-      const precioConIva = precio * (item.aplica_iva ? 1.19 : 1);
+      if (item.aplica_iva) totalIva += base * ivaRate;
+      const precioConIva = precio * (item.aplica_iva ? 1 + ivaRate : 1);
       const pvs = precioConIva / pct;
       totalGanancia += (pvs - precioConIva) * cantidad;
     }
@@ -155,7 +169,7 @@ const Facturas = () => {
       encomienda: enf,
       totalGanancia,
     };
-  }, [items, encomienda, pct]);
+  }, [items, encomienda, pct, ivaRate]);
 
   const handleAddItem = () => setItems((current) => [...current, { ...EMPTY_ITEM }]);
 
@@ -326,17 +340,19 @@ const Facturas = () => {
             </div>
 
             <div className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm focus-within:border-rosewood">
-              <span className="text-gray-500">% Ganancia:</span>
+              <span className="text-gray-500" title="Porcentaje del precio de venta que es ganancia. Precio de venta = costo ÷ (1 − margen)">Margen s/ venta:</span>
               <input
                 type="number"
-                min="0.01"
-                max="1"
-                step="0.01"
-                value={porcentajeGanancia}
-                onChange={(e) => setPorcentajeGanancia(e.target.value)}
-                className="w-20 border-0 p-0 text-sm focus:outline-none"
-                placeholder="0.70"
+                min="5"
+                max="95"
+                step="1"
+                value={margenPct}
+                onChange={(e) => setMargenPct(e.target.value)}
+                className="w-16 border-0 p-0 text-sm focus:outline-none"
+                placeholder="30"
+                aria-label="Margen de ganancia sobre el precio de venta, en porcentaje"
               />
+              <span className="text-gray-500">%</span>
             </div>
 
             <div className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm focus-within:border-rosewood">
@@ -357,9 +373,9 @@ const Facturas = () => {
               const cantidad = Number(item.cantidad || 0);
               const precio = Number(item.precio_unitario || 0);
               const base = cantidad * precio;
-              const iva = item.aplica_iva ? base * 0.19 : 0;
+              const iva = item.aplica_iva ? base * ivaRate : 0;
               const total = base + iva;
-              const precioConIva = precio * (item.aplica_iva ? 1.19 : 1);
+              const precioConIva = precio * (item.aplica_iva ? 1 + ivaRate : 1);
               const pvs = precioConIva / pct;
               const ganancia = pvs - precioConIva;
 
@@ -581,7 +597,7 @@ const Facturas = () => {
                     <th className="px-3 py-3 font-semibold text-gray-700">IVA</th>
                     <th className="px-3 py-3 font-semibold text-gray-700">Encomienda</th>
                     <th className="px-3 py-3 font-semibold text-gray-700">Total</th>
-                    <th className="px-3 py-3 font-semibold text-gray-700">%Ganancia</th>
+                    <th className="px-3 py-3 font-semibold text-gray-700">Margen</th>
                     <th className="px-3 py-3 font-semibold text-gray-700">Items</th>
                     <th className="px-3 py-3 font-semibold text-gray-700">Accion</th>
                   </tr>
@@ -596,7 +612,7 @@ const Facturas = () => {
                       <td className="px-3 py-3 text-gray-700">{formatMoney(factura.total_iva)}</td>
                       <td className="px-3 py-3 text-gray-700">{factura.encomienda ? formatMoney(factura.encomienda) : '-'}</td>
                       <td className="px-3 py-3 font-semibold text-gray-900">{formatMoney(factura.total_factura)}</td>
-                      <td className="px-3 py-3 text-gray-700">{factura.porcentaje_ganancia ? `${(factura.porcentaje_ganancia * 100).toFixed(0)}%` : '-'}</td>
+                      <td className="px-3 py-3 text-gray-700">{factura.porcentaje_ganancia ? `${((1 - factura.porcentaje_ganancia) * 100).toFixed(0)}%` : '-'}</td>
                       <td className="px-3 py-3 text-gray-700">{Array.isArray(factura.items) ? factura.items.length : 0}</td>
                       <td className="px-3 py-3">
                         <button
@@ -641,8 +657,8 @@ const Facturas = () => {
                     </div>
                   ) : null}
                   <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="text-gray-500">Ganancia:</span>
-                    <span className="text-gray-900">{factura.porcentaje_ganancia ? `${(factura.porcentaje_ganancia * 100).toFixed(0)}%` : '-'}</span>
+                    <span className="text-gray-500">Margen:</span>
+                    <span className="text-gray-900">{factura.porcentaje_ganancia ? `${((1 - factura.porcentaje_ganancia) * 100).toFixed(0)}%` : '-'}</span>
                   </div>
                   <div className="mb-1 flex items-center justify-between text-sm">
                     <span className="text-gray-500">Total:</span>
@@ -693,7 +709,7 @@ const Facturas = () => {
               <p><span className="font-semibold">Proveedor:</span> {selectedPrintFactura.proveedor_nombre}</p>
               <p><span className="font-semibold">Fecha:</span> {new Date(selectedPrintFactura.fecha_creacion).toLocaleDateString()}</p>
               {selectedPrintFactura.encomienda ? <p><span className="font-semibold">Encomienda:</span> {formatMoney(selectedPrintFactura.encomienda)}</p> : null}
-              {selectedPrintFactura.porcentaje_ganancia ? <p><span className="font-semibold">% Ganancia:</span> {(selectedPrintFactura.porcentaje_ganancia * 100).toFixed(0)}%</p> : null}
+              {selectedPrintFactura.porcentaje_ganancia ? <p><span className="font-semibold">Margen:</span> {((1 - selectedPrintFactura.porcentaje_ganancia) * 100).toFixed(0)}%</p> : null}
             </div>
 
             <div className="my-3 border-t border-dashed border-gray-400" />
@@ -716,7 +732,7 @@ const Facturas = () => {
                   const precio = Number(item.precio_unitario || 0);
                   const aplicaIva = Boolean(item.aplica_iva);
                   const total = cantidad * precio;
-                  const precioConIva = precio * (aplicaIva ? 1.19 : 1);
+                  const precioConIva = precio * (aplicaIva ? 1 + ivaRate : 1);
                   const pvs = item.precio_venta_sugerido || (precioConIva / (selectedPrintFactura.porcentaje_ganancia || 0.70));
                   const ganancia = item.ganancia_estimada || (pvs - precioConIva);
                   return (
@@ -742,7 +758,7 @@ const Facturas = () => {
                 <span>{formatMoney(selectedPrintFactura.subtotal || 0)}</span>
               </div>
               <div className="flex justify-between">
-                <span>IVA (19%):</span>
+                <span>IVA:</span>
                 <span>{formatMoney(selectedPrintFactura.total_iva || 0)}</span>
               </div>
               {selectedPrintFactura.encomienda ? (
