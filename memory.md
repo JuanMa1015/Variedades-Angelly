@@ -597,3 +597,26 @@ apps\api\.venv\Scripts\python.exe -m alembic -c apps\api\alembic.ini upgrade hea
 .\scripts\backup_db.ps1
 ```
 
+---
+
+## 14. Imágenes, operación y POS (actualización)
+
+- **Las imágenes subidas se guardan en Vercel Blob** cuando `BLOB_READ_WRITE_TOKEN` está definido
+  (contrato verificado contra el SDK oficial `@vercel/blob` 2.9: `PUT <BLOB_API_URL>/?pathname=productos/<archivo>`,
+  headers `authorization: Bearer`, `x-api-version: 13`, `x-vercel-blob-access: public`, `x-add-random-suffix: 1`;
+  `BLOB_API_URL` por defecto `https://vercel.com/api/blob`). **Sin el token se guardan en `/uploads` del
+  servidor, que en Render (disco efímero) se borra en cada despliegue o reinicio.** `imagen_url` guarda la URL
+  completa de Blob o la ruta relativa `/uploads/...`.
+- **Migraciones pendientes:** en producción `/health` devuelve `migraciones: {actual, esperada, al_dia}` y
+  `status: "degraded"` si la base no está al día; el arranque también lo deja en el log como `ERROR`.
+  Quien despliegue sin Docker debe ejecutar `alembic -c alembic.ini upgrade head` (lo hace `scripts/release_api.sh`).
+  Un 500 en una operación que usa columnas nuevas suele significar migraciones sin aplicar.
+- Los errores 500 no controlados se registran con su traza (`Error no controlado en <método> <ruta>`).
+- **Token de acceso:** el frontend lo envía como `Authorization: Bearer` (en memoria) además de la cookie, para no
+  depender de cookies de terceros cuando front y API están en dominios distintos. El refresh sigue usando cookie.
+- **POS (`apps/web/src/pages/Ventas*`)**: una sola barra para buscar o escanear (F2; Enter agrega el código o el
+  único resultado), tarjetas con foto o icono/iniciales si la imagen falta, ticket con total y botón Cobrar siempre
+  visibles (F9), tickets en espera (F4, guardados en `localStorage`), favoritos/frecuentes por equipo, aviso de caja
+  cerrada, pago en efectivo vacío = exacto, barra fija en móvil. La lógica de validación/payload está en
+  `Ventas/posHelpers.js` y los datos en `Ventas/useVentasData.js`.
+

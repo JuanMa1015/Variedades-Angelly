@@ -23,7 +23,7 @@ vi.mock('../Ventas/ProductSelectionView', () => ({
       <p>Loading: {String(loading)}</p>
       <input data-testid="search" value={searchTerm} onChange={(e) => onSearchChange(e.target.value)} />
       <button data-testid="scan-remoto" onClick={() => onScanCode('770999')}>scan remoto</button>
-      <button data-testid="scan-inexistente" onClick={() => onScanCode('000')}>scan inexistente</button>
+      <button data-testid="scan-inexistente" onClick={() => onScanCode('9990001')}>scan inexistente</button>
       {productos.map((p) => (
         <button
           key={p.id}
@@ -367,7 +367,7 @@ describe('Ventas page', () => {
 
     fireEvent.click(screen.getByTestId('scan-inexistente'));
 
-    await waitFor(() => expect(screen.getByText(/No existe un producto con el código 000/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/No existe un producto con el código 9990001/)).toBeInTheDocument());
     expect(screen.getByText('Cart: 0')).toBeInTheDocument();
   });
 

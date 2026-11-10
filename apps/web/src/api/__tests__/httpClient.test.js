@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { apiGet, apiPost } from '../httpClient';
+import { apiGet, apiPost, setAuthToken } from '../httpClient';
 
 const jsonResponse = (status, body = {}) => ({
   ok: status >= 200 && status < 300,
@@ -44,5 +44,43 @@ describe('httpClient reintentos', () => {
     expect(antes[0].stock_actual).toBe(5);
     expect(despues[0].stock_actual).toBe(4);
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('httpClient token de acceso', () => {
+  afterEach(() => {
+    setAuthToken(null);
+    vi.restoreAllMocks();
+  });
+
+  it('envia el token como Bearer ademas de la cookie (por si el navegador bloquea cookies de terceros)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { ok: true }));
+    vi.stubGlobal('fetch', fetchMock);
+    setAuthToken('token-abc');
+
+    await apiGet('/api/auth-header-test');
+
+    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer token-abc');
+    expect(fetchMock.mock.calls[0][1].credentials).toBe('include');
+  });
+
+  it('sin token no envia Authorization', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { ok: true }));
+    vi.stubGlobal('fetch', fetchMock);
+    setAuthToken(null);
+
+    await apiGet('/api/sin-token-test');
+
+    expect(fetchMock.mock.calls[0][1].headers).not.toHaveProperty('Authorization');
+  });
+
+  it('respeta un Authorization explicito', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, {}));
+    vi.stubGlobal('fetch', fetchMock);
+    setAuthToken('token-abc');
+
+    await apiGet('/api/explicito-test', { headers: { Authorization: 'Bearer otro' } });
+
+    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer otro');
   });
 });

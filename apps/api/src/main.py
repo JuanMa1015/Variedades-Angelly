@@ -46,6 +46,7 @@ from src.api.routers.superadmin import router as superadmin_router
 from src.api.routers.upload import router as upload_router
 from src.api.routers.ventas_fidelizacion import router as ventas_fidelizacion_router
 from src.infrastructure.database.connection import engine, get_db
+from src.infrastructure.database.migraciones import estado_migraciones
 from src.infrastructure.database.models import Base
 
 
@@ -207,6 +208,15 @@ def _run_startup_tasks():
             {"ahora": datetime.now(UTC).replace(tzinfo=None)},
         )
         conn.commit()
+
+    estado = _estado_migraciones()
+    if estado is not None and not estado["al_dia"]:
+        logger.error(
+            "MIGRACIONES PENDIENTES: la base esta en %s y el codigo espera %s. "
+            "Ejecuta `alembic upgrade head`; hasta entonces fallaran las operaciones que usen columnas nuevas.",
+            estado["actual"],
+            estado["esperada"],
+        )
 
     # Usuarios semilla (auto-guardados por AUTH_BOOTSTRAP_ENABLED).
     _seed_auth_users()
@@ -392,6 +402,14 @@ async def integrity_error_handler(request, exc):
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
+    # Sin este log el 500 llegaba al usuario pero no dejaba rastro en los logs del servidor.
+    logger.error(
+        "Error no controlado en %s %s: %s",
+        request.method,
+        request.url.path,
+        exc,
+        exc_info=(type(exc), exc, exc.__traceback__),
+    )
     if isinstance(exc, ValueError):
         detail = str(exc)
     else:
@@ -463,6 +481,17 @@ app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 # ─── Health Check ───
 
+def _estado_migraciones() -> dict | None:
+    """Solo en produccion: en desarrollo/test el esquema lo crea create_all."""
+    if not _IS_PRODUCTION:
+        return None
+    try:
+        return estado_migraciones(engine)
+    except Exception as exc:  # no debe tumbar el health check
+        logger.warning("No se pudo comprobar el estado de las migraciones: %s", exc)
+        return None
+
+
 @app.get("/health")
 def health_check():
     db_ok = False
@@ -473,9 +502,12 @@ def health_check():
         db_ok = True
     except Exception as e:
         logger.warning("Health check — DB error: %s", e)
+    migraciones = _estado_migraciones() if db_ok else None
+    pendientes = migraciones is not None and not migraciones["al_dia"]
     return {
-        "status": "ok",
+        "status": "degraded" if pendientes else "ok",
         "database": "connected" if db_ok else "unavailable",
+        "migraciones": migraciones,
     }
 
 
