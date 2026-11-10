@@ -4,6 +4,7 @@ import { ScanBarcode, Search, X } from 'lucide-react';
 import Skeleton from '../../components/Skeleton';
 import ProductCard from './ProductCard';
 import QuickPickRow from './QuickPickRow';
+import { formatThousands } from './posHelpers';
 
 const EMPTY_SET = new Set();
 const GRID_CLASS = 'grid grid-cols-2 gap-3 pb-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5';
@@ -77,6 +78,11 @@ const CategoryChips = ({ categories, active, onChange }) => (
   </div>
 );
 
+// Si la tienda tiene mas productos de los que se cargan de una vez, lo dice y manda al buscador.
+const catalogSummary = (shown, total) => (total && total > shown
+  ? `Mostrando ${formatThousands(shown)} de ${formatThousands(total)} productos · usa el buscador para encontrar el resto`
+  : `${formatThousands(shown) || 0} productos · toca una tarjeta para agregarla al ticket`);
+
 const ProductSelectionView = ({
   productos,
   searchTerm,
@@ -86,6 +92,7 @@ const ProductSelectionView = ({
   cart,
   formatMoney,
   loading,
+  totalCatalogo = null,
   searchInputRef,
   favorites = EMPTY_SET,
   onToggleFavorite,
@@ -121,7 +128,7 @@ const ProductSelectionView = ({
         <p className="mt-2 text-xs text-gray-500">
           {isSearching
             ? `${visibleProducts.length} resultado${visibleProducts.length === 1 ? '' : 's'} · Enter agrega el producto o el código escaneado`
-            : `${productos.length} productos · toca una tarjeta para agregarla al ticket`}
+            : catalogSummary(productos.length, totalCatalogo)}
         </p>
       </div>
 

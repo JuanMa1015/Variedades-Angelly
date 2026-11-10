@@ -59,7 +59,7 @@ const MainLayout = () => {
         onCloseMobile={() => setIsMobileOpen(false)}
       />
 
-      <div className={`min-h-screen transition-[padding] duration-300 ease-in-out ${contentOffsetClass}`}>
+      <div className={`flex min-h-screen flex-col transition-[padding] duration-300 ease-in-out ${contentOffsetClass}`}>
         <header className="sticky top-0 z-20 border-b border-blush-300 bg-blush-50/92 px-4 py-3 shadow-sm backdrop-blur sm:px-6">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-3">
@@ -97,7 +97,8 @@ const MainLayout = () => {
           </div>
         </header>
 
-        <main className="min-h-screen overflow-x-hidden p-4 sm:p-6 lg:p-8">
+        {/* flex-1 (no min-h-screen): el contenido ocupa lo que queda bajo el encabezado y la pagina no se desplaza de mas. */}
+        <main className="flex-1 overflow-x-hidden p-4 sm:p-6 lg:p-8">
           <div className="w-full">
             <Outlet />
           </div>
