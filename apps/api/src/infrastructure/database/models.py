@@ -4,12 +4,17 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class Base(DeclarativeBase):
     """Base declarativa compartida por todos los modelos ORM."""
+
+
+def _dinero() -> Numeric:
+    """Monto en pesos: NUMERIC(14,2) exacto en BD, entregado como float a la API."""
+    return Numeric(14, 2, asdecimal=False)
 
 
 def _utcnow_naive() -> datetime:
@@ -45,8 +50,8 @@ class ClienteModel(Base):
         nullable=True,
     )
     telefono_whatsapp: Mapped[str | None] = mapped_column(String(25), nullable=True)
-    limite_credito: Mapped[float] = mapped_column(Float, nullable=False)
-    deuda_total: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    limite_credito: Mapped[float] = mapped_column(_dinero(), nullable=False)
+    deuda_total: Mapped[float] = mapped_column(_dinero(), nullable=False, default=0.0)
     activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     def __repr__(self) -> str:
@@ -79,7 +84,7 @@ class ClienteFiadoTiendaModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     nombre: Mapped[str] = mapped_column(String(120), nullable=False)
     telefono_whatsapp: Mapped[str | None] = mapped_column(String(25), nullable=True)
-    deuda_total: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    deuda_total: Mapped[float] = mapped_column(_dinero(), nullable=False, default=0.0)
     activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     def __repr__(self) -> str:
@@ -94,8 +99,8 @@ class ProductoModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     nombre: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
     codigo_barras: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
-    precio_costo: Mapped[float] = mapped_column(Float, nullable=False)
-    precio_venta: Mapped[float] = mapped_column(Float, nullable=False)
+    precio_costo: Mapped[float] = mapped_column(_dinero(), nullable=False)
+    precio_venta: Mapped[float] = mapped_column(_dinero(), nullable=False)
     catalogo: Mapped[str] = mapped_column(String(20), nullable=False, default="tienda")
     stock_actual: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     stock_minimo: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -123,8 +128,8 @@ class VentaModel(Base):
     tipo_fiado: Mapped[str | None] = mapped_column(String(20), nullable=True)
     metodo_pago: Mapped[str | None] = mapped_column(String(20), nullable=True)
     es_fiado: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    total: Mapped[float] = mapped_column(Float, nullable=False)
-    saldo_pendiente: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    total: Mapped[float] = mapped_column(_dinero(), nullable=False)
+    saldo_pendiente: Mapped[float] = mapped_column(_dinero(), nullable=False, default=0.0)
     fecha: Mapped[datetime] = mapped_column(
         DateTime(timezone=False),
         nullable=False,
@@ -145,8 +150,8 @@ class DetalleVentaModel(Base):
     producto_id: Mapped[int] = mapped_column(ForeignKey("productos.id"), nullable=False)
     nombre_producto: Mapped[str] = mapped_column(String(120), nullable=False)
     cantidad: Mapped[int] = mapped_column(Integer, nullable=False)
-    precio_unitario: Mapped[float] = mapped_column(Float, nullable=False)
-    subtotal: Mapped[float] = mapped_column(Float, nullable=False)
+    precio_unitario: Mapped[float] = mapped_column(_dinero(), nullable=False)
+    subtotal: Mapped[float] = mapped_column(_dinero(), nullable=False)
 
     def __repr__(self) -> str:
         return (
@@ -182,7 +187,7 @@ class PedidoProveedorModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     proveedor_id: Mapped[int] = mapped_column(ForeignKey("proveedores.id"), nullable=False)
     descripcion: Mapped[str] = mapped_column(String(255), nullable=False)
-    monto_estimado: Mapped[float] = mapped_column(Float, nullable=False)
+    monto_estimado: Mapped[float] = mapped_column(_dinero(), nullable=False)
     estado: Mapped[str] = mapped_column(String(20), nullable=False, default="enviado")
     creado_por: Mapped[str] = mapped_column(String(50), nullable=False)
     aprobado_por: Mapped[str | None] = mapped_column(String(50), nullable=True)
@@ -208,11 +213,11 @@ class FacturaCompraModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     proveedor_id: Mapped[int] = mapped_column(ForeignKey("proveedores.id"), nullable=False)
     creado_por: Mapped[str] = mapped_column(String(50), nullable=False)
-    subtotal: Mapped[float] = mapped_column(Float, nullable=False)
-    total_iva: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    total_factura: Mapped[float] = mapped_column(Float, nullable=False)
+    subtotal: Mapped[float] = mapped_column(_dinero(), nullable=False)
+    total_iva: Mapped[float] = mapped_column(_dinero(), nullable=False, default=0.0)
+    total_factura: Mapped[float] = mapped_column(_dinero(), nullable=False)
     numero_factura: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    encomienda: Mapped[float | None] = mapped_column(Float, nullable=True, default=0.0)
+    encomienda: Mapped[float | None] = mapped_column(_dinero(), nullable=True, default=0.0)
     porcentaje_ganancia: Mapped[float | None] = mapped_column(Float, nullable=True, default=0.70)
     proveedor: Mapped["ProveedorModel"] = relationship(
         "ProveedorModel",
@@ -243,10 +248,10 @@ class FacturaCompraDetalleModel(Base):
     nombre_producto: Mapped[str] = mapped_column(String(120), nullable=False)
     cantidad: Mapped[int] = mapped_column(Integer, nullable=False)
     aplica_iva: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    precio_unitario: Mapped[float] = mapped_column(Float, nullable=False)
-    precio_total: Mapped[float] = mapped_column(Float, nullable=False)
-    precio_venta_sugerido: Mapped[float | None] = mapped_column(Float, nullable=True)
-    ganancia_estimada: Mapped[float | None] = mapped_column(Float, nullable=True)
+    precio_unitario: Mapped[float] = mapped_column(_dinero(), nullable=False)
+    precio_total: Mapped[float] = mapped_column(_dinero(), nullable=False)
+    precio_venta_sugerido: Mapped[float | None] = mapped_column(_dinero(), nullable=True)
+    ganancia_estimada: Mapped[float | None] = mapped_column(_dinero(), nullable=True)
     factura: Mapped["FacturaCompraModel"] = relationship(
         "FacturaCompraModel",
         back_populates="detalles",
@@ -267,7 +272,7 @@ class GastoModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     categoria: Mapped[str] = mapped_column(String(50), nullable=False)
     descripcion: Mapped[str] = mapped_column(String(255), nullable=False)
-    monto: Mapped[float] = mapped_column(Float, nullable=False)
+    monto: Mapped[float] = mapped_column(_dinero(), nullable=False)
     fecha: Mapped[datetime] = mapped_column(
         DateTime(timezone=False),
         nullable=False,
@@ -286,9 +291,9 @@ class AbonoCarteraModel(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     cliente_id: Mapped[int] = mapped_column(ForeignKey("clientes.id"), nullable=False)
-    monto: Mapped[float] = mapped_column(Float, nullable=False)
+    monto: Mapped[float] = mapped_column(_dinero(), nullable=False)
     metodo_pago: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    saldo_cliente: Mapped[float] = mapped_column(Float, nullable=False)
+    saldo_cliente: Mapped[float] = mapped_column(_dinero(), nullable=False)
     referencia: Mapped[str | None] = mapped_column(String(255), nullable=True)
     fecha: Mapped[datetime] = mapped_column(
         DateTime(timezone=False),
@@ -307,9 +312,9 @@ class AbonoTiendaModel(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     cliente_id: Mapped[int] = mapped_column(ForeignKey("clientes_fiado_tienda.id"), nullable=False)
-    monto: Mapped[float] = mapped_column(Float, nullable=False)
+    monto: Mapped[float] = mapped_column(_dinero(), nullable=False)
     metodo_pago: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    saldo_cliente: Mapped[float] = mapped_column(Float, nullable=False)
+    saldo_cliente: Mapped[float] = mapped_column(_dinero(), nullable=False)
     referencia: Mapped[str | None] = mapped_column(String(255), nullable=True)
     fecha: Mapped[datetime] = mapped_column(
         DateTime(timezone=False),
@@ -336,15 +341,15 @@ class CierreCajaModel(Base):
         DateTime(timezone=False),
         nullable=True,
     )
-    monto_inicial: Mapped[float] = mapped_column(Float, nullable=False)
-    monto_ventas_efectivo: Mapped[float] = mapped_column(Float, nullable=False)
-    monto_ventas_transferencia: Mapped[float] = mapped_column(Float, nullable=False)
-    monto_gastos: Mapped[float] = mapped_column(Float, nullable=False)
-    monto_efectivo_real: Mapped[float | None] = mapped_column(Float, nullable=True)
-    esperado_vs_real: Mapped[float | None] = mapped_column(Float, nullable=True)
+    monto_inicial: Mapped[float] = mapped_column(_dinero(), nullable=False)
+    monto_ventas_efectivo: Mapped[float] = mapped_column(_dinero(), nullable=False)
+    monto_ventas_transferencia: Mapped[float] = mapped_column(_dinero(), nullable=False)
+    monto_gastos: Mapped[float] = mapped_column(_dinero(), nullable=False)
+    monto_efectivo_real: Mapped[float | None] = mapped_column(_dinero(), nullable=True)
+    esperado_vs_real: Mapped[float | None] = mapped_column(_dinero(), nullable=True)
     estado: Mapped[str] = mapped_column(String(20), nullable=False)
     observaciones: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    monto_cierre: Mapped[float | None] = mapped_column(Float, nullable=True)
+    monto_cierre: Mapped[float | None] = mapped_column(_dinero(), nullable=True)
     abierto_por: Mapped[str] = mapped_column(String(50), nullable=False)
     cerrado_por: Mapped[str | None] = mapped_column(String(50), nullable=True)
 

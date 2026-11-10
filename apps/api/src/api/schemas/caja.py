@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 class AperturaCajaRequest(BaseModel):
     """Entrada para abrir caja."""
 
-    monto_inicial: Annotated[float, Field(gt=0)]
+    monto_inicial: Annotated[float, Field(ge=0)]
 
 
 class CierreCajaRequest(BaseModel):
@@ -23,7 +23,7 @@ class CierreCajaRequest(BaseModel):
 class ActualizarCajaRequest(BaseModel):
     """Entrada para actualizar un registro de caja."""
 
-    monto_inicial: Annotated[float | None, Field(gt=0)] = None
+    monto_inicial: Annotated[float | None, Field(ge=0)] = None
     monto_cierre: Annotated[float | None, Field(ge=0)] = None
     monto_efectivo_real: Annotated[float | None, Field(ge=0)] = None
     observaciones: str | None = None

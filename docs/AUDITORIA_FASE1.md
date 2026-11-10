@@ -91,3 +91,13 @@ Revisar a fondo la UI y el flujo de: **POS/Ventas → Caja → Inventario → Pr
 - **S6** auditoría automática (usuario del token) en productos, proveedores, facturas, ventas, abonos de cartera, caja y usuarios vendedor/admin.
 - Dependencias: `Pillow 12.3.0 → 13.0.0` y `PyJWT 2.13.0 → 2.15.1` (`pip-audit`: 54 avisos → 0).
 - Pendiente de fase 1: S4 (límite de login por IP detrás de proxy), S7 (upload), S9 (CSV), S10, S11.
+
+## Actualización (Bloque 3 aplicado)
+
+- **D1** montos en `NUMERIC(14,2)` (migración `d4e5f6a7b8c9`, solo PostgreSQL; la API sigue entregando `float`).
+- **D2** borrar o editar una venta fiada de tienda reajusta la deuda del cliente (incluido cambiar de cliente o pasarla a contado).
+- **D3** fiados de cartera respetan el cupo de crédito; no se vende con productos o clientes desactivados.
+- **D4** `saldo_pendiente` de un fiado de tienda guarda el saldo de la venta (total − abono inicial), no la deuda total del cliente. Las ventas anteriores conservan el valor antiguo: la reversión lo acota al total de la venta.
+- **D5/D6** caja: solo cuenta dinero cobrado (un fiado no es caja; las ventas de cartera entran por sus abonos, una sola vez); el efectivo esperado ya no suma transferencias; se puede abrir con base $0; toda venta con cobro exige método de pago. El abono inicial de un fiado de cartera hecho por `/api/ventas` ahora se registra como abono.
+- **D7** editar o borrar un abono de cartera reajusta la deuda del cliente.
+- Pendiente: D8–D10, ver Fase 2.

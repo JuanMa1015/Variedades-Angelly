@@ -13,13 +13,21 @@ from sqlalchemy.orm import Session
 
 from src.api.schemas.cartera import MetodoPago, VentaItemCreateRequest, VentaDetalleResponse, VentaResponse
 from src.api.services.auditoria import registrar_auditoria
+from src.api.services.deuda import SIN_DEUDA, deuda_pendiente_tienda, mover_deuda_tienda
 from src.api.dependencies import AuthenticatedUser, require_roles
+from src.api.services.venta_reglas import (
+    exigir_cliente_activo,
+    exigir_credito_disponible,
+    exigir_metodo_pago_si_hay_cobro,
+    exigir_producto_vendible,
+)
 from src.api.pagination import PageInfo, build_page
 from src.application.services.ventas_service import (
     build_recibo_text,
 )
 from src.infrastructure.database.connection import get_db
 from src.infrastructure.database.models import (
+    AbonoCarteraModel,
     ClienteFiadoTiendaModel,
     ClienteModel,
     DetalleVentaModel,
@@ -98,6 +106,11 @@ def create_venta(
     else:
         fiado_origen = None
 
+    exigir_metodo_pago_si_hay_cobro(
+        payload.metodo_pago,
+        hay_cobro=(not payload.es_fiado) or abono_inicial > 0,
+    )
+
     try:
         with db.begin():
             if payload.es_fiado and fiado_origen == FIADO_ORIGEN_CARTERA:
@@ -122,6 +135,7 @@ def create_venta(
                 if cliente is None:
                     raise HTTPException(status_code=404, detail="Cliente no encontrado")
 
+                exigir_cliente_activo(cliente)
                 cliente_nombre = cliente.nombre
 
             if payload.es_fiado and fiado_origen == FIADO_ORIGEN_TIENDA:
@@ -143,6 +157,7 @@ def create_venta(
                         detail="Cliente fiado de tienda no encontrado",
                     )
 
+                exigir_cliente_activo(cliente_tienda)
                 cliente_nombre = cliente_tienda.nombre
 
             for item in payload.items:
@@ -157,6 +172,8 @@ def create_venta(
                         status_code=404,
                         detail=f"Producto {item.producto_id} no encontrado",
                     )
+
+                exigir_producto_vendible(producto)
 
                 if producto.stock_actual < item.cantidad:
                     raise HTTPException(
@@ -196,6 +213,7 @@ def create_venta(
                         )
 
                     nueva_deuda = float(cliente.deuda_total + (total - abono_inicial))
+                    exigir_credito_disponible(cliente, nueva_deuda)
                     cliente.deuda_total = nueva_deuda
                     saldo_pendiente = nueva_deuda
                 elif fiado_origen == FIADO_ORIGEN_TIENDA:
@@ -205,9 +223,9 @@ def create_venta(
                             detail="Debes seleccionar un cliente de tienda",
                         )
 
-                    nueva_deuda = float(cliente_tienda.deuda_total + (total - abono_inicial))
-                    cliente_tienda.deuda_total = nueva_deuda
-                    saldo_pendiente = nueva_deuda
+                    cliente_tienda.deuda_total = float(cliente_tienda.deuda_total + (total - abono_inicial))
+                    # Saldo de ESTA venta (no la deuda total del cliente): permite revertirla y calcular caja.
+                    saldo_pendiente = float(total - abono_inicial)
 
             venta = VentaModel(
                 creado_por=current_user.username,
@@ -231,6 +249,18 @@ def create_venta(
                         cantidad=detalle.cantidad,
                         precio_unitario=detalle.precio_unitario,
                         subtotal=detalle.subtotal,
+                    ),
+                )
+
+            if cliente is not None and abono_inicial > 0:
+                # Igual que la venta de cartera del modulo de cartera: el abono inicial es un cobro.
+                db.add(
+                    AbonoCarteraModel(
+                        cliente_id=cliente.id,
+                        monto=abono_inicial,
+                        metodo_pago=payload.metodo_pago,
+                        saldo_cliente=cliente.deuda_total,
+                        referencia=f"Abono aplicado en venta #{venta.id}",
                     ),
                 )
 
@@ -409,6 +439,8 @@ def update_venta(
                 detail="Las ventas de cartera se gestionan desde el modulo de cartera",
             )
 
+        deuda_antes = deuda_pendiente_tienda(venta)
+
         total = float(payload.total) if "total" in campos and payload.total is not None else float(venta.total)
 
         es_fiado = (
@@ -450,11 +482,12 @@ def update_venta(
                 raise HTTPException(status_code=404, detail="Cliente fiado de tienda no encontrado")
 
             cliente_id = None
-            saldo_pendiente = (
-                float(payload.saldo_pendiente)
-                if "saldo_pendiente" in campos and payload.saldo_pendiente is not None
-                else float(total)
-            )
+            if "saldo_pendiente" in campos and payload.saldo_pendiente is not None:
+                saldo_pendiente = float(payload.saldo_pendiente)
+            elif venta.es_fiado:
+                saldo_pendiente = min(float(venta.saldo_pendiente), float(total))  # conserva el abono ya hecho
+            else:
+                saldo_pendiente = float(total)
         else:
             tipo_fiado = None
             cliente_id = None
@@ -480,6 +513,7 @@ def update_venta(
         venta.cliente_id = cliente_id
         venta.cliente_tienda_id = cliente_tienda_id
         venta.saldo_pendiente = saldo_pendiente
+        mover_deuda_tienda(db, deuda_antes, deuda_pendiente_tienda(venta))
         db.flush()
 
     venta = db.execute(
@@ -556,6 +590,8 @@ def delete_venta(
                 status_code=409,
                 detail="Las ventas de cartera se eliminan desde el modulo de cartera",
             )
+
+        mover_deuda_tienda(db, deuda_pendiente_tienda(venta), SIN_DEUDA)
 
         detalles = db.execute(
             select(DetalleVentaModel)
