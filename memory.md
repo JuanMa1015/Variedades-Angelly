@@ -702,3 +702,27 @@ apps\api\.venv\Scripts\python.exe -m alembic -c apps\api\alembic.ini upgrade hea
   reporte imprimible (`buildCierreHtml`), historial en tarjetas (responsive) con detalle desplegable, lectura sin caché (`skipCache`) y
   recarga al volver a la pestaña. `MoneyInput` permite apertura en 0 (antes `min=1` lo impedía).
 
+## 20. Clientes de tienda (fiado): dinero y trazabilidad
+
+- Ajustar `deuda_total` por `PATCH /api/clientes/tienda-fiado/{id}` exige `motivo_ajuste` (mín. 3 letras) si el valor cambia; queda en
+  auditoría (`modulo=clientes_tienda`, `accion=ajustar_deuda`, valor anterior -> nuevo y motivo). Por decisión del dueño sigue disponible
+  para el vendedor (hoy es el mismo admin); si algún día hay vendedores distintos, exigir autorización de admin como en las anulaciones.
+- No se elimina (desactiva) un cliente con deuda > 0 (409); sigue sin poder eliminarse si tiene ventas. Crear, editar, eliminar, reactivar
+  y cada abono quedan en auditoría.
+- `POST /api/clientes/tienda/{id}/abonos` exige caja abierta (409 "La caja esta cerrada. Abre la caja para registrar abonos").
+  `exigir_caja_abierta(db, operacion)` es compartido con las ventas. Los abonos de cartera (`/api/cartera/...`) aún no lo exigen.
+- **Paso 2 (flujo y pantalla):** una sola lista (`GET /api/clientes/tienda/lista`: búsqueda `q`, `filtro` todos/con_deuda/alerta/moroso,
+  `orden` deuda/antigüedad/nombre, paginación; `inactivos=true` solo admin/superadmin) con el botón principal "Abonar".
+  Semáforo por **antigüedad** (`services/antiguedad_deuda.py`): los pagos se aplican a lo más viejo, así que la deuda actual son las
+  ventas fiadas más recientes; la última necesaria marca desde cuándo se debe. Al día ≤30 días, alerta 31-60, moroso >60; una deuda
+  sin ventas (ajustada a mano) no tiene fecha y no se marca morosa. El resumen (`/resumen`) cuenta con la misma regla.
+- Teléfono en un solo formato (`services/telefono.py`): se guarda `57` + 10 dígitos (acepta 7, 10 o 12; otra longitud = 422). Los datos
+  viejos no se migraron: el frontend y wa.me aceptan ambos formatos.
+- Nombre libre (sin apellido obligatorio). Mismo nombre (sin tildes/mayúsculas) con otro WhatsApp = homónimo: 409 `{homonimo: true,
+  coincidencias}` y se registra con `confirmar_homonimo=true`; mismo nombre y mismo WhatsApp = mismo cliente (409 sin confirmación).
+- `GET /api/clientes/tienda/{id}/movimientos`: una fila por venta fiada (con sus productos y lo que quedó fiado) y por abono (medio,
+  referencia, saldo después). `POST /api/clientes/tienda/abonos/{id}/anular` (migración `d1e2f3a4b5c6`, columnas `anulado*`): devuelve la
+  deuda, mismas reglas que anular ventas (autorización de admin, solo turno abierto, motivo, auditoría); el abono anulado no cuenta en caja.
+- El abono responde con `cliente_nombre` y `deuda_anterior` para el comprobante imprimible y el aviso por WhatsApp.
+- Pendiente: cupo de crédito para clientes de tienda (decisión del dueño), abonos de cartera con caja abierta.
+

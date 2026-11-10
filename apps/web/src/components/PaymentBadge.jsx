@@ -2,7 +2,7 @@ import { paymentLabel } from '../utils/paymentMethods';
 
 const TONES = {
   efectivo: 'bg-rosewood/10 text-rosewood',
-  transferencia: 'bg-gold-50 text-gold-200',
+  transferencia: 'bg-blue-50 text-blue-700',
   tarjeta: 'bg-sky-50 text-sky-700',
 };
 

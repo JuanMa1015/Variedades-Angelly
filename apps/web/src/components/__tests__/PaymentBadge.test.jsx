@@ -5,7 +5,7 @@ import PaymentBadge from '../PaymentBadge';
 describe('PaymentBadge', () => {
   it.each([
     ['efectivo', 'Efectivo', 'text-rosewood'],
-    ['transferencia', 'Transferencia', 'text-gold-200'],
+    ['transferencia', 'Transferencia', 'text-blue-700'],
     ['tarjeta', 'Tarjeta', 'text-sky-700'],
   ])('%s se muestra como %s con su color', (method, label, clase) => {
     render(<PaymentBadge method={method} />);

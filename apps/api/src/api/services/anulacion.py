@@ -20,6 +20,7 @@ from src.api.services.venta_reglas import caja_abierta_id
 from src.auth.security import hash_password, verify_password
 from src.infrastructure.database.models import (
     AbonoTiendaModel,
+    ClienteFiadoTiendaModel,
     DetalleVentaModel,
     ProductoModel,
     UsuarioModel,
@@ -182,3 +183,52 @@ def anular_venta(
         detalle=f"Total {venta.total}. Autorizo: {autorizada_por}. Motivo: {motivo}",
     )
     return venta
+
+
+def anular_abono_tienda(
+    db: Session,
+    abono_id: int,
+    *,
+    solicitante: str,
+    autorizado_por: str,
+    motivo: str,
+) -> AbonoTiendaModel:
+    """Marca el abono como anulado y le devuelve su monto a la deuda del cliente. No borra nada."""
+    abono = db.execute(
+        select(AbonoTiendaModel).where(AbonoTiendaModel.id == abono_id).with_for_update(),
+    ).scalar_one_or_none()
+    if abono is None:
+        raise HTTPException(status_code=404, detail="Abono no encontrado")
+    if abono.anulado:
+        raise HTTPException(status_code=409, detail="El abono ya esta anulado")
+    caja_abierta = caja_abierta_id(db)
+    if caja_abierta is None or abono.caja_id != caja_abierta:
+        raise HTTPException(
+            status_code=409,
+            detail="Solo se pueden anular abonos del turno de caja abierto: ese turno ya se cerro",
+        )
+
+    cliente = db.execute(
+        select(ClienteFiadoTiendaModel).where(ClienteFiadoTiendaModel.id == abono.cliente_id).with_for_update(),
+    ).scalar_one()
+    deuda_antes = float(cliente.deuda_total)
+    cliente.deuda_total = round(deuda_antes + float(abono.monto), 2)
+
+    abono.anulado = True
+    abono.anulado_en = datetime.now(UTC).replace(tzinfo=None)
+    abono.anulado_por = solicitante
+    abono.autorizado_por = autorizado_por
+    abono.motivo_anulacion = motivo
+    registrar_auditoria(
+        db,
+        usuario=solicitante,
+        modulo="clientes_tienda",
+        entidad="abono_tienda",
+        accion="anular_abono",
+        entidad_id=abono.id,
+        detalle=(
+            f"{cliente.nombre}: abono {float(abono.monto)}. Deuda {deuda_antes} -> {float(cliente.deuda_total)}. "
+            f"Autorizo: {autorizado_por}. Motivo: {motivo}"
+        ),
+    )
+    return abono

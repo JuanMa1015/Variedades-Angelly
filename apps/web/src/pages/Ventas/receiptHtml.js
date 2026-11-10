@@ -37,7 +37,8 @@ const totalsBlock = (receipt, formatMoney) => {
   return lines.join('');
 };
 
-const STYLES = `
+// Estilos de impresion de 80 mm: tambien los usan otros comprobantes (abonos).
+export const RECEIPT_STYLES = `
   @page { margin: 0; }
   * { box-sizing: border-box; }
   body { margin: 0; width: 80mm; padding: 4mm; font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #111; }
@@ -57,7 +58,7 @@ const STYLES = `
 // Comprobante de venta para impresora termica de 80 mm (tambien sale bien en una hoja normal).
 // Se imprime en un documento aparte para que no dependa del diseno de la aplicacion.
 export const buildReceiptHtml = (receipt, { formatMoney, site, contacto }) => `<!doctype html>
-<html lang="es"><head><meta charset="utf-8"><title>Comprobante de venta</title><style>${STYLES}</style></head>
+<html lang="es"><head><meta charset="utf-8"><title>Comprobante de venta</title><style>${RECEIPT_STYLES}</style></head>
 <body>
   <div class="center">
     <div class="title">${escapeHtml(site.name)}</div>

@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from src.api.schemas.anulacion import AnularRequest as AnularVentaRequest
 from src.api.schemas.cartera import MetodoPago, VentaItemCreateRequest, VentaDetalleResponse, VentaResponse
 from src.api.limiter import limiter, login_rate_limit
 from src.api.services.anulacion import anular_venta, quien_autoriza
@@ -69,14 +70,6 @@ class VentaUpdateRequest(BaseModel):
     fiado_origen: str | None = None
     total: Annotated[float | None, Field(ge=0)] = None
     saldo_pendiente: Annotated[float | None, Field(ge=0)] = None
-
-
-class AnularVentaRequest(BaseModel):
-    """Motivo obligatorio; un vendedor ademas necesita la clave de un administrador."""
-
-    motivo: Annotated[str, Field(min_length=3, max_length=200)]
-    autorizador_usuario: Annotated[str | None, Field(max_length=50)] = None
-    autorizador_password: Annotated[str | None, Field(max_length=128)] = None
 
 
 class VentaPageResponse(BaseModel):
