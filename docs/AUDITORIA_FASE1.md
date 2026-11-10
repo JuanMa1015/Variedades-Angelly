@@ -109,3 +109,11 @@ Revisar a fondo la UI y el flujo de: **POS/Ventas → Caja → Inventario → Pr
 - **Dashboard:** las ventas recientes usan `/api/ventas/paginadas?limit=8` en vez de descargar todo el historial.
 - **Caja:** cierre ciego. Mientras la caja está abierta el vendedor no ve el efectivo esperado; al cerrar recibe el descuadre. El superadmin sigue viéndolo.
 - **Pendiente de decisión:** que registrar una factura de compra sume stock y actualice el costo.
+
+### Factura de compra → inventario (acordado con el dueño)
+
+- Registrar una factura **suma el stock** y deja el **último costo** (precio de factura + IVA si aplica) en cada producto.
+- El **precio de venta** solo cambia si se confirma por línea (casilla marcada por defecto, valor editable). El precio sugerido = costo ÷ margen, **redondeado hacia arriba a múltiplos de $50**.
+- Cada cambio de stock/costo/precio queda en auditoría con el usuario del token.
+- **Eliminar** una factura resta el stock que sumó; si parte ya se vendió responde 409 y no cambia nada. El costo y precio no se revierten.
+- Nota: los datos antiguos no se tocan; solo aplica a facturas nuevas.

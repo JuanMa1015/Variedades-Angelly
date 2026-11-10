@@ -12,6 +12,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.api.services.auditoria import registrar_auditoria
+from src.api.services.compras import (
+    aplicar_compra_a_producto,
+    costo_unitario,
+    redondear_precio_venta,
+    revertir_stock_de_factura,
+)
 from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.pagination import PageInfo, build_page
 from src.infrastructure.database.connection import get_db
@@ -32,6 +38,9 @@ class FacturaDetalleCreateRequest(BaseModel):
     cantidad: Annotated[int, Field(gt=0)]
     aplica_iva: bool = False
     precio_unitario: Annotated[float, Field(gt=0)]
+    # Si es True el producto queda con `precio_venta` (o con el sugerido redondeado si no se envia).
+    actualizar_precio: bool = False
+    precio_venta: Annotated[float | None, Field(gt=0)] = None
 
 
 class FacturaCompraCreateRequest(BaseModel):
@@ -231,7 +240,7 @@ def create_factura_compra(
 
     producto_ids = {item.producto_id for item in payload.items}
     productos = db.execute(
-        select(ProductoModel).where(ProductoModel.id.in_(producto_ids)),
+        select(ProductoModel).where(ProductoModel.id.in_(producto_ids)).with_for_update(),
     ).scalars().all()
     productos_map = {producto.id: producto for producto in productos}
 
@@ -247,8 +256,8 @@ def create_factura_compra(
         base = item.cantidad * item.precio_unitario
         iva = base * IVA_RATE if item.aplica_iva else 0.0
         total_linea = base + iva
-        precio_con_iva = item.precio_unitario * (1 + IVA_RATE) if item.aplica_iva else item.precio_unitario
-        precio_venta_sugerido = precio_con_iva / payload.porcentaje_ganancia
+        precio_con_iva = costo_unitario(item.precio_unitario, item.aplica_iva, IVA_RATE)
+        precio_venta_sugerido = redondear_precio_venta(precio_con_iva / payload.porcentaje_ganancia)
         ganancia_estimada = precio_venta_sugerido - precio_con_iva
 
         subtotal += base
@@ -263,6 +272,10 @@ def create_factura_compra(
                 "precio_total": total_linea,
                 "precio_venta_sugerido": round(precio_venta_sugerido, 2),
                 "ganancia_estimada": round(ganancia_estimada, 2),
+                "costo": precio_con_iva,
+                "nuevo_precio_venta": (
+                    (item.precio_venta or precio_venta_sugerido) if item.actualizar_precio else None
+                ),
             },
         )
 
@@ -294,6 +307,25 @@ def create_factura_compra(
         )
         db.add(detalle)
         detalles_creados.append(detalle)
+
+        anteriores = aplicar_compra_a_producto(
+            productos_map[item["producto_id"]],
+            cantidad=item["cantidad"],
+            costo=item["costo"],
+            nuevo_precio_venta=item["nuevo_precio_venta"],
+        )
+        registrar_auditoria(
+            db,
+            usuario=current_user.username,
+            modulo="facturas",
+            entidad="producto",
+            accion="compra",
+            entidad_id=item["producto_id"],
+            detalle=(
+                f"Factura {factura.id}: +{item['cantidad']} u., costo {anteriores['costo']}->{item['costo']}, "
+                f"venta {anteriores['venta']}->{item['nuevo_precio_venta'] or anteriores['venta']}"
+            ),
+        )
 
     db.commit()
     db.refresh(factura)
@@ -375,6 +407,12 @@ def delete_factura_compra(
         entidad_id=factura.id,
         detalle=f"Eliminada factura total {factura.total_factura}",
     )
+    productos = db.execute(
+        select(ProductoModel)
+        .where(ProductoModel.id.in_({d.producto_id for d in detalles}))
+        .with_for_update(),
+    ).scalars().all()
+    revertir_stock_de_factura(detalles, {p.id: p for p in productos})
     for detalle in detalles:
         db.delete(detalle)
     db.delete(factura)
