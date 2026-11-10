@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, Numeric, String, Text, event, select
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, Numeric, String, Text, event, select, text
 from sqlalchemy.sql import expression
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -381,6 +381,17 @@ class CierreCajaModel(Base):
     """Representacion persistente de apertura/cierre de caja."""
 
     __tablename__ = "cierres_caja"
+    # Solo puede haber un turno abierto en toda la tienda. Es la base de datos la que lo garantiza:
+    # si dos personas abren la caja a la vez, la segunda recibe un error de unicidad.
+    __table_args__ = (
+        Index(
+            "ux_cierres_caja_un_turno_abierto",
+            text("(1)"),
+            unique=True,
+            postgresql_where=text("fecha_cierre IS NULL"),
+            sqlite_where=text("fecha_cierre IS NULL"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     usuario: Mapped[str] = mapped_column(String(50), nullable=False)
