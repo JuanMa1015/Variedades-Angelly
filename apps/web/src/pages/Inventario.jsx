@@ -12,7 +12,9 @@ import Modal from '../components/Modal';
 const EMPTY_MANUAL_FORM = { nombre: '', codigo_barras: '', precio_costo: '', precio_venta: '', stock_actual: '', stock_minimo: '', proveedor_id: '' };
 
 const Inventario = () => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  // Desactivar productos es solo de admin/superadmin (el backend responde 403 al vendedor).
+  const canDeactivate = user?.role === 'admin' || user?.role === 'superadmin';
 
   const [productos, setProductos] = useState([]);
   const [proveedores, setProveedores] = useState([]);
@@ -866,14 +868,14 @@ const Inventario = () => {
                         >
                           <Pencil className="h-4 w-4" />
                         </button>
-                        <button
+                        {canDeactivate && <button
                           type="button"
                           onClick={() => handleDelete(producto)}
                           className="rounded-lg border border-gray-300 p-1.5 text-red-600 transition hover:bg-red-50"
                           title="Desactivar producto"
                         >
                           <Trash2 className="h-4 w-4" />
-                        </button>
+                        </button>}
                       </div>
                     </td>
                   </tr>

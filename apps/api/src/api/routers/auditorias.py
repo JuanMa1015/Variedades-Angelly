@@ -107,7 +107,7 @@ def update_auditoria(
     auditoria_id: int,
     payload: AuditoriaUpdateRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> AuditoriaResponse:
     auditoria = db.execute(
         select(AuditoriaModel).where(AuditoriaModel.id == auditoria_id),
@@ -145,7 +145,7 @@ def update_auditoria(
 def delete_auditoria(
     auditoria_id: int,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> Response:
     auditoria = db.execute(
         select(AuditoriaModel).where(AuditoriaModel.id == auditoria_id),

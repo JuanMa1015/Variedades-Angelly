@@ -10,6 +10,7 @@ export const SITE = {
 };
 
 export const CONTACTO = {
+  nit: env.VITE_CONTACTO_NIT ?? '',
   direccion: env.VITE_CONTACTO_DIRECCION ?? '',
   telefono: env.VITE_CONTACTO_TELEFONO ?? '',
   email: env.VITE_CONTACTO_EMAIL ?? '',

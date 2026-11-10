@@ -8,6 +8,7 @@ import ProductSelectionView from './Ventas/ProductSelectionView';
 import CartPanel from './Ventas/CartPanel';
 import SaleReceiptPanel from './Ventas/SaleReceiptPanel';
 import { formatMoney } from '../utils/format';
+import { CONTACTO, SITE } from '../config/site';
 
 const fetchJson = async ({ endpoint, signal, errorMessage }) => {
   try {
@@ -210,8 +211,6 @@ const Ventas = () => {
 
       await apiPost('/api/ventas', payload);
 
-      await loadData();
-
       const selectedCliente = esFiado && clienteTiendaId
         ? clientesTienda.find((c) => String(c.id) === String(clienteTiendaId))
         : null;
@@ -235,11 +234,18 @@ const Ventas = () => {
         pago,
         cambio: cambioContado,
         esFiado,
+        abono: esFiado ? abonoFiado : 0,
         cliente: selectedCliente?.nombre || null,
         timestamp: new Date().toLocaleString('es-CO'),
       });
 
       resetVentaForm();
+
+      // La venta ya quedo registrada: si la recarga falla no debe presentarse como
+      // un error de venta (el cajero la repetiria y se duplicaria el cobro).
+      loadData().catch(() => {
+        setSuccess('Venta registrada. No se pudo actualizar el inventario en pantalla; recarga la página.');
+      });
     } catch (err) {
       setError(err.message || 'No fue posible registrar la venta');
     } finally {
@@ -472,16 +478,17 @@ const Ventas = () => {
       <div id="print-receipt" className="hidden print:block">
         <div className="mx-auto bg-white p-2 text-xs text-gray-800">
           <div className="mb-3 text-center">
-            <p className="text-base font-bold uppercase tracking-wide">Variedades Angelly</p>
-            <p className="text-[10px] text-gray-600">NIT: 123.456.789-0</p>
-            <p className="text-[10px] text-gray-600">Carrera XX #YY-ZZ, Ciudad</p>
-            <p className="text-[10px] text-gray-600">Tel: (123) 456-7890</p>
+            <p className="text-base font-bold uppercase tracking-wide">{SITE.name}</p>
+            {CONTACTO.nit && <p className="text-[10px] text-gray-600">NIT: {CONTACTO.nit}</p>}
+            {CONTACTO.direccion && <p className="text-[10px] text-gray-600">{CONTACTO.direccion}</p>}
+            {CONTACTO.telefono && <p className="text-[10px] text-gray-600">Tel: {CONTACTO.telefono}</p>}
           </div>
 
           <div className="mb-2 border-t border-dashed border-gray-400" />
 
           <div className="mb-2 text-center">
-            <p className="text-xs font-bold uppercase tracking-wide">Factura de Venta</p>
+            <p className="text-xs font-bold uppercase tracking-wide">Comprobante de venta</p>
+            <p className="text-[10px] text-gray-500">Documento no válido como factura</p>
             <p className="text-[10px] text-gray-600">{printReceipt?.timestamp || ''}</p>
           </div>
 
@@ -522,6 +529,24 @@ const Ventas = () => {
                 <span>TOTAL:</span>
                 <span>{formatMoney(printReceipt.total)}</span>
               </div>
+              {printReceipt.esFiado && (
+                <>
+                  {printReceipt.cliente && (
+                    <div className="flex justify-between">
+                      <span>Cliente:</span>
+                      <span>{printReceipt.cliente}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span>Abono:</span>
+                    <span>{formatMoney(printReceipt.abono || 0)}</span>
+                  </div>
+                  <div className="flex justify-between font-semibold">
+                    <span>Queda fiado:</span>
+                    <span>{formatMoney(Math.max(0, printReceipt.total - (printReceipt.abono || 0)))}</span>
+                  </div>
+                </>
+              )}
               {!printReceipt.esFiado && (
                 <>
                   <div className="flex justify-between">

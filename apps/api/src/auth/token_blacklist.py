@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.infrastructure.database.models import RefreshTokenBlacklistModel
@@ -34,3 +35,19 @@ def is_jti_blacklisted(db: Session, jti: str) -> bool:
         RefreshTokenBlacklistModel.jti == jti,
     )
     return db.execute(statement).scalar_one_or_none() is not None
+
+
+def claim_jti(db: Session, jti: str, expires_at_epoch: int) -> bool:
+    """Marca el JTI como consumido de forma atomica (la PK impide doble uso).
+
+    Retorna False si otro request ya lo consumio: dos refresh simultaneos con el mismo
+    token no pueden salir ambos exitosos.
+    """
+    expires_naive = datetime.fromtimestamp(expires_at_epoch, tz=timezone.utc).replace(tzinfo=None)
+    db.add(RefreshTokenBlacklistModel(jti=jti, expires_at=expires_naive))
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        return False
+    return True

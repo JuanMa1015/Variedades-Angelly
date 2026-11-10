@@ -21,15 +21,18 @@ from src.auth.security import (
     create_access_token,
     create_refresh_token,
     decode_access_token,
+    hash_password,
     refresh_expire_days,
     verify_password,
 )
-from src.auth.token_blacklist import blacklist_jti, is_jti_blacklisted
+from src.auth.token_blacklist import blacklist_jti, claim_jti, is_jti_blacklisted
 from src.infrastructure.database.connection import get_db
 from src.infrastructure.database.models import UsuarioModel
 from src.api.limiter import limiter, login_rate_limit
 
 router = APIRouter(tags=["auth"])
+
+_DUMMY_PASSWORD_HASH = hash_password("dummy-password-for-timing-equalization")
 
 
 def _is_production() -> bool:
@@ -66,11 +69,13 @@ class LoginResponse(BaseModel):
 
 
 class RefreshResponse(BaseModel):
-    """Respuesta con nuevo access token."""
+    """Respuesta con nuevo access token e identidad del usuario (restaura sesion al recargar)."""
 
     access_token: str
     token_type: str = "bearer"
     expires_in: int
+    role: str
+    username: str
 
 
 class VendedorUsuarioResponse(BaseModel):
@@ -109,7 +114,11 @@ def auth_login(
         select(UsuarioModel).where(UsuarioModel.username == payload.username),
     ).scalar_one_or_none()
 
-    if usuario is None or not verify_password(payload.password, usuario.password_hash):
+    # Siempre se ejecuta bcrypt (hash falso si el usuario no existe) para que el tiempo de
+    # respuesta no revele si el username existe.
+    password_hash = usuario.password_hash if usuario is not None else _DUMMY_PASSWORD_HASH
+    password_ok = verify_password(payload.password, password_hash)
+    if usuario is None or not password_ok or not usuario.activo:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Credenciales invalidas",
@@ -176,25 +185,39 @@ def auth_refresh(
 
     jti = str(decoded.get("jti", "")).strip()
     expires_at = decoded.get("exp")
-    if jti and is_jti_blacklisted(db, jti):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Refresh token revocado",
-        )
-
     username = str(decoded.get("sub", ""))
-    role = str(decoded.get("role", ""))
-    if not username or not role:
+    if not jti or not isinstance(expires_at, int) or not username:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Refresh token invalido",
         )
 
+    if is_jti_blacklisted(db, jti):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token revocado",
+        )
+
+    # El refresh dura 30 dias: el usuario y su rol se revalidan contra la BD, no contra el token.
+    usuario = db.execute(
+        select(UsuarioModel).where(UsuarioModel.username == username),
+    ).scalar_one_or_none()
+    role = str(usuario.rol or "").lower().strip() if usuario is not None else ""
+    if usuario is None or not usuario.activo or role not in {"superadmin", "admin", "vendedor"}:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Usuario inactivo o inexistente",
+        )
+
+    # Consumo atomico del JTI: si dos requests llegan a la vez solo uno continua.
+    if not claim_jti(db, jti, expires_at):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token revocado",
+        )
+
     new_token, expires_in = create_access_token(username=username, role=role)
     new_refresh_token, refresh_expires = create_refresh_token(username=username, role=role)
-
-    if jti and isinstance(expires_at, int):
-        blacklist_jti(db, jti, expires_at)
 
     _set_access_token_cookie(response, new_token, expires_in)
     response.set_cookie(
@@ -209,6 +232,8 @@ def auth_refresh(
     return RefreshResponse(
         access_token=new_token,
         expires_in=expires_in,
+        role=role,
+        username=username,
     )
 
 
@@ -246,9 +271,9 @@ def list_vendedores(
 def create_vendedor(
     payload: VendedorUsuarioCreateRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> VendedorUsuarioResponse:
-    return VendedorUsuarioResponse(**_create_vendedor(payload.username, payload.password, db))
+    return VendedorUsuarioResponse(**_create_vendedor(payload.username, payload.password, db, current_user.username))
 
 
 @router.patch("/api/usuarios/vendedores/{usuario_id}", response_model=VendedorUsuarioResponse)
@@ -256,15 +281,15 @@ def update_vendedor(
     usuario_id: int,
     payload: VendedorUsuarioUpdateRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> VendedorUsuarioResponse:
-    return VendedorUsuarioResponse(**_update_vendedor(usuario_id, payload.username, payload.password, db))
+    return VendedorUsuarioResponse(**_update_vendedor(usuario_id, payload.username, payload.password, db, current_user.username))
 
 
 @router.delete("/api/usuarios/vendedores/{usuario_id}", status_code=204)
 def delete_vendedor(
     usuario_id: int,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> None:
-    _delete_vendedor(usuario_id, db)
+    _delete_vendedor(usuario_id, db, current_user.username)

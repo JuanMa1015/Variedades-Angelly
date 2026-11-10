@@ -101,6 +101,23 @@ const CartPanel = ({
           {!esFiado && (
             <div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
               <input type="text" inputMode="numeric" value={Number(montoPago) === 0 ? '' : String(montoPago)} onChange={(e) => { const v = parseInt(e.target.value.replace(/\D/g, ''), 10) || 0; onSetMontoPago(v); }} className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-rosewood focus:outline-none" placeholder="¿Con cuánto paga?" />
+              {totalEstimado > 0 && (
+                <div className="flex flex-wrap gap-1.5" aria-label="Montos rápidos de pago">
+                  {[totalEstimado, ...[5000, 10000, 20000, 50000, 100000]
+                    .map((step) => Math.ceil(totalEstimado / step) * step)
+                    .filter((value, index, arr) => value > totalEstimado && arr.indexOf(value) === index)
+                    .slice(0, 3)].map((value, index) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => onSetMontoPago(value)}
+                      className="rounded-lg border border-emerald-300 bg-white px-2 py-1 text-[11px] font-semibold text-emerald-800 transition hover:bg-emerald-100"
+                    >
+                      {index === 0 ? 'Exacto' : formatMoney(value)}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="grid grid-cols-3 gap-1.5">
                 {['efectivo', 'nequi', 'tarjeta'].map((opt) => (
                   <button key={opt} type="button" onClick={() => onSetMetodoPago(opt)} className={`rounded-lg border px-2 py-1.5 text-[11px] font-semibold transition ${metodoPago === opt ? 'border-rosewood bg-rosewood text-white' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}>

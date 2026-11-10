@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
+from src.api.services.auditoria import registrar_auditoria
 from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.pagination import PageInfo, build_page
 from src.infrastructure.database.connection import get_db
@@ -187,7 +188,7 @@ def toggle_proveedor_activo(
 def delete_proveedor(
     proveedor_id: int,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> Response:
     proveedor = db.execute(
         select(ProveedorModel).where(ProveedorModel.id == proveedor_id),
@@ -221,6 +222,15 @@ def delete_proveedor(
         .values(proveedor_id=None),
     )
     db.flush()
+    registrar_auditoria(
+        db,
+        usuario=current_user.username,
+        modulo="proveedores",
+        entidad="proveedor",
+        accion="eliminar",
+        entidad_id=proveedor.id,
+        detalle=f"Eliminado: {proveedor.nombre}",
+    )
     db.delete(proveedor)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

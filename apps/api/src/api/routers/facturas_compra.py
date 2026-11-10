@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from src.api.services.auditoria import registrar_auditoria
 from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.pagination import PageInfo, build_page
 from src.infrastructure.database.connection import get_db
@@ -37,7 +38,7 @@ class FacturaCompraCreateRequest(BaseModel):
     proveedor_id: Annotated[int, Field(gt=0)]
     items: Annotated[list[FacturaDetalleCreateRequest], Field(min_length=1)]
     encomienda: Annotated[float, Field(ge=0)] = 0.0
-    porcentaje_ganancia: Annotated[float, Field(gt=0, le=1)] = 0.70
+    porcentaje_ganancia: Annotated[float, Field(ge=0.05, le=0.95)] = 0.70
     numero_factura: Annotated[str | None, Field(max_length=20)] = None
 
 
@@ -107,6 +108,14 @@ def _to_factura_response(
             for item in items
         ],
     )
+
+
+@router.get("/api/facturas-compra/config")
+def get_facturas_config(
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+) -> dict[str, float]:
+    """Parametros que el frontend necesita para previsualizar totales (fuente unica: backend)."""
+    return {"iva_rate": IVA_RATE}
 
 
 @router.get("/api/facturas-compra", response_model=list[FacturaCompraResponse])
@@ -301,7 +310,7 @@ def update_factura_compra(
     factura_id: int,
     payload: FacturaCompraUpdateRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> FacturaCompraResponse:
     factura = db.execute(
         select(FacturaCompraModel).where(FacturaCompraModel.id == factura_id),
@@ -310,6 +319,15 @@ def update_factura_compra(
         raise HTTPException(status_code=404, detail="Factura no encontrada")
 
     if payload.total_factura is not None:
+        registrar_auditoria(
+            db,
+            usuario=current_user.username,
+            modulo="facturas",
+            entidad="factura_compra",
+            accion="editar_total",
+            entidad_id=factura.id,
+            detalle=f"Total {factura.total_factura} -> {payload.total_factura}",
+        )
         factura.total_factura = payload.total_factura
 
     db.commit()
@@ -335,7 +353,7 @@ def update_factura_compra(
 def delete_factura_compra(
     factura_id: int,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> None:
     factura = db.execute(
         select(FacturaCompraModel).where(FacturaCompraModel.id == factura_id),
@@ -348,6 +366,15 @@ def delete_factura_compra(
             FacturaCompraDetalleModel.factura_id == factura.id,
         ),
     ).scalars().all()
+    registrar_auditoria(
+        db,
+        usuario=current_user.username,
+        modulo="facturas",
+        entidad="factura_compra",
+        accion="eliminar",
+        entidad_id=factura.id,
+        detalle=f"Eliminada factura total {factura.total_factura}",
+    )
     for detalle in detalles:
         db.delete(detalle)
     db.delete(factura)
