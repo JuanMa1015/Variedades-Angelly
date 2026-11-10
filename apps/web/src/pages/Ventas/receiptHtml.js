@@ -18,7 +18,12 @@ const itemRows = (items, formatMoney) => items.map((item) => (
 )).join('');
 
 const totalsBlock = (receipt, formatMoney) => {
-  const lines = [row('TOTAL:', formatMoney(receipt.total), true)];
+  const lines = [];
+  if (receipt.descuento > 0) {
+    lines.push(row('Subtotal:', formatMoney(receipt.total + receipt.descuento)));
+    lines.push(row(`Descuento (${receipt.puntosCanjeados} pts):`, `-${formatMoney(receipt.descuento)}`));
+  }
+  lines.push(row('TOTAL:', formatMoney(receipt.total), true));
   if (receipt.esFiado) {
     if (receipt.cliente) lines.push(row('Cliente:', receipt.cliente));
     lines.push(row('Abono:', formatMoney(receipt.abono || 0)));

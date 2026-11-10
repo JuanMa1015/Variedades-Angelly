@@ -133,6 +133,9 @@ class VentaResponse(BaseModel):
     detalles: list[VentaDetalleResponse]
     resumen_recibo: str
     puntos_otorgados: int = 0
+    puntos_canjeados: int = 0
+    descuento_puntos: float = 0.0
+    monto_recibido: float | None = None
     anulada: bool = False
     anulada_en: datetime | None = None
     anulada_por: str | None = None

@@ -20,6 +20,7 @@ export const emptyTicket = () => ({
   esFiado: false,
   clienteTiendaId: '',
   clienteFidelizacionId: '',
+  usarPuntos: false,
   montoPago: '0',
   abonoInicialFiado: '0',
   metodoPago: 'efectivo',
@@ -74,7 +75,18 @@ export const validateSale = ({ grouped, productos, ticket, total }) => {
   return pago < total ? 'El dinero recibido es menor al total de la venta' : null;
 };
 
-export const buildSalePayload = ({ grouped, ticket }) => {
+// Canje de puntos como descuento: solo si el cliente alcanza el minimo y nunca por mas del total.
+// 1 punto = `valor_punto` pesos (lo define el servidor); se usan todos los puntos que caben en la venta.
+export const loyaltyRedemption = ({ cliente, config, subtotal, usar }) => {
+  const valor = Number(config?.valor_punto) || 0;
+  const puntosCliente = Number(cliente?.puntos_acumulados) || 0;
+  const alcanza = valor > 0 && puntosCliente >= (Number(config?.umbral_bono) || 0);
+  const maxPuntos = alcanza ? Math.min(puntosCliente, Math.floor(subtotal / valor)) : 0;
+  const puntos = usar ? maxPuntos : 0;
+  return { maxPuntos, puntos, descuento: puntos * valor };
+};
+
+export const buildSalePayload = ({ grouped, ticket, puntosCanjeados = 0, montoRecibido = null }) => {
   const payload = {
     items: Array.from(grouped.entries()).map(([producto_id, cantidad]) => ({ producto_id, cantidad })),
     es_fiado: ticket.esFiado,
@@ -82,6 +94,8 @@ export const buildSalePayload = ({ grouped, ticket }) => {
     metodo_pago: ticket.metodoPago === 'nequi' ? 'transferencia' : ticket.metodoPago,
   };
   if (ticket.clienteFidelizacionId) payload.cliente_fidelizacion_id = Number(ticket.clienteFidelizacionId);
+  if (puntosCanjeados > 0) payload.puntos_a_canjear = puntosCanjeados;
+  if (montoRecibido != null && !ticket.esFiado) payload.monto_recibido = montoRecibido;
   if (ticket.esFiado) {
     payload.fiado_origen = 'tienda';
     payload.cliente_tienda_id = Number(ticket.clienteTiendaId);

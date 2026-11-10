@@ -160,6 +160,21 @@ describe('HistorialVentasModal', () => {
     expect(await screen.findByText('Autorizacion invalida')).toBeInTheDocument();
   });
 
+  it('al reabrir el historial no queda el formulario de anulación anterior', async () => {
+    fetchMock.mockResolvedValue([venta()]);
+    const props = { onClose: vi.fn(), role: 'vendedor', onPrint: vi.fn(), onChanged: vi.fn() };
+    const { rerender } = render(<HistorialVentasModal isOpen {...props} />);
+    await screen.findByText('#7');
+    fireEvent.click(screen.getByRole('button', { name: /^Anular/ }));
+    fireEvent.change(screen.getByLabelText('Clave del administrador'), { target: { value: 'secreta' } });
+
+    rerender(<HistorialVentasModal isOpen={false} {...props} />);
+    rerender(<HistorialVentasModal isOpen {...props} />);
+    await screen.findByText('#7');
+
+    expect(screen.queryByLabelText('Clave del administrador')).not.toBeInTheDocument();
+  });
+
   it('avisa si no se pudo cargar', async () => {
     fetchMock.mockRejectedValue(new Error('Sin conexión'));
     abrir();

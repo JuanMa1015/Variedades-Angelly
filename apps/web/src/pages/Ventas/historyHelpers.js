@@ -4,6 +4,8 @@ import { parseApiDate } from '../../utils/format';
 export const receiptFromVenta = (venta) => {
   const total = Number(venta.total || 0);
   const esFiado = Boolean(venta.es_fiado);
+  // Si la venta guardo el monto recibido se reimprime con su cambio real.
+  const pago = Number(venta.monto_recibido) > 0 ? Number(venta.monto_recibido) : total;
   const abono = esFiado ? Math.max(0, total - Number(venta.saldo_pendiente || 0)) : 0;
   return {
     items: (venta.detalles ?? []).map((detalle) => ({
@@ -14,8 +16,10 @@ export const receiptFromVenta = (venta) => {
     })),
     total,
     metodoPago: venta.metodo_pago,
-    pago: total,
-    cambio: 0,
+    pago,
+    cambio: esFiado ? 0 : Math.max(0, pago - total),
+    descuento: Number(venta.descuento_puntos || 0),
+    puntosCanjeados: Number(venta.puntos_canjeados || 0),
     esFiado,
     abono,
     puntos: Number(venta.puntos_otorgados || 0),

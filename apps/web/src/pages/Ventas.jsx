@@ -12,6 +12,7 @@ import CajaGate from './Ventas/CajaGate';
 import HistorialVentasModal from './Ventas/HistorialVentasModal';
 import MobileCartBar from './Ventas/MobileCartBar';
 import NewClientModal from './Ventas/NewClientModal';
+import NewLoyaltyClientModal from './Ventas/NewLoyaltyClientModal';
 import { printHtml } from './Ventas/printReceipt';
 import { buildReceiptHtml } from './Ventas/receiptHtml';
 import { useAvailableHeight } from './Ventas/useAvailableHeight';
@@ -26,12 +27,14 @@ import {
   extractProductos,
   groupCartItems,
   looksLikeBarcode,
+  loyaltyRedemption,
   resolvePayment,
   validateSale,
 } from './Ventas/posHelpers';
 import { formatMoney } from '../utils/format';
 import { CONTACTO, SITE } from '../config/site';
 
+const EMPTY_LOYALTY_FORM = { nombre: '', telefono: '', aceptaDatos: false };
 const TICKET_FIELDS = Object.keys(emptyTicket());
 const pickTicketFields = (source) => Object.fromEntries(TICKET_FIELDS.map((field) => [field, source[field]]));
 
@@ -53,6 +56,8 @@ const Ventas = () => {
   const [newClient, setNewClient] = useState({ nombre: '', telefono: '' });
   const [isNewClientOpen, setIsNewClientOpen] = useState(false);
   const [creatingClient, setCreatingClient] = useState(false);
+  const [isLoyaltyModalOpen, setIsLoyaltyModalOpen] = useState(false);
+  const [loyaltyForm, setLoyaltyForm] = useState(EMPTY_LOYALTY_FORM);
 
   const searchInputRef = useRef(null);
   const rootRef = useRef(null);
@@ -69,7 +74,7 @@ const Ventas = () => {
     [ticket.items],
   );
 
-  const totalEstimado = useMemo(
+  const subtotalEstimado = useMemo(
     () => ticket.items.reduce((acc, item) => {
       const producto = productosById.get(Number(item.producto_id));
       const cantidad = Number(item.cantidad || 0);
@@ -77,6 +82,22 @@ const Ventas = () => {
     }, 0),
     [ticket.items, productosById],
   );
+
+  const clienteFidelizacion = useMemo(
+    () => clientesFidelizacion.find((cliente) => String(cliente.id) === String(ticket.clienteFidelizacionId)),
+    [clientesFidelizacion, ticket.clienteFidelizacionId],
+  );
+  const redencion = useMemo(
+    () => loyaltyRedemption({
+      cliente: clienteFidelizacion,
+      config: fidelizacionConfig,
+      subtotal: subtotalEstimado,
+      usar: ticket.usarPuntos,
+    }),
+    [clienteFidelizacion, fidelizacionConfig, subtotalEstimado, ticket.usarPuntos],
+  );
+  // Lo que realmente se cobra: el subtotal menos el descuento por puntos.
+  const totalEstimado = subtotalEstimado - redencion.descuento;
 
   const cambioContado = useMemo(() => {
     if (ticket.metodoPago !== 'efectivo') return 0;
@@ -219,7 +240,12 @@ const Ventas = () => {
 
     try {
       setSubmittingVenta(true);
-      const ventaCreada = await apiPost('/api/ventas', buildSalePayload({ grouped, ticket }));
+      const ventaCreada = await apiPost('/api/ventas', buildSalePayload({
+        grouped,
+        ticket,
+        puntosCanjeados: redencion.puntos,
+        montoRecibido: ticket.esFiado || ticket.metodoPago !== 'efectivo' ? null : pago,
+      }));
 
       const selectedCliente = ticket.esFiado
         ? clientesTienda.find((cliente) => String(cliente.id) === String(ticket.clienteTiendaId))
@@ -234,6 +260,8 @@ const Ventas = () => {
       setVentaCompletada({
         items: receiptItems,
         total: totalEstimado,
+        descuento: redencion.descuento,
+        puntosCanjeados: redencion.puntos,
         metodoPago: ticket.metodoPago,
         pago,
         cambio: ticket.esFiado ? 0 : Math.max(0, pago - totalEstimado),
@@ -252,6 +280,8 @@ const Ventas = () => {
       });
     } catch (err) {
       setError(err.message || 'No fue posible registrar la venta');
+      // Otra pestaña pudo cerrar la caja: se vuelve a consultar para mostrar la apertura.
+      if (err.status === 409 && /caja/i.test(err.message || '')) data.reload().catch(() => {});
     } finally {
       setSubmittingVenta(false);
     }
@@ -290,6 +320,28 @@ const Ventas = () => {
 
   // ── Clientes ──
 
+  const handleCreateLoyaltyClient = async (event) => {
+    event.preventDefault();
+    cleanMessages();
+    try {
+      setCreatingClient(true);
+      const creado = await apiPost('/api/fidelizacion/clientes', {
+        nombre: loyaltyForm.nombre.trim(),
+        telefono_whatsapp: loyaltyForm.telefono.replace(/\D/g, ''),
+        acepta_datos: loyaltyForm.aceptaDatos,
+      });
+      data.setClientesFidelizacion((current) => [...current, creado].sort((a, b) => String(a.nombre).localeCompare(String(b.nombre), 'es')));
+      patchTicket({ clienteFidelizacionId: String(creado.id), usarPuntos: false });
+      setLoyaltyForm(EMPTY_LOYALTY_FORM);
+      setIsLoyaltyModalOpen(false);
+      setSuccess(`${creado.nombre} quedó inscrito en el programa de puntos`);
+    } catch (err) {
+      setError(err.message || 'No se pudo inscribir al cliente');
+    } finally {
+      setCreatingClient(false);
+    }
+  };
+
   const handleCreateStoreClient = async (event) => {
     event.preventDefault();
     cleanMessages();
@@ -322,7 +374,7 @@ const Ventas = () => {
   // ── Atajos ──
 
   useVentasShortcuts({
-    enabled: !isNewClientOpen,
+    enabled: !isNewClientOpen && !isLoyaltyModalOpen,
     onFocusSearch: () => {
       if (ventaCompletada) handleNewSale();
       searchInputRef.current?.focus();
@@ -407,7 +459,12 @@ const Ventas = () => {
               submittingVenta={submittingVenta}
               clientesFidelizacion={clientesFidelizacion}
               clienteFidelizacionId={ticket.clienteFidelizacionId}
-              onSetClienteFidelizacionId={(clienteFidelizacionId) => patchTicket({ clienteFidelizacionId })}
+              onSetClienteFidelizacionId={(clienteFidelizacionId) => patchTicket({ clienteFidelizacionId, usarPuntos: false })}
+              onCreateFidelizacion={() => setIsLoyaltyModalOpen(true)}
+              redencion={redencion}
+              valorPunto={fidelizacionConfig.valor_punto}
+              usarPuntos={ticket.usarPuntos}
+              onSetUsarPuntos={(usarPuntos) => patchTicket({ usarPuntos })}
               puntosEstimados={puntosEstimados}
               heldTickets={heldTickets.tickets}
               onHold={handleHold}
@@ -437,6 +494,14 @@ const Ventas = () => {
         role={user?.role}
         onPrint={(receipt) => printHtml(buildReceiptHtml(receipt, { formatMoney, site: SITE, contacto: CONTACTO }))}
         onChanged={() => data.reload()}
+      />
+      <NewLoyaltyClientModal
+        isOpen={isLoyaltyModalOpen}
+        onClose={() => setIsLoyaltyModalOpen(false)}
+        form={loyaltyForm}
+        onChange={(patch) => setLoyaltyForm((current) => ({ ...current, ...patch }))}
+        onSubmit={handleCreateLoyaltyClient}
+        saving={creatingClient}
       />
       <NewClientModal
         isOpen={isNewClientOpen}

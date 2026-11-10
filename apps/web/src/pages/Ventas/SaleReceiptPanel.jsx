@@ -54,6 +54,13 @@ const SaleReceiptPanel = ({ receipt, formatMoney, onPrint, onNewSale }) => {
             valueClass="text-amber-700"
           />
         )}
+        {receipt.descuento > 0 && (
+          <SummaryRow
+            label={`Descuento por ${receipt.puntosCanjeados} puntos`}
+            value={`-${formatMoney(receipt.descuento)}`}
+            valueClass="text-violet-700"
+          />
+        )}
         {receipt.puntos > 0 && <SummaryRow label="Puntos ganados" value={`+${receipt.puntos}`} valueClass="text-violet-700" />}
         <div className="flex items-center justify-between border-t border-gray-200 pt-2">
           <span className="text-base font-bold text-gray-900">Total</span>

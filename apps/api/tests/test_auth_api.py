@@ -216,36 +216,19 @@ def test_cartera_admin_solo_lista_clientes_fiados(
     assert "Cliente Al Dia" not in nombres
 
 
-def test_fidelizacion_canjea_bono_y_descuenta_puntos(
+def test_ya_no_existe_el_canje_de_bono_sin_descuento(
     auth_client: tuple[TestClient, sessionmaker[Session]],
 ) -> None:
-    """Valida ciclo basico de canje para clientes de fidelizacion."""
-    client, testing_session_local = auth_client
-
-    with testing_session_local() as session:
-        session.add(
-            ClienteFidelizacionModel(
-                nombre="Cliente Bono",
-                telefono_whatsapp="3009876543",
-                puntos_acumulados=140,
-            ),
-        )
-        session.commit()
-        cliente = session.execute(
-            select(ClienteFidelizacionModel).where(
-                ClienteFidelizacionModel.telefono_whatsapp == "3009876543",
-            ),
-        ).scalar_one()
-        cliente_id = cliente.id
-
+    """Los puntos solo se canjean como descuento dentro de la venta, no restandolos sin beneficio."""
+    client, _ = auth_client
     admin_token = _login_token(client, "angelly_admin", "cambiame123")
-    canje_response = client.post(
-        f"/api/fidelizacion/clientes/{cliente_id}/canjear-bono",
+
+    respuesta = client.post(
+        "/api/fidelizacion/clientes/1/canjear-bono",
         headers={"Authorization": f"Bearer {admin_token}"},
     )
 
-    assert canje_response.status_code == 200
-    assert canje_response.json()["puntos_acumulados"] == 40
+    assert respuesta.status_code in {404, 405}
 
 
 def test_vendedor_puede_listar_clientes_fidelizacion(

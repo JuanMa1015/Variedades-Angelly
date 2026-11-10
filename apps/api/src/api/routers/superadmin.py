@@ -522,6 +522,8 @@ def informes_superadmin(
             func.coalesce(func.sum(DetalleVentaModel.cantidad), 0).label("unidades_vendidas"),
             func.coalesce(func.sum(DetalleVentaModel.subtotal), 0.0).label("total_vendido"),
         )
+        .join(VentaModel, VentaModel.id == DetalleVentaModel.venta_id)
+        .where(VentaModel.anulada.is_(False))
         .group_by(DetalleVentaModel.producto_id, DetalleVentaModel.nombre_producto)
         .order_by(
             func.sum(DetalleVentaModel.cantidad).desc(),
@@ -537,6 +539,8 @@ def informes_superadmin(
             func.coalesce(func.sum(DetalleVentaModel.cantidad), 0).label("unidades_vendidas"),
             func.coalesce(func.sum(DetalleVentaModel.subtotal), 0.0).label("total_vendido"),
         )
+        .join(VentaModel, VentaModel.id == DetalleVentaModel.venta_id)
+        .where(VentaModel.anulada.is_(False))
         .group_by(DetalleVentaModel.producto_id, DetalleVentaModel.nombre_producto)
         .order_by(
             func.sum(DetalleVentaModel.cantidad).asc(),

@@ -74,8 +74,9 @@ const VentaRow = ({ venta, pideAutorizacion, onPrint, onAnulada, anulando, onTog
   );
 };
 
-// Ultimas ventas: sirve para reimprimir el comprobante y para anular una venta con autorizacion.
-const HistorialVentasModal = ({ isOpen, onClose, role, onPrint, onChanged }) => {
+// Lista con su propio estado: al cerrar el modal se desmonta, asi al reabrir no queda ni la lista
+// vieja ni un formulario de anulacion (con la clave del administrador) a medias.
+const HistorialLista = ({ role, onPrint, onChanged }) => {
   const [ventas, setVentas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -93,8 +94,8 @@ const HistorialVentasModal = ({ isOpen, onClose, role, onPrint, onChanged }) => 
   }, []);
 
   useEffect(() => {
-    if (isOpen) void cargar();
-  }, [isOpen, cargar]);
+    void cargar();
+  }, [cargar]);
 
   const handleAnulada = async () => {
     setAnulandoId(null);
@@ -105,7 +106,7 @@ const HistorialVentasModal = ({ isOpen, onClose, role, onPrint, onChanged }) => 
   const pideAutorizacion = role !== 'admin' && role !== 'superadmin';
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Historial de ventas" subtitle="Las últimas 30 ventas" maxWidth="max-w-2xl">
+    <>
       {error && <p role="alert" className="mb-2 text-sm text-red-600">{error}</p>}
       {loading && <p className="text-sm text-gray-500">Cargando…</p>}
       {!loading && ventas.length === 0 && !error && <p className="text-sm text-gray-500">Todavía no hay ventas.</p>}
@@ -122,8 +123,15 @@ const HistorialVentasModal = ({ isOpen, onClose, role, onPrint, onChanged }) => 
           />
         ))}
       </ul>
-    </Modal>
+    </>
   );
 };
+
+// Ultimas ventas: sirve para reimprimir el comprobante y para anular una venta con autorizacion.
+const HistorialVentasModal = ({ isOpen, onClose, role, onPrint, onChanged }) => (
+  <Modal isOpen={isOpen} onClose={onClose} title="Historial de ventas" subtitle="Las últimas 30 ventas" maxWidth="max-w-2xl">
+    <HistorialLista role={role} onPrint={onPrint} onChanged={onChanged} />
+  </Modal>
+);
 
 export default HistorialVentasModal;

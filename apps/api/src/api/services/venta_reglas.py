@@ -40,10 +40,14 @@ def exigir_metodo_pago_si_hay_cobro(metodo_pago: str | None, hay_cobro: bool) ->
         raise HTTPException(status_code=400, detail="Debes indicar el metodo de pago")
 
 
-def exigir_caja_abierta(db: Session) -> None:
-    """Sin turno abierto el dinero cobrado no entra a ningun cuadre: no se puede vender."""
-    abierta = db.execute(
+def caja_abierta_id(db: Session) -> int | None:
+    """Id del turno de caja abierto, o None si la caja esta cerrada."""
+    return db.execute(
         select(CierreCajaModel.id).where(CierreCajaModel.fecha_cierre.is_(None)).limit(1),
     ).scalar_one_or_none()
-    if abierta is None:
+
+
+def exigir_caja_abierta(db: Session) -> None:
+    """Sin turno abierto el dinero cobrado no entra a ningun cuadre: no se puede vender."""
+    if caja_abierta_id(db) is None:
         raise HTTPException(status_code=409, detail="La caja esta cerrada. Abre la caja para registrar ventas")

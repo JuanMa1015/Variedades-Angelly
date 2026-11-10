@@ -1,11 +1,12 @@
 import { Gift } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { apiGet, apiRequest } from '../api/httpClient';
+import { apiGet } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage'
 import Skeleton from '../components/Skeleton'
 
 const UMBRAL_BONO_DEFECTO = 100;
+const VALOR_PUNTO_DEFECTO = 20;
 
 const Fidelizacion = () => {
   const { token } = useAuth();
@@ -14,7 +15,7 @@ const Fidelizacion = () => {
   const [umbralBono, setUmbralBono] = useState(UMBRAL_BONO_DEFECTO);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [redeemingClientId, setRedeemingClientId] = useState(null);
+  const [valorPunto, setValorPunto] = useState(VALOR_PUNTO_DEFECTO);
 
   const fetchClientes = async (signal) => {
     const payload = await apiGet('/api/fidelizacion/clientes', { signal });
@@ -37,6 +38,7 @@ const Fidelizacion = () => {
         await fetchClientes(controller.signal);
         const config = await apiGet('/api/fidelizacion/config', { signal: controller.signal }).catch(() => null);
         if (!controller.signal.aborted && config?.umbral_bono > 0) setUmbralBono(config.umbral_bono);
+        if (!controller.signal.aborted && config?.valor_punto > 0) setValorPunto(config.valor_punto);
       } catch {
         if (controller.signal.aborted) return;
         setError('No fue posible cargar clientes de fidelización');
@@ -53,25 +55,6 @@ const Fidelizacion = () => {
     return () => controller.abort();
   }, [token]);
 
-  const handleCanjearBono = async (cliente) => {
-    setRedeemingClientId(cliente.id);
-    setError('');
-
-    try {
-      const payload = await apiRequest(`/api/fidelizacion/clientes/${cliente.id}/canjear-bono`, {
-        method: 'POST',
-      });
-
-      setClientes((current) =>
-        current.map((item) => (item.id === payload.id ? payload : item)),
-      );
-    } catch (err) {
-      setError(err.message || 'No fue posible canjear el bono');
-    } finally {
-      setRedeemingClientId(null);
-    }
-  };
-
   const clientesConBono = useMemo(
     () => clientes.filter((item) => Number(item.puntos_acumulados ?? 0) >= umbralBono).length,
     [clientes, umbralBono],
@@ -83,7 +66,7 @@ const Fidelizacion = () => {
         <Gift className="w-8 h-8 text-rosewood" />
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Fidelización</h1>
-          <p className="text-gray-600">Programa de bonos y recompensas</p>
+          <p className="text-gray-600">Los puntos se canjean como descuento al cobrar en Ventas</p>
         </div>
       </div>
 
@@ -100,11 +83,12 @@ const Fidelizacion = () => {
             <p className="text-3xl font-bold text-gray-900">{clientes.length}</p>
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <p className="text-sm text-gray-500 uppercase">Umbral de Canje</p>
-            <p className="text-3xl font-bold text-gray-900">{umbralBono}</p>
+            <p className="text-sm text-gray-500 uppercase">Mínimo para canjear</p>
+            <p className="text-3xl font-bold text-gray-900">{umbralBono} pts</p>
+            <p className="text-xs text-gray-500">1 punto = ${valorPunto}</p>
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <p className="text-sm text-gray-500 uppercase">Bono Disponible</p>
+            <p className="text-sm text-gray-500 uppercase">Pueden canjear</p>
             <p className="text-3xl font-bold text-emerald-700">{clientesConBono}</p>
           </div>
         </div>
@@ -120,13 +104,12 @@ const Fidelizacion = () => {
                 <th className="px-4 py-3 text-sm font-semibold text-gray-700">Nombre</th>
                 <th className="px-4 py-3 text-sm font-semibold text-gray-700">WhatsApp</th>
                 <th className="px-4 py-3 text-sm font-semibold text-gray-700">Puntos</th>
-                <th className="px-4 py-3 text-sm font-semibold text-gray-700">Acción</th>
               </tr>
             </thead>
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan="4" className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan="3" className="px-4 py-8 text-center text-gray-500">
                     <Skeleton lines={1} />
                   </td>
                 </tr>
@@ -134,7 +117,7 @@ const Fidelizacion = () => {
 
               {!loading && clientes.length === 0 && (
                 <tr>
-                  <td colSpan="4" className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan="3" className="px-4 py-8 text-center text-gray-500">
                     No hay clientes de fidelización registrados.
                   </td>
                 </tr>
@@ -143,7 +126,6 @@ const Fidelizacion = () => {
               {!loading && clientes.map((cliente) => {
                 const puntos = Number(cliente.puntos_acumulados ?? 0);
                 const habilitado = puntos >= umbralBono;
-                const canjeando = redeemingClientId === cliente.id;
 
                 return (
                   <tr key={cliente.id} className="border-b border-gray-100">
@@ -153,16 +135,6 @@ const Fidelizacion = () => {
                       <span className={`font-bold ${habilitado ? 'text-emerald-700' : 'text-gray-700'}`}>
                         {puntos}
                       </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        type="button"
-                        disabled={!habilitado || canjeando}
-                        onClick={() => handleCanjearBono(cliente)}
-                        className="rounded-lg px-4 py-2 bg-rosewood text-white font-semibold disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed"
-                      >
-                        {canjeando ? 'Canjeando...' : '🎁 CANJEAR BONO'}
-                      </button>
                     </td>
                   </tr>
                 );
