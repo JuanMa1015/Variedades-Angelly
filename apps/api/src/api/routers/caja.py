@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from src.api.services.auditoria import registrar_auditoria
 from src.api.services.caja_calculos import calcular_metricas, efectivo_esperado
+from src.api.services.caja_movimientos import movimientos_de_turno
 from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.schemas.caja import (
     ActualizarCajaRequest,
@@ -18,6 +19,7 @@ from src.api.schemas.caja import (
     CajaHistorialItemResponse,
     CierreCajaRequest,
     CierreCajaResponse,
+    MovimientoCajaResponse,
 )
 from src.infrastructure.database.connection import get_db
 from src.infrastructure.database.models import (
@@ -65,6 +67,7 @@ def _to_cierre_caja_response(
         esta_abierta=esta_abierta,
         descuadre=cierre.esperado_vs_real if cierre.esperado_vs_real is not None
                   else (float(cierre.monto_cierre) - saldo_esperado if cierre.monto_cierre is not None else None),
+        observaciones=cierre.observaciones,
     )
 
 
@@ -153,7 +156,8 @@ def caja_cierre(
         select(CierreCajaModel)
         .where(CierreCajaModel.fecha_cierre.is_(None))
         .order_by(CierreCajaModel.id.desc())
-        .limit(1),
+        .limit(1)
+        .with_for_update(),  # dos cierres a la vez no pueden cerrar el mismo turno dos veces
     ).scalar_one_or_none()
 
     if caja is None:
@@ -168,6 +172,7 @@ def caja_cierre(
     caja.monto_ventas_tarjeta = float(caja.monto_ventas_tarjeta + metricas.tarjeta)
     caja.monto_gastos = float(caja.monto_gastos + metricas.gastos)
     caja.monto_cierre = payload.monto_cierre
+    caja.observaciones = (payload.observaciones or "").strip() or caja.observaciones
     caja.fecha_cierre = datetime.now(UTC).replace(tzinfo=None)
     caja.cerrado_por = current_user.username
     caja.estado = "cerrada"
@@ -180,39 +185,51 @@ def caja_cierre(
     return _to_cierre_caja_response(caja)
 
 
+def _item_historial(c: CierreCajaModel, user: AuthenticatedUser, db: Session) -> CajaHistorialItemResponse:
+    # Reusa el calculo de la caja: el turno abierto suma lo vivo, no los ceros que aun no se guardaron.
+    r = _to_cierre_caja_response(c, db=db)
+    return CajaHistorialItemResponse(
+        id=r.id,
+        fecha_apertura=r.fecha_apertura,
+        fecha_cierre=r.fecha_cierre,
+        abierto_por=r.abierto_por,
+        cerrado_por=r.cerrado_por,
+        monto_inicial=r.monto_inicial,
+        monto_ventas_efectivo=r.monto_ventas_efectivo,
+        monto_ventas_transferencia=r.monto_ventas_transferencia,
+        monto_ventas_tarjeta=r.monto_ventas_tarjeta,
+        monto_gastos=r.monto_gastos,
+        monto_cierre=r.monto_cierre,
+        saldo_esperado=None if _es_cierre_ciego(user, r.esta_abierta) else r.saldo_esperado,
+        esta_abierta=r.esta_abierta,
+        descuadre=float(c.esperado_vs_real) if c.esperado_vs_real is not None else None,
+        observaciones=c.observaciones,
+    )
+
+
 @router.get("/api/caja", response_model=list[CajaHistorialItemResponse])
 def caja_listar(
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> list[CajaHistorialItemResponse]:
     """Lista todas las aperturas y cierres de caja."""
     cierres = db.execute(
         select(CierreCajaModel).order_by(CierreCajaModel.fecha_apertura.desc()),
     ).scalars().all()
+    return [_item_historial(c, current_user, db) for c in cierres]
 
-    return [
-        CajaHistorialItemResponse(
-            id=c.id,
-            fecha_apertura=c.fecha_apertura,
-            fecha_cierre=c.fecha_cierre,
-            abierto_por=c.abierto_por,
-            cerrado_por=c.cerrado_por,
-            monto_inicial=float(c.monto_inicial),
-            monto_ventas_efectivo=float(c.monto_ventas_efectivo),
-            monto_ventas_transferencia=float(c.monto_ventas_transferencia),
-            monto_ventas_tarjeta=float(c.monto_ventas_tarjeta or 0.0),
-            monto_gastos=float(c.monto_gastos),
-            monto_cierre=float(c.monto_cierre) if c.monto_cierre is not None else None,
-            saldo_esperado=(
-                None
-                if _es_cierre_ciego(current_user, c.fecha_cierre is None)
-                else efectivo_esperado(c.monto_inicial, c.monto_ventas_efectivo, c.monto_gastos)
-            ),
-            esta_abierta=c.fecha_cierre is None,
-            descuadre=float(c.esperado_vs_real) if c.esperado_vs_real is not None else None,
-        )
-        for c in cierres
-    ]
+
+@router.get("/api/caja/{caja_id}/movimientos", response_model=list[MovimientoCajaResponse])
+def caja_movimientos(
+    caja_id: int,
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+) -> list[MovimientoCajaResponse]:
+    """Ventas (lo cobrado), abonos y gastos de un turno: lo que explica su efectivo esperado."""
+    caja = db.get(CierreCajaModel, caja_id)
+    if caja is None:
+        raise HTTPException(status_code=404, detail="Registro de caja no encontrado")
+    return movimientos_de_turno(db, caja)
 
 
 @router.patch("/api/caja/{caja_id}", response_model=CierreCajaResponse)
@@ -242,6 +259,11 @@ def caja_actualizar(
     )
     for key, value in update_data.items():
         setattr(caja, key, value)
+    if caja.monto_cierre is not None and ("monto_inicial" in update_data or "monto_cierre" in update_data):
+        # El descuadre guardado debe seguir al monto corregido, no quedarse con el del cierre original.
+        caja.esperado_vs_real = float(caja.monto_cierre) - efectivo_esperado(
+            caja.monto_inicial, caja.monto_ventas_efectivo, caja.monto_gastos,
+        )
 
     db.commit()
     db.refresh(caja)

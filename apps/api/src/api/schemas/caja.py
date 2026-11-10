@@ -18,6 +18,8 @@ class CierreCajaRequest(BaseModel):
     """Entrada para cerrar caja."""
 
     monto_cierre: Annotated[float, Field(ge=0)]
+    # Nota opcional para explicar un descuadre (p. ej. "faltaron $500 por un vuelto").
+    observaciones: Annotated[str | None, Field(max_length=500)] = None
 
 
 class ActualizarCajaRequest(BaseModel):
@@ -48,6 +50,7 @@ class CierreCajaResponse(BaseModel):
     total_ingresos: float
     esta_abierta: bool
     descuadre: float | None = None
+    observaciones: str | None = None
 
 
 class CajaEstadoResponse(BaseModel):
@@ -75,3 +78,18 @@ class CajaHistorialItemResponse(BaseModel):
     saldo_esperado: float | None
     esta_abierta: bool
     descuadre: float | None = None
+    observaciones: str | None = None
+
+
+class MovimientoCajaResponse(BaseModel):
+    """Una linea de lo que paso en un turno: venta, abono o gasto."""
+
+    tipo: str  # venta | abono_tienda | abono_cartera | gasto
+    id: int
+    fecha: datetime
+    descripcion: str
+    metodo_pago: str | None = None
+    monto: float  # dinero de este movimiento (en una venta, lo realmente cobrado)
+    total: float | None = None  # solo ventas: valor de la venta (un fiado cobra menos)
+    es_fiado: bool = False
+    anulada: bool = False

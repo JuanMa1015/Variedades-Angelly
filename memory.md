@@ -688,3 +688,17 @@ apps\api\.venv\Scripts\python.exe -m alembic -c apps\api\alembic.ini upgrade hea
   se amplió: Alembic no la repite aunque `/health` diga `al_dia`. Lección: nunca editar una migración ya aplicada en alguna base;
   agregar siempre una nueva.
 
+## 19. Caja: movimientos, historial vivo y cierre
+
+- `GET /api/caja/{id}/movimientos` (admin/vendedor/superadmin): ventas (lo realmente cobrado; las anuladas con `anulada=true`),
+  abonos de tienda/cartera y gastos del turno. Turnos viejos sin `caja_id` se listan por rango de fechas (`services/caja_movimientos.py`).
+  Es lo que explica el efectivo esperado: `inicial + efectivo (ventas+abonos) - gastos`.
+- `GET /api/caja` ya suma lo vivo en el turno abierto (antes mostraba ceros) y lo puede ver admin. `POST /api/caja/cierre` acepta
+  `observaciones` (nota que explica un descuadre) y bloquea la fila (`FOR UPDATE`) para no cerrar dos veces. Editar el monto de un
+  cierre recalcula su descuadre.
+- Cierre ciego: el vendedor no ve el efectivo esperado, pero el historial de ventas del POS le deja deducirlo: es una ayuda de
+  presentación, no una barrera de seguridad.
+- Frontend (`pages/Caja/*`): tarjetas por medio de pago, movimientos del turno, cierre con confirmación y nota, último cierre visible con
+  reporte imprimible (`buildCierreHtml`), historial en tarjetas (responsive) con detalle desplegable, lectura sin caché (`skipCache`) y
+  recarga al volver a la pestaña. `MoneyInput` permite apertura en 0 (antes `min=1` lo impedía).
+
