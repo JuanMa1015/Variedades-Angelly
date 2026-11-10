@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.api.services.auditoria import registrar_auditoria
@@ -107,6 +108,18 @@ def caja_estado(
     )
 
 
+_CAJA_YA_ABIERTA = HTTPException(
+    status_code=409,
+    detail="Ya hay una caja abierta. Debes cerrarla antes de abrir una nueva.",
+)
+
+
+def _hay_caja_abierta(db: Session) -> bool:
+    return db.execute(
+        select(CierreCajaModel.id).where(CierreCajaModel.fecha_cierre.is_(None)).limit(1),
+    ).first() is not None
+
+
 @router.post("/api/caja/apertura", response_model=CierreCajaResponse, status_code=201)
 def caja_apertura(
     payload: AperturaCajaRequest,
@@ -114,17 +127,8 @@ def caja_apertura(
     current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> CierreCajaResponse:
     """Abre la caja con un monto inicial. Rechaza si ya hay una caja abierta."""
-    caja_existente = db.execute(
-        select(CierreCajaModel)
-        .where(CierreCajaModel.fecha_cierre.is_(None))
-        .limit(1),
-    ).scalar_one_or_none()
-
-    if caja_existente is not None:
-        raise HTTPException(
-            status_code=409,
-            detail="Ya hay una caja abierta. Debes cerrarla antes de abrir una nueva.",
-        )
+    if _hay_caja_abierta(db):
+        raise _CAJA_YA_ABIERTA
 
     cierre = CierreCajaModel(
         usuario=current_user.username,
@@ -139,7 +143,12 @@ def caja_apertura(
         cerrado_por=None,
     )
     db.add(cierre)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        # Otra apertura gano la carrera: el indice unico de la base solo deja un turno abierto.
+        db.rollback()
+        raise _CAJA_YA_ABIERTA from exc
     db.refresh(cierre)
 
     return _to_cierre_caja_response(cierre)
