@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
@@ -17,6 +18,9 @@ from src.infrastructure.database.models import (
     ProductoModel,
     VentaModel,
 )
+
+
+pytestmark = pytest.mark.sin_turno
 
 
 def _h(token: str) -> dict[str, str]:
@@ -68,18 +72,19 @@ def test_la_venta_queda_asociada_al_turno_abierto(auth_client) -> None:
     assert _venta_caja_id(sf, venta_id) == caja_id
 
 
-def test_lo_vendido_con_la_caja_cerrada_no_entra_a_ningun_turno(auth_client) -> None:
+def test_con_la_caja_cerrada_no_se_vende_y_lo_anterior_queda_en_su_turno(auth_client) -> None:
     client, sf = auth_client
     producto = _producto(sf)
     vendedor = _login_token(client, "vendedor1", "ventas123")
 
-    antes = _vender(client, vendedor, producto).json()["venta_id"]
-    _abrir(client, vendedor)
+    assert _vender(client, vendedor, producto).status_code == 409
+    caja_id = _abrir(client, vendedor).json()["id"]
+    venta = _vender(client, vendedor, producto).json()["venta_id"]
     client.post("/api/caja/cierre", headers=_h(vendedor), json={"monto_cierre": 0})
-    despues = _vender(client, vendedor, producto).json()["venta_id"]
+    rechazada = _vender(client, vendedor, producto)
 
-    assert _venta_caja_id(sf, antes) is None
-    assert _venta_caja_id(sf, despues) is None
+    assert _venta_caja_id(sf, venta) == caja_id
+    assert rechazada.status_code == 409
 
 
 def test_cada_turno_cuenta_solo_lo_suyo(auth_client) -> None:
@@ -212,6 +217,7 @@ def test_el_dashboard_separa_tarjeta_transferencia_y_efectivo(auth_client) -> No
     producto = _producto(sf)
     vendedor = _login_token(client, "vendedor1", "ventas123")
     admin = _login_token(client, "angelly_admin", "cambiame123")
+    _abrir(client, vendedor)
     _vender(client, vendedor, producto, "efectivo", cantidad=1)
     _vender(client, vendedor, producto, "transferencia", cantidad=2)
     _vender(client, vendedor, producto, "tarjeta", cantidad=3)

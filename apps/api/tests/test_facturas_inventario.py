@@ -86,6 +86,20 @@ def test_factura_suma_stock_y_deja_el_ultimo_costo_sin_tocar_el_precio_de_venta(
     assert detalle["precio_venta_sugerido"] == 3400.0  # 2380 / 0.70, ya en multiplo de 50
 
 
+def test_el_vendedor_registra_y_consulta_facturas_de_compra(auth_client) -> None:
+    client, sf = auth_client
+    proveedor, producto = _proveedor(sf), _producto(sf)
+    vendedor = _login_token(client, "vendedor1", "ventas123")
+
+    respuesta = _factura(client, vendedor, proveedor, [
+        {"producto_id": producto, "cantidad": 4, "precio_unitario": 1000, "aplica_iva": False},
+    ])
+
+    assert respuesta.status_code == 201
+    assert _estado(sf, producto)[0] == 14
+    assert client.get("/api/facturas-compra", headers=_h(vendedor)).status_code == 200
+
+
 def test_factura_con_confirmacion_actualiza_el_precio_con_el_sugerido_redondeado(auth_client) -> None:
     client, sf = auth_client
     proveedor, producto = _proveedor(sf), _producto(sf)

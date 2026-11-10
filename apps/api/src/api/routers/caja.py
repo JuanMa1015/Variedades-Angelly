@@ -76,7 +76,7 @@ def _es_cierre_ciego(user: AuthenticatedUser, esta_abierta: bool) -> bool:
 @router.get("/api/caja/estado", response_model=CajaEstadoResponse)
 def caja_estado(
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> CajaEstadoResponse:
     """Retorna estado actual de la caja y ultimo cierre."""
     caja_abierta = db.execute(
@@ -108,7 +108,7 @@ def caja_estado(
 def caja_apertura(
     payload: AperturaCajaRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> CierreCajaResponse:
     """Abre la caja con un monto inicial. Rechaza si ya hay una caja abierta."""
     caja_existente = db.execute(
@@ -146,7 +146,7 @@ def caja_apertura(
 def caja_cierre(
     payload: CierreCajaRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> CierreCajaResponse:
     """Cierra la caja abierta. Calcula ventas/gastos del turno."""
     caja = db.execute(

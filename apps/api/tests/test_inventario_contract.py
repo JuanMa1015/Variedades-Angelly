@@ -12,6 +12,7 @@ from sqlalchemy.pool import StaticPool
 from src.infrastructure.database.connection import get_db
 from src.infrastructure.database.models import Base, ClienteFiadoTiendaModel
 from src.main import app
+from tests.test_auth_api import abrir_turno
 
 
 @pytest.fixture()
@@ -31,6 +32,7 @@ def inventario_client() -> Generator[tuple[TestClient, sessionmaker[Session]], N
     )
     testing_session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     Base.metadata.create_all(bind=engine)
+    abrir_turno(testing_session_local)
 
     def override_get_db():
         db = testing_session_local()

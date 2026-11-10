@@ -135,7 +135,7 @@ def test_admin_puede_crear_factura_compra_y_totales_iva(
     assert len(factura["items"]) == 2
 
 
-def test_vendedor_no_puede_crear_facturas_compra(
+def test_vendedor_puede_crear_facturas_compra(
     operaciones_client: tuple[TestClient, sessionmaker[Session]],
 ) -> None:
     client, _ = operaciones_client
@@ -171,7 +171,8 @@ def test_vendedor_no_puede_crear_facturas_compra(
         },
     )
 
-    assert forbidden_response.status_code == 403
+    # Ya no es 403: el vendedor llega a validar los productos (el 999 no existe).
+    assert forbidden_response.status_code == 404
 
 
 def test_no_se_puede_eliminar_proveedor_con_pedidos(
@@ -260,7 +261,7 @@ def test_vendedor_puede_crear_pedido_y_admin_actualizarlo(
     assert updated["monto_estimado"] == 150000
 
 
-def test_listado_facturas_compra_es_solo_admin(
+def test_vendedor_puede_listar_facturas_compra(
     operaciones_client: tuple[TestClient, sessionmaker[Session]],
 ) -> None:
     client, _ = operaciones_client
@@ -271,4 +272,4 @@ def test_listado_facturas_compra_es_solo_admin(
         headers={"Authorization": f"Bearer {vendedor_token}"},
     )
 
-    assert response.status_code == 403
+    assert response.status_code == 200

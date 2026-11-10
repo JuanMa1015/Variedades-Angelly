@@ -506,7 +506,7 @@ def informes_superadmin(
             func.count(VentaModel.id).label("ventas"),
             func.coalesce(func.sum(VentaModel.total), 0.0).label("total_vendido"),
         )
-        .where(VentaModel.creado_por.is_not(None))
+        .where(VentaModel.creado_por.is_not(None), VentaModel.anulada.is_(False))
         .group_by(VentaModel.creado_por)
         .order_by(
             func.sum(VentaModel.total).desc(),
@@ -576,7 +576,7 @@ def informes_superadmin(
         select(
             func.count(VentaModel.id),
             func.coalesce(func.sum(VentaModel.total), 0.0),
-        ).where(VentaModel.creado_por.is_not(None)),
+        ).where(VentaModel.creado_por.is_not(None), VentaModel.anulada.is_(False)),
     ).one()
 
     return InformesSuperadminResponse(

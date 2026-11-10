@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, Numeric, String, Text, event, select
+from sqlalchemy.sql import expression
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -147,6 +148,13 @@ class VentaModel(Base):
         nullable=True,
         index=True,
     )
+
+    # Una venta anulada no se borra: queda marcada con quien, cuando, por que y quien autorizo.
+    anulada: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=expression.false())
+    anulada_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), nullable=True)
+    anulada_por: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    autorizada_por: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    motivo_anulacion: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     def __repr__(self) -> str:
         return f"VentaModel(id={self.id!r}, total={self.total!r})"

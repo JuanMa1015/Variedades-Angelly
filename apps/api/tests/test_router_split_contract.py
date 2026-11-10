@@ -20,6 +20,7 @@ from src.infrastructure.database.models import (
     VentaModel,
 )
 from src.main import app
+from tests.test_auth_api import abrir_turno
 
 
 @pytest.fixture()
@@ -41,6 +42,7 @@ def split_router_client() -> Generator[tuple[TestClient, sessionmaker[Session]],
     )
     testing_session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     Base.metadata.create_all(bind=engine)
+    abrir_turno(testing_session_local)
 
     def override_get_db():
         db = testing_session_local()

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Generator
+from datetime import datetime
 import os
 
 import pytest
@@ -15,6 +16,7 @@ from src.auth.security import decode_access_token
 from src.infrastructure.database.connection import get_db
 from src.infrastructure.database.models import (
     Base,
+    CierreCajaModel,
     ClienteFiadoTiendaModel,
     ClienteFidelizacionModel,
     ClienteModel,
@@ -24,8 +26,26 @@ from src.infrastructure.database.models import (
 from src.main import app
 
 
+def abrir_turno(session_factory) -> None:
+    """Las ventas exigen caja abierta: las pruebas arrancan con un turno ya abierto."""
+    with session_factory() as db:
+        db.add(
+            CierreCajaModel(
+                usuario="angelly_admin",
+                fecha_apertura=datetime(2020, 1, 1),
+                monto_inicial=0.0,
+                monto_ventas_efectivo=0.0,
+                monto_ventas_transferencia=0.0,
+                monto_gastos=0.0,
+                estado="abierta",
+                abierto_por="angelly_admin",
+            ),
+        )
+        db.commit()
+
+
 @pytest.fixture()
-def auth_client() -> Generator[tuple[TestClient, sessionmaker[Session]], None, None]:
+def auth_client(request: pytest.FixtureRequest) -> Generator[tuple[TestClient, sessionmaker[Session]], None, None]:
     """Entrega cliente API con BD SQLite aislada para pruebas auth."""
     os.environ["APP_ENV"] = "test"
     os.environ["AUTH_BOOTSTRAP_ENABLED"] = "true"
@@ -44,6 +64,8 @@ def auth_client() -> Generator[tuple[TestClient, sessionmaker[Session]], None, N
     )
     testing_session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     Base.metadata.create_all(bind=engine)
+    if request.node.get_closest_marker("sin_turno") is None:
+        abrir_turno(testing_session_local)
 
     def override_get_db():
         db = testing_session_local()

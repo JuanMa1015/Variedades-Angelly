@@ -84,7 +84,7 @@ def export_ventas(
     db: Session = Depends(get_db),
     _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> StreamingResponse:
-    query = select(VentaModel).order_by(VentaModel.fecha.desc())
+    query = select(VentaModel).where(VentaModel.anulada.is_(False)).order_by(VentaModel.fecha.desc())
     if fecha_desde:
         query = query.where(VentaModel.fecha >= fecha_desde)
     if fecha_hasta:
