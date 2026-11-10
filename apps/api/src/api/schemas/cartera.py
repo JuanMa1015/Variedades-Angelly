@@ -133,6 +133,11 @@ class VentaResponse(BaseModel):
     detalles: list[VentaDetalleResponse]
     resumen_recibo: str
     puntos_otorgados: int = 0
+    anulada: bool = False
+    anulada_en: datetime | None = None
+    anulada_por: str | None = None
+    autorizada_por: str | None = None
+    motivo_anulacion: str | None = None
 
 
 class CarteraVentaHistorialItemResponse(BaseModel):

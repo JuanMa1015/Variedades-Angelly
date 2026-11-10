@@ -5,6 +5,7 @@ Feature: Ventas
 
   Background:
     Given el sistema esta listo con usuarios semilla
+    And hay una caja abierta
     And existen los siguientes productos:
       | nombre              | precio_costo | precio_venta | stock_actual | stock_minimo |
       | Arroz Diana 500g    | 2800         | 3500         | 40           | 10           |

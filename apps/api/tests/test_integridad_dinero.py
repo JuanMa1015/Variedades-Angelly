@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from sqlalchemy import select
 
 from tests.test_auth_api import _login_token, auth_client  # noqa: F401  (fixture)
@@ -296,6 +297,7 @@ def _vender_contado(client, token, producto, metodo, cantidad=2):
     )
 
 
+@pytest.mark.sin_turno
 def test_se_puede_abrir_caja_con_base_cero(auth_client) -> None:
     client, _ = auth_client
     token = _login_token(client, "vendedor1", "ventas123")
@@ -303,6 +305,7 @@ def test_se_puede_abrir_caja_con_base_cero(auth_client) -> None:
     assert _abrir_caja(client, token, 0).status_code == 201
 
 
+@pytest.mark.sin_turno
 def test_caja_solo_cuenta_el_dinero_cobrado_y_el_efectivo_esperado(auth_client) -> None:
     client, sf = auth_client
     producto, cliente = _producto(sf), _cliente_tienda(sf)

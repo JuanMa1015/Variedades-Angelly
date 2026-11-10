@@ -124,6 +124,7 @@ def list_cliente_tienda_movimientos(
         VentaModel.es_fiado.label('es_fiado'),
     ).where(
         VentaModel.cliente_tienda_id == cliente_id,
+        VentaModel.anulada.is_(False),
         DetalleVentaModel.venta_id == VentaModel.id,
     )
 

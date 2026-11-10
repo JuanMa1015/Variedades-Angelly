@@ -1,7 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
-import CajaStatusBanner from '../CajaStatusBanner';
 import CartPanel from '../CartPanel';
 import HeldTicketsBar from '../HeldTicketsBar';
 import MobileCartBar from '../MobileCartBar';
@@ -223,29 +222,6 @@ describe('HeldTicketsBar', () => {
 
     expect(onResume).toHaveBeenCalledWith('a');
     expect(onDiscard).toHaveBeenCalledWith('a');
-  });
-});
-
-describe('CajaStatusBanner', () => {
-  const renderBanner = (cajaAbierta) => render(<MemoryRouter><CajaStatusBanner cajaAbierta={cajaAbierta} /></MemoryRouter>);
-
-  it('avisa solo cuando la caja esta cerrada y enlaza a Caja', () => {
-    renderBanner(false);
-    expect(screen.getByText(/La caja está cerrada/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Abrir caja' })).toHaveAttribute('href', '/caja');
-  });
-
-  it('no molesta con la caja abierta o desconocida', () => {
-    const { container, unmount } = renderBanner(true);
-    expect(container).toBeEmptyDOMElement();
-    unmount();
-    expect(renderBanner(null).container).toBeEmptyDOMElement();
-  });
-
-  it('se puede ocultar', () => {
-    renderBanner(false);
-    fireEvent.click(screen.getByRole('button', { name: 'Ocultar aviso de caja cerrada' }));
-    expect(screen.queryByText(/La caja está cerrada/)).not.toBeInTheDocument();
   });
 });
 

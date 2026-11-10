@@ -13,11 +13,13 @@ from src.infrastructure.database.models import AbonoCarteraModel, AbonoTiendaMod
 def cobrado_en_venta():
     """Dinero cobrado al registrar la venta.
 
+    - Ventas anuladas: 0.
     - Ventas de cartera (con cliente): 0, su dinero entra por ``abonos_cartera``.
     - Ventas al contado: el total.
     - Fiado de tienda: solo el abono inicial (total - saldo de la venta, nunca negativo).
     """
     return case(
+        (VentaModel.anulada.is_(True), 0.0),
         (VentaModel.cliente_id.is_not(None), 0.0),
         (VentaModel.es_fiado.is_(False), VentaModel.total),
         (VentaModel.saldo_pendiente >= VentaModel.total, 0.0),

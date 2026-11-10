@@ -5,18 +5,21 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.api.schemas.cartera import MetodoPago, VentaItemCreateRequest, VentaDetalleResponse, VentaResponse
+from src.api.limiter import limiter, login_rate_limit
+from src.api.services.anulacion import anular_venta, quien_autoriza
 from src.api.services.auditoria import registrar_auditoria
 from src.api.services.fidelizacion import acumular_puntos, revertir_puntos
 from src.api.services.deuda import SIN_DEUDA, deuda_pendiente_tienda, mover_deuda_tienda
 from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.services.venta_reglas import (
+    exigir_caja_abierta,
     exigir_cliente_activo,
     exigir_credito_disponible,
     exigir_metodo_pago_si_hay_cobro,
@@ -66,6 +69,14 @@ class VentaUpdateRequest(BaseModel):
     saldo_pendiente: Annotated[float | None, Field(ge=0)] = None
 
 
+class AnularVentaRequest(BaseModel):
+    """Motivo obligatorio; un vendedor ademas necesita la clave de un administrador."""
+
+    motivo: Annotated[str, Field(min_length=3, max_length=200)]
+    autorizador_usuario: Annotated[str | None, Field(max_length=50)] = None
+    autorizador_password: Annotated[str | None, Field(max_length=128)] = None
+
+
 class VentaPageResponse(BaseModel):
     """Respuesta paginada de ventas."""
 
@@ -80,6 +91,39 @@ def _to_detalle_response(detalle: DetalleVentaModel) -> VentaDetalleResponse:
         cantidad=detalle.cantidad,
         precio_unitario=detalle.precio_unitario,
         subtotal=detalle.subtotal,
+    )
+
+
+def _respuesta_venta(
+    venta: VentaModel,
+    detalles: list[VentaDetalleResponse],
+    cliente_nombre: str | None,
+) -> VentaResponse:
+    return VentaResponse(
+        venta_id=venta.id,
+        cliente_id=venta.cliente_id,
+        cliente_tienda_id=venta.cliente_tienda_id,
+        cliente_nombre=cliente_nombre,
+        es_fiado=venta.es_fiado,
+        fiado_origen=venta.tipo_fiado,
+        metodo_pago=venta.metodo_pago,
+        total=venta.total,
+        saldo_pendiente=venta.saldo_pendiente,
+        fecha=venta.fecha,
+        detalles=detalles,
+        resumen_recibo=build_recibo_text(
+            venta_id=venta.id,
+            detalles=detalles,
+            total=venta.total,
+            saldo_pendiente=venta.saldo_pendiente,
+            cliente_nombre=cliente_nombre,
+        ),
+        puntos_otorgados=venta.puntos_otorgados,
+        anulada=bool(venta.anulada),
+        anulada_en=venta.anulada_en,
+        anulada_por=venta.anulada_por,
+        autorizada_por=venta.autorizada_por,
+        motivo_anulacion=venta.motivo_anulacion,
     )
 
 
@@ -115,6 +159,7 @@ def create_venta(
 
     try:
         with db.begin():
+            exigir_caja_abierta(db)
             if payload.es_fiado and fiado_origen == FIADO_ORIGEN_CARTERA:
                 if current_user.role != "admin":
                     raise HTTPException(
@@ -279,29 +324,7 @@ def create_venta(
             detail="No fue posible registrar la venta por conflicto de datos",
         ) from exc
 
-    resumen = build_recibo_text(
-        venta_id=venta.id,
-        detalles=detalle_payload,
-        total=venta.total,
-        saldo_pendiente=venta.saldo_pendiente,
-        cliente_nombre=cliente_nombre,
-    )
-
-    return VentaResponse(
-        venta_id=venta.id,
-        cliente_id=venta.cliente_id,
-        cliente_tienda_id=venta.cliente_tienda_id,
-        cliente_nombre=cliente_nombre,
-        es_fiado=venta.es_fiado,
-        fiado_origen=venta.tipo_fiado,
-        metodo_pago=venta.metodo_pago,
-        total=venta.total,
-        saldo_pendiente=venta.saldo_pendiente,
-        fecha=venta.fecha,
-        detalles=detalle_payload,
-        resumen_recibo=resumen,
-        puntos_otorgados=venta.puntos_otorgados,
-    )
+    return _respuesta_venta(venta, detalle_payload, cliente_nombre)
 
 
 @router.get("/api/ventas", response_model=list[VentaResponse])
@@ -395,28 +418,7 @@ def _build_venta_responses(
         else:
             cliente_nombre = None
 
-        payload.append(
-            VentaResponse(
-                venta_id=venta.id,
-                cliente_id=venta.cliente_id,
-                cliente_tienda_id=venta.cliente_tienda_id,
-                cliente_nombre=cliente_nombre,
-                es_fiado=venta.es_fiado,
-                fiado_origen=venta.tipo_fiado,
-                metodo_pago=venta.metodo_pago,
-                total=venta.total,
-                saldo_pendiente=venta.saldo_pendiente,
-                fecha=venta.fecha,
-                detalles=detalles,
-                resumen_recibo=build_recibo_text(
-                    venta_id=venta.id,
-                    detalles=detalles,
-                    total=venta.total,
-                    saldo_pendiente=venta.saldo_pendiente,
-                    cliente_nombre=cliente_nombre,
-                ),
-            ),
-        )
+        payload.append(_respuesta_venta(venta, detalles, cliente_nombre))
 
     return payload
 
@@ -551,26 +553,37 @@ def update_venta(
     else:
         cliente_nombre = None
 
-    return VentaResponse(
-        venta_id=venta.id,
-        cliente_id=venta.cliente_id,
-        cliente_tienda_id=venta.cliente_tienda_id,
-        cliente_nombre=cliente_nombre,
-        es_fiado=venta.es_fiado,
-        fiado_origen=venta.tipo_fiado,
-        metodo_pago=venta.metodo_pago,
-        total=venta.total,
-        saldo_pendiente=venta.saldo_pendiente,
-        fecha=venta.fecha,
-        detalles=detalles,
-        resumen_recibo=build_recibo_text(
-            venta_id=venta.id,
-            detalles=detalles,
-            total=venta.total,
-            saldo_pendiente=venta.saldo_pendiente,
-            cliente_nombre=cliente_nombre,
-        ),
-    )
+    return _respuesta_venta(venta, detalles, cliente_nombre)
+
+
+@router.post("/api/ventas/{venta_id}/anular", response_model=VentaResponse)
+@limiter.limit(login_rate_limit())
+def anular_venta_endpoint(
+    request: Request,
+    venta_id: int,
+    payload: AnularVentaRequest,
+    db: Session = Depends(get_db),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+) -> VentaResponse:
+    """Anula una venta del turno abierto: devuelve stock, deuda y puntos, y conserva el registro."""
+    with db.begin():
+        autorizada_por = quien_autoriza(db, current_user, payload.autorizador_usuario, payload.autorizador_password)
+        venta = anular_venta(
+            db,
+            venta_id,
+            solicitante=current_user.username,
+            autorizada_por=autorizada_por,
+            motivo=payload.motivo.strip(),
+        )
+        db.flush()
+        detalles = [
+            _to_detalle_response(d)
+            for d in db.execute(select(DetalleVentaModel).where(DetalleVentaModel.venta_id == venta.id)).scalars()
+        ]
+        cliente_tienda = (
+            db.get(ClienteFiadoTiendaModel, venta.cliente_tienda_id) if venta.cliente_tienda_id is not None else None
+        )
+        return _respuesta_venta(venta, detalles, cliente_tienda.nombre if cliente_tienda else None)
 
 
 @router.delete(

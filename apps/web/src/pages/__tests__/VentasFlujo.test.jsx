@@ -5,8 +5,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const apiGetMock = vi.hoisted(() => vi.fn());
 const apiPostMock = vi.hoisted(() => vi.fn());
+const abrirCajaMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../../api/httpClient', () => ({ apiGet: apiGetMock, apiPost: apiPostMock }));
+vi.mock('../../api/cajaApi', () => ({ abrirCaja: abrirCajaMock }));
 vi.mock('../../auth/AuthContext', () => ({ useAuth: () => ({ token: 'fake-token' }) }));
 vi.mock('react-virtuoso', () => ({
   VirtuosoGrid: ({ totalCount, itemContent, listClassName }) => (
@@ -39,6 +41,7 @@ const mockApi = ({ cajaAbierta = true, remoto = [] } = {}) => {
 const renderPos = async (options) => {
   mockApi(options);
   render(<MemoryRouter><Ventas /></MemoryRouter>);
+  if (options?.cajaAbierta === false) return;
   await screen.findByRole('button', { name: 'Agregar Arroz Diana' });
 };
 
@@ -209,11 +212,28 @@ describe('POS: flujo completo', () => {
     expect(await screen.findByText('"Agua Sabor" no tiene stock disponible')).toBeInTheDocument();
   });
 
-  it('con la caja cerrada avisa y enlaza a Caja', async () => {
+  it('con la caja cerrada pide abrirla en la misma pantalla y luego deja vender', async () => {
+    abrirCajaMock.mockResolvedValue({ id: 1 });
     await renderPos({ cajaAbierta: false });
 
     expect(await screen.findByText(/La caja está cerrada/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Abrir caja' })).toHaveAttribute('href', '/caja');
+    expect(screen.queryByRole('button', { name: 'Agregar Arroz Diana' })).not.toBeInTheDocument();
+
+    mockApi({ cajaAbierta: true });
+    fireEvent.change(screen.getByLabelText('Efectivo inicial'), { target: { value: '50000' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir caja y vender' }));
+
+    await waitFor(() => expect(abrirCajaMock).toHaveBeenCalledWith({ monto_inicial: 50000 }));
+    expect(await screen.findByRole('button', { name: 'Agregar Arroz Diana' })).toBeInTheDocument();
+  });
+
+  it('el historial de ventas se abre desde el punto de venta', async () => {
+    await renderPos();
+    apiGetMock.mockImplementation(() => Promise.resolve({ data: [] }));
+
+    fireEvent.click(screen.getByRole('button', { name: /Historial de ventas/ }));
+
+    expect(await screen.findByText('Todavía no hay ventas.')).toBeInTheDocument();
   });
 
   it('marcar favorito agrega el producto a la fila de acceso rapido', async () => {

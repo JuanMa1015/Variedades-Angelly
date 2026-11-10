@@ -3,8 +3,15 @@
 from __future__ import annotations
 
 from fastapi import HTTPException
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
-from src.infrastructure.database.models import ClienteFiadoTiendaModel, ClienteModel, ProductoModel
+from src.infrastructure.database.models import (
+    CierreCajaModel,
+    ClienteFiadoTiendaModel,
+    ClienteModel,
+    ProductoModel,
+)
 
 
 def exigir_producto_vendible(producto: ProductoModel) -> None:
@@ -31,3 +38,12 @@ def exigir_metodo_pago_si_hay_cobro(metodo_pago: str | None, hay_cobro: bool) ->
     """Toda venta con dinero recibido debe decir como se cobro (la caja separa efectivo/transferencia)."""
     if hay_cobro and not metodo_pago:
         raise HTTPException(status_code=400, detail="Debes indicar el metodo de pago")
+
+
+def exigir_caja_abierta(db: Session) -> None:
+    """Sin turno abierto el dinero cobrado no entra a ningun cuadre: no se puede vender."""
+    abierta = db.execute(
+        select(CierreCajaModel.id).where(CierreCajaModel.fecha_cierre.is_(None)).limit(1),
+    ).scalar_one_or_none()
+    if abierta is None:
+        raise HTTPException(status_code=409, detail="La caja esta cerrada. Abre la caja para registrar ventas")

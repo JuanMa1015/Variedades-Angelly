@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { History } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { apiGet, apiPost } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage';
@@ -7,7 +8,8 @@ import useConfirm from '../components/useConfirm';
 import ProductSelectionView from './Ventas/ProductSelectionView';
 import CartPanel from './Ventas/CartPanel';
 import SaleReceiptPanel from './Ventas/SaleReceiptPanel';
-import CajaStatusBanner from './Ventas/CajaStatusBanner';
+import CajaGate from './Ventas/CajaGate';
+import HistorialVentasModal from './Ventas/HistorialVentasModal';
 import MobileCartBar from './Ventas/MobileCartBar';
 import NewClientModal from './Ventas/NewClientModal';
 import { printHtml } from './Ventas/printReceipt';
@@ -34,7 +36,7 @@ const TICKET_FIELDS = Object.keys(emptyTicket());
 const pickTicketFields = (source) => Object.fromEntries(TICKET_FIELDS.map((field) => [field, source[field]]));
 
 const Ventas = () => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const { confirm, ConfirmModal } = useConfirm();
   const data = useVentasData(token);
   const { productos, clientesTienda, clientesFidelizacion, fidelizacionConfig, error, setError } = data;
@@ -46,6 +48,7 @@ const Ventas = () => {
   const [success, setSuccess] = useState('');
   const [submittingVenta, setSubmittingVenta] = useState(false);
   const [ventaCompletada, setVentaCompletada] = useState(null);
+  const [historialAbierto, setHistorialAbierto] = useState(false);
 
   const [newClient, setNewClient] = useState({ nombre: '', telefono: '' });
   const [isNewClientOpen, setIsNewClientOpen] = useState(false);
@@ -334,10 +337,20 @@ const Ventas = () => {
 
   return (
     <div ref={rootRef} className="flex flex-col gap-3 pb-20 lg:pb-0">
-      <CajaStatusBanner cajaAbierta={data.cajaAbierta} />
       <ErrorMessage message={error} onDismiss={() => setError('')} />
       <SuccessMessage message={success} onDismiss={() => setSuccess('')} />
 
+      {data.cajaAbierta === false ? <CajaGate onOpened={() => data.reload()} /> : (
+      <>
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => setHistorialAbierto(true)}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50"
+        >
+          <History className="h-3.5 w-3.5" aria-hidden="true" /> Historial de ventas
+        </button>
+      </div>
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_26rem] xl:grid-cols-[minmax(0,1fr)_28rem] 2xl:grid-cols-[minmax(0,1fr)_32rem]">
         <div className={`min-h-[30rem] lg:min-h-0 ${ventaCompletada ? 'pointer-events-none opacity-40' : ''}`}>
           <ProductSelectionView
@@ -406,7 +419,10 @@ const Ventas = () => {
         </div>
       </div>
 
-      {!ventaCompletada && (
+      </>
+      )}
+
+      {!ventaCompletada && data.cajaAbierta !== false && (
         <MobileCartBar
           unidades={cartItems.reduce((acc, item) => acc + Number(item.cantidad || 0), 0)}
           total={totalEstimado}
@@ -415,6 +431,13 @@ const Ventas = () => {
         />
       )}
 
+      <HistorialVentasModal
+        isOpen={historialAbierto}
+        onClose={() => setHistorialAbierto(false)}
+        role={user?.role}
+        onPrint={(receipt) => printHtml(buildReceiptHtml(receipt, { formatMoney, site: SITE, contacto: CONTACTO }))}
+        onChanged={() => data.reload()}
+      />
       <NewClientModal
         isOpen={isNewClientOpen}
         onClose={() => setIsNewClientOpen(false)}

@@ -1,10 +1,12 @@
 import json
+from datetime import datetime
 
 from behave import given, when, then
 from sqlalchemy import select
 
 from src.domain.enums import RolUsuario
 from src.infrastructure.database.models import (
+    CierreCajaModel,
     ClienteFiadoTiendaModel,
     ClienteModel,
     ProductoModel,
@@ -35,6 +37,25 @@ def _producto_id(context, nombre):
 @given("el sistema esta listo con usuarios semilla")
 def step_sistema_listo(context):
     pass
+
+
+@given("hay una caja abierta")
+def step_caja_abierta(context):
+    # Vender exige un turno abierto.
+    with context.db_session() as session:
+        session.add(
+            CierreCajaModel(
+                usuario="angelly_admin",
+                fecha_apertura=datetime(2020, 1, 1),
+                monto_inicial=0.0,
+                monto_ventas_efectivo=0.0,
+                monto_ventas_transferencia=0.0,
+                monto_gastos=0.0,
+                estado="abierta",
+                abierto_por="angelly_admin",
+            ),
+        )
+        session.commit()
 
 
 @given('estoy autenticado como "{usuario}" con password "{password}"')

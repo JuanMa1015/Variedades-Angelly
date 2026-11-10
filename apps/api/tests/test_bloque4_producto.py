@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from tests.test_auth_api import _login_token, auth_client  # noqa: F401  (fixture)
 from src.infrastructure.database.models import (
     ClienteFidelizacionModel,
@@ -154,6 +155,7 @@ def test_canjear_bono_usa_el_umbral_configurado(auth_client, monkeypatch) -> Non
 # ── Cierre de caja ciego ──
 
 
+@pytest.mark.sin_turno
 def test_vendedor_no_ve_el_efectivo_esperado_con_la_caja_abierta(auth_client) -> None:
     client, _ = auth_client
     vendedor = _login_token(client, "vendedor1", "ventas123")
@@ -169,6 +171,7 @@ def test_vendedor_no_ve_el_efectivo_esperado_con_la_caja_abierta(auth_client) ->
     assert historial[0]["saldo_esperado"] is None
 
 
+@pytest.mark.sin_turno
 def test_al_cerrar_el_vendedor_conoce_el_descuadre(auth_client) -> None:
     client, _ = auth_client
     vendedor = _login_token(client, "vendedor1", "ventas123")

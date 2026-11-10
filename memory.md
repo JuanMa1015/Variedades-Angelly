@@ -654,3 +654,19 @@ apps\api\.venv\Scripts\python.exe -m alembic -c apps\api\alembic.ini upgrade hea
   mínima de *DNS rebinding*); el endpoint exige sesión y está limitado por IP.
 - Frontend: `api/imagesApi.js`; Inventario importa toda URL http(s) que no sea ya del Blob propio antes de guardar el producto.
 
+## 17. Anulación de ventas y caja obligatoria
+
+- `POST /api/ventas/{id}/anular` (`{motivo, autorizador_usuario?, autorizador_password?}`): **no borra** la venta; la marca
+  (`anulada`, `anulada_en`, `anulada_por`, `autorizada_por`, `motivo_anulacion`; migración `a8b9c0d1e2f3`). Devuelve stock,
+  revierte puntos de fidelización y la deuda de fiado de tienda, y deja auditoría (`accion=anular`).
+- Autorización: admin/superadmin se autorizan solos; el vendedor debe enviar usuario y clave de un admin/superadmin
+  activo (403 si falla; mismo límite por IP que el login). Lógica en `api/services/anulacion.py`.
+- Solo se anulan ventas del **turno de caja abierto** (409 si el turno ya cerró) y no las de cartera (se gestionan en cartera).
+  `DELETE /api/ventas/{id}` sigue existiendo para admin.
+- Las anuladas valen 0 en `cobrado_en_venta` (caja/dashboard) y se excluyen de informes de superadmin, export y detalle de
+  fiado de tienda. El listado las devuelve con `anulada=true` para mostrarlas tachadas.
+- **Vender exige caja abierta**: `POST /api/ventas` responde 409 si no hay turno (`exigir_caja_abierta`). `/api/cartera/ventas`
+  no lo exige (permite fecha de venta pasada). Admin ahora también puede ver estado/abrir/cerrar caja por API.
+- Frontend: el POS muestra `CajaGate` (abrir caja con efectivo inicial) en vez de vender sin turno, y un "Historial de ventas"
+  con reimprimir y anular. En pruebas `auth_client` abre un turno; las que manejan la caja usan `@pytest.mark.sin_turno`.
+
