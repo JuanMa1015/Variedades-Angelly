@@ -12,6 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from src.api.services.auditoria import registrar_auditoria
+from src.api.services.caja_calculos import efectivo_esperado
 from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.services.vendedor import (
     create_vendedor as _create_vendedor,
@@ -596,6 +597,7 @@ class CajaCierreSchema(BaseModel):
     monto_inicial: float
     monto_ventas_efectivo: float
     monto_ventas_transferencia: float
+    monto_ventas_tarjeta: float = 0.0
     monto_gastos: float
     monto_cierre: float | None
     fecha_apertura: datetime
@@ -623,13 +625,14 @@ def list_caja(
             monto_inicial=float(r.monto_inicial),
             monto_ventas_efectivo=float(r.monto_ventas_efectivo),
             monto_ventas_transferencia=float(r.monto_ventas_transferencia),
+            monto_ventas_tarjeta=float(r.monto_ventas_tarjeta or 0.0),
             monto_gastos=float(r.monto_gastos),
             monto_cierre=float(r.monto_cierre) if r.monto_cierre is not None else None,
             fecha_apertura=r.fecha_apertura,
             fecha_cierre=r.fecha_cierre,
             abierto_por=r.abierto_por,
             cerrado_por=r.cerrado_por,
-            saldo_esperado=float(r.monto_inicial + r.monto_ventas_efectivo + r.monto_ventas_transferencia - r.monto_gastos),
+            saldo_esperado=efectivo_esperado(r.monto_inicial, r.monto_ventas_efectivo, r.monto_gastos),
             esta_abierta=r.fecha_cierre is None,
         )
         for r in rows

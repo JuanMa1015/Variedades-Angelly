@@ -6,7 +6,7 @@ import ErrorMessage from '../components/ErrorMessage'
 import SuccessMessage from '../components/SuccessMessage'
 import Skeleton from '../components/Skeleton'
 import Modal from '../components/Modal';
-import { formatMoney } from '../utils/format';
+import { formatMoney, parseApiDate } from '../utils/format';
 
 const EMPTY_ITEM = {
   producto_id: '',
@@ -752,7 +752,7 @@ const Facturas = () => {
 
             <div className="mb-4 space-y-1 text-xs text-gray-700">
               <p><span className="font-semibold">Proveedor:</span> {selectedPrintFactura.proveedor_nombre}</p>
-              <p><span className="font-semibold">Fecha:</span> {new Date(selectedPrintFactura.fecha_creacion).toLocaleDateString()}</p>
+              <p><span className="font-semibold">Fecha:</span> {parseApiDate(selectedPrintFactura.fecha_creacion).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' })}</p>
               {selectedPrintFactura.encomienda ? <p><span className="font-semibold">Encomienda:</span> {formatMoney(selectedPrintFactura.encomienda)}</p> : null}
               {selectedPrintFactura.porcentaje_ganancia ? <p><span className="font-semibold">Margen:</span> {((1 - selectedPrintFactura.porcentaje_ganancia) * 100).toFixed(0)}%</p> : null}
             </div>

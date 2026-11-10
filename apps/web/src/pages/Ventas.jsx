@@ -10,7 +10,9 @@ import SaleReceiptPanel from './Ventas/SaleReceiptPanel';
 import CajaStatusBanner from './Ventas/CajaStatusBanner';
 import MobileCartBar from './Ventas/MobileCartBar';
 import NewClientModal from './Ventas/NewClientModal';
-import PrintableReceipt from './Ventas/PrintableReceipt';
+import { printHtml } from './Ventas/printReceipt';
+import { buildReceiptHtml } from './Ventas/receiptHtml';
+import { useAvailableHeight } from './Ventas/useAvailableHeight';
 import { useVentasData } from './Ventas/useVentasData';
 import { useHeldTickets } from './Ventas/useHeldTickets';
 import { usePosPreferences } from './Ventas/usePosPreferences';
@@ -26,6 +28,7 @@ import {
   validateSale,
 } from './Ventas/posHelpers';
 import { formatMoney } from '../utils/format';
+import { CONTACTO, SITE } from '../config/site';
 
 const TICKET_FIELDS = Object.keys(emptyTicket());
 const pickTicketFields = (source) => Object.fromEntries(TICKET_FIELDS.map((field) => [field, source[field]]));
@@ -49,6 +52,8 @@ const Ventas = () => {
   const [creatingClient, setCreatingClient] = useState(false);
 
   const searchInputRef = useRef(null);
+  const rootRef = useRef(null);
+  useAvailableHeight(rootRef);
   const patchTicket = useCallback((patch) => setTicket((current) => ({ ...current, ...patch })), []);
 
   const productosById = useMemo(
@@ -328,12 +333,12 @@ const Ventas = () => {
   });
 
   return (
-    <div className="flex flex-col gap-3 pb-20 lg:h-[calc(100vh-8.75rem)] lg:pb-0">
+    <div ref={rootRef} className="flex flex-col gap-3 pb-20 lg:pb-0">
       <CajaStatusBanner cajaAbierta={data.cajaAbierta} />
       <ErrorMessage message={error} onDismiss={() => setError('')} />
       <SuccessMessage message={success} onDismiss={() => setSuccess('')} />
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_26rem] xl:grid-cols-[minmax(0,1fr)_28rem]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_26rem] xl:grid-cols-[minmax(0,1fr)_28rem] 2xl:grid-cols-[minmax(0,1fr)_32rem]">
         <div className={`min-h-[30rem] lg:min-h-0 ${ventaCompletada ? 'pointer-events-none opacity-40' : ''}`}>
           <ProductSelectionView
             productos={productosFiltrados}
@@ -344,6 +349,7 @@ const Ventas = () => {
             cart={cartItems}
             formatMoney={formatMoney}
             loading={data.loading}
+            totalCatalogo={data.catalogoTotal}
             searchInputRef={searchInputRef}
             favorites={preferences.favorites}
             onToggleFavorite={preferences.toggleFavorite}
@@ -356,7 +362,7 @@ const Ventas = () => {
             <SaleReceiptPanel
               receipt={ventaCompletada}
               formatMoney={formatMoney}
-              onPrint={() => window.print()}
+              onPrint={() => printHtml(buildReceiptHtml(ventaCompletada, { formatMoney, site: SITE, contacto: CONTACTO }))}
               onNewSale={handleNewSale}
             />
           ) : (
@@ -420,7 +426,6 @@ const Ventas = () => {
         saving={creatingClient}
       />
       {ConfirmModal}
-      <PrintableReceipt receipt={ventaCompletada} formatMoney={formatMoney} />
     </div>
   );
 };

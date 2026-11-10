@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
+from src.domain.zona_horaria import a_utc_naive, inicio_del_dia_local
+
 
 @dataclass(frozen=True)
 class VentasMetricDTO:
@@ -21,6 +23,7 @@ class PagosTotalesDTO:
 
     efectivo: float
     transferencia: float
+    tarjeta: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -35,6 +38,7 @@ class DashboardResumenDTO:
     transacciones_mensuales: int
     pagos_efectivo: float
     pagos_transferencia: float
+    pagos_tarjeta: float = 0.0
 
 
 class DashboardMetricsReader(Protocol):
@@ -56,9 +60,13 @@ class DashboardService:
     def build_resumen(self, now: datetime | None = None) -> DashboardResumenDTO:
         """Construye el resumen con cortes diario, semanal y mensual."""
         current = now or datetime.now(UTC)
-        inicio_dia = current.replace(hour=0, minute=0, second=0, microsecond=0)
-        inicio_semana = inicio_dia - timedelta(days=inicio_dia.weekday())
-        inicio_mes = inicio_dia.replace(day=1)
+        # Los cortes son a medianoche hora de Colombia; la base guarda UTC, asi que se convierten.
+        inicio_dia_local = inicio_del_dia_local(current)
+        inicio_semana_local = inicio_dia_local - timedelta(days=inicio_dia_local.weekday())
+        inicio_mes_local = inicio_dia_local.replace(day=1)
+        inicio_dia = a_utc_naive(inicio_dia_local)
+        inicio_semana = a_utc_naive(inicio_semana_local)
+        inicio_mes = a_utc_naive(inicio_mes_local)
 
         diarias = self._metrics_reader.ventas_metric_since(inicio_dia)
         semanales = self._metrics_reader.ventas_metric_since(inicio_semana)
@@ -74,4 +82,5 @@ class DashboardService:
             transacciones_mensuales=mensuales.transacciones,
             pagos_efectivo=pagos.efectivo,
             pagos_transferencia=pagos.transferencia,
+            pagos_tarjeta=pagos.tarjeta,
         )

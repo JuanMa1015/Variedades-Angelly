@@ -19,6 +19,7 @@ export const useVentasData = (token) => {
   const [clientesFidelizacion, setClientesFidelizacion] = useState([]);
   const [fidelizacionConfig, setFidelizacionConfig] = useState({ pesos_por_punto: 1000 });
   const [cajaAbierta, setCajaAbierta] = useState(null);
+  const [catalogoTotal, setCatalogoTotal] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -37,6 +38,7 @@ export const useVentasData = (token) => {
     if (signal?.aborted) return;
 
     setProductos(extractProductos(productosPayload));
+    setCatalogoTotal(Number.isInteger(productosPayload?.page?.total) ? productosPayload.page.total : null);
     setClientesTienda(asList(tiendaPayload));
     setClientesFidelizacion(asList(fidelizacionPayload));
     if (configPayload?.pesos_por_punto > 0) setFidelizacionConfig(configPayload);
@@ -78,6 +80,7 @@ export const useVentasData = (token) => {
     clientesFidelizacion,
     fidelizacionConfig,
     cajaAbierta,
+    catalogoTotal,
     loading,
     error,
     setError,

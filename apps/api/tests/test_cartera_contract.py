@@ -185,7 +185,7 @@ def test_metodo_pago_invalido_en_abono_rechaza_payload(
         headers={"Authorization": f"Bearer {admin_token}"},
         json={
             "monto": 5000,
-            "metodo_pago": "tarjeta",
+            "metodo_pago": "cheque",
         },
     )
 

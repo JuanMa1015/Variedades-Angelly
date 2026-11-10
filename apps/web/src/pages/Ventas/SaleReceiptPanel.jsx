@@ -41,8 +41,8 @@ const SaleReceiptPanel = ({ receipt, formatMoney, onPrint, onNewSale }) => {
       <div className="space-y-1 border-t border-gray-200 bg-gray-50/70 px-4 py-3">
         <SummaryRow label="Método de pago" value={METHOD_LABELS[receipt.metodoPago] ?? 'Transferencia'} />
         {!receipt.esFiado && <SummaryRow label="Recibido" value={formatMoney(receipt.pago)} />}
-        {!receipt.esFiado && receipt.cambio > 0 && (
-          <SummaryRow label="Cambio" value={formatMoney(receipt.cambio)} valueClass="text-emerald-700" />
+        {!receipt.esFiado && (
+          <SummaryRow label="Cambio" value={formatMoney(receipt.cambio || 0)} valueClass="text-emerald-700" />
         )}
         {receipt.esFiado && receipt.cliente && (
           <SummaryRow label="Cliente" value={receipt.cliente} valueClass="text-amber-700" />

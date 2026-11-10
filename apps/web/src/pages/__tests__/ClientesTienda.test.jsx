@@ -162,4 +162,36 @@ describe('ClientesTienda', () => {
     fireEvent.click(screen.getByText('Nuevo Cliente'));
     expect(screen.getByTestId('modal-title')).toHaveTextContent('Nuevo Cliente');
   });
+
+  it('saldar deuda abre el dialogo con el monto completo para elegir como pago el cliente', async () => {
+    const ClientesTienda = (await import('../ClientesTienda')).default;
+    render(<ClientesTienda />);
+    await waitFor(() => expect(screen.getByText('Clientes totales')).toBeTruthy());
+    fireEvent.click(screen.getByText('Cobrar'));
+    await waitFor(() => expect(screen.getByText('Juan Perez')).toBeTruthy());
+
+    fireEvent.click(screen.getAllByText('Saldar deuda')[0]);
+
+    expect(screen.getByLabelText('Monto del abono')).toHaveValue('150.000');
+    fireEvent.click(screen.getByRole('radio', { name: /Tarjeta/ }));
+    fireEvent.click(screen.getByText('Confirmar abono'));
+
+    await waitFor(() => {
+      expect(apiPostMock).toHaveBeenCalledWith('/api/clientes/tienda/1/abonos', { monto: 150000, metodo_pago: 'tarjeta' });
+    });
+  });
+
+  it('el abono ofrece efectivo, transferencia y tarjeta', async () => {
+    const ClientesTienda = (await import('../ClientesTienda')).default;
+    render(<ClientesTienda />);
+    await waitFor(() => expect(screen.getByText('Clientes totales')).toBeTruthy());
+    fireEvent.click(screen.getByText('Cobrar'));
+    await waitFor(() => expect(screen.getByText('Juan Perez')).toBeTruthy());
+
+    fireEvent.click(screen.getAllByText('Registrar abono')[0]);
+
+    expect(screen.getByRole('radio', { name: /Efectivo/ })).toBeChecked();
+    expect(screen.getByRole('radio', { name: /Transferencia/ })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Tarjeta/ })).toBeInTheDocument();
+  });
 });

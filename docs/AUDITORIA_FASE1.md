@@ -117,3 +117,14 @@ Revisar a fondo la UI y el flujo de: **POS/Ventas → Caja → Inventario → Pr
 - Cada cambio de stock/costo/precio queda en auditoría con el usuario del token.
 - **Eliminar** una factura resta el stock que sumó; si parte ya se vendió responde 409 y no cambia nada. El costo y precio no se revierten.
 - Nota: los datos antiguos no se tocan; solo aplica a facturas nuevas.
+
+## Actualización (reglas de dinero y caja)
+
+- **D6 (caja):** cada venta, abono y gasto queda asociado al turno en que se registró (`caja_id`); los totales del
+  turno ya no dependen de rangos de fechas. Lo hecho con la caja cerrada no entra a ningún turno.
+- La tarjeta se cuenta aparte de la transferencia (caja y dashboard); el cierre guarda `monto_ventas_tarjeta`.
+- Saldar la deuda de un cliente de tienda pide el medio de pago (antes siempre efectivo).
+- **D9 (huso horario):** los cortes del dashboard son a medianoche de Colombia y el frontend muestra las fechas del
+  servidor como UTC convertidas (antes salían corridas 5 horas).
+- El comprobante del POS se imprime en una sola hoja y muestra siempre el cambio.
+- Pendiente: D10 (orden de bloqueo de productos), facturas para el vendedor, refactor de pantallas grandes.

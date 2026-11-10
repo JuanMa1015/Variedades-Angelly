@@ -305,6 +305,7 @@ const CarteraVentaSection = ({
               >
                 <option value="efectivo">Efectivo</option>
                 <option value="transferencia">Transferencia</option>
+                <option value="tarjeta">Tarjeta</option>
               </select>
             </div>
 

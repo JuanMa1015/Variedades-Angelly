@@ -78,8 +78,8 @@ export const buildSalePayload = ({ grouped, ticket }) => {
   const payload = {
     items: Array.from(grouped.entries()).map(([producto_id, cantidad]) => ({ producto_id, cantidad })),
     es_fiado: ticket.esFiado,
-    // Nequi y tarjeta se registran como transferencia (el servidor solo distingue efectivo/transferencia).
-    metodo_pago: ticket.metodoPago === 'nequi' || ticket.metodoPago === 'tarjeta' ? 'transferencia' : ticket.metodoPago,
+    // Nequi es una transferencia; la tarjeta se registra aparte para que la caja las distinga.
+    metodo_pago: ticket.metodoPago === 'nequi' ? 'transferencia' : ticket.metodoPago,
   };
   if (ticket.clienteFidelizacionId) payload.cliente_fidelizacion_id = Number(ticket.clienteFidelizacionId);
   if (ticket.esFiado) {

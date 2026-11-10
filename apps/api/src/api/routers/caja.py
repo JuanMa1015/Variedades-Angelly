@@ -5,10 +5,11 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.api.services.auditoria import registrar_auditoria
+from src.api.services.caja_calculos import calcular_metricas, efectivo_esperado
 from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.schemas.caja import (
     ActualizarCajaRequest,
@@ -19,74 +20,11 @@ from src.api.schemas.caja import (
     CierreCajaResponse,
 )
 from src.infrastructure.database.connection import get_db
-from src.infrastructure.repositories.ingresos import cobrado_en_venta
 from src.infrastructure.database.models import (
-    AbonoCarteraModel,
-    AbonoTiendaModel,
     CierreCajaModel,
-    GastoModel,
-    VentaModel,
 )
 
 router = APIRouter(tags=["caja"])
-
-
-def _calcular_metricas_desde(
-    db: Session,
-    desde: datetime,
-) -> tuple[float, float, float]:
-    """Calcula ventas efectivo, transferencia y gastos desde una fecha."""
-    # Solo cuenta lo cobrado: un fiado no es dinero en caja y las ventas de cartera entran por sus abonos.
-    cobrado = cobrado_en_venta()
-    ventas = db.execute(
-        select(
-            func.coalesce(
-                func.sum(cobrado).filter(VentaModel.metodo_pago == "efectivo"),
-                0.0,
-            ),
-            func.coalesce(
-                func.sum(cobrado).filter(VentaModel.metodo_pago == "transferencia"),
-                0.0,
-            ),
-        ).where(VentaModel.fecha >= desde),
-    ).one()
-    total_efectivo = float(ventas[0] or 0.0)
-    total_transferencia = float(ventas[1] or 0.0)
-
-    # Sum abonos de cartera y tienda (son ingresos en efectivo/transferencia)
-    for abono_model in (AbonoCarteraModel, AbonoTiendaModel):
-        abonos = db.execute(
-            select(
-                func.coalesce(
-                    func.sum(abono_model.monto).filter(abono_model.metodo_pago == "efectivo"),
-                    0.0,
-                ),
-                func.coalesce(
-                    func.sum(abono_model.monto).filter(abono_model.metodo_pago == "transferencia"),
-                    0.0,
-                ),
-            ).where(abono_model.fecha >= desde),
-        ).one()
-        total_efectivo += float(abonos[0] or 0.0)
-        total_transferencia += float(abonos[1] or 0.0)
-
-    total_gastos = db.execute(
-        select(func.coalesce(func.sum(GastoModel.monto), 0.0)).where(
-            GastoModel.fecha >= desde,
-        ),
-    ).scalar_one()
-    total_gastos = float(total_gastos or 0.0)
-
-    return total_efectivo, total_transferencia, total_gastos
-
-
-def _efectivo_esperado(
-    monto_inicial: float,
-    ventas_efectivo: float,
-    gastos: float,
-) -> float:
-    """Efectivo que debe haber en el cajon: las transferencias no estan en la caja fisica."""
-    return float(monto_inicial) + float(ventas_efectivo) - float(gastos)
 
 
 def _to_cierre_caja_response(
@@ -95,34 +33,35 @@ def _to_cierre_caja_response(
 ) -> CierreCajaResponse:
     esta_abierta = cierre.fecha_cierre is None
     monto_inicial = float(cierre.monto_inicial)
-    total_gastos = float(cierre.monto_gastos)
+    efectivo = float(cierre.monto_ventas_efectivo)
+    transferencia = float(cierre.monto_ventas_transferencia)
+    tarjeta = float(cierre.monto_ventas_tarjeta or 0.0)
+    gastos = float(cierre.monto_gastos)
 
     if esta_abierta and db is not None:
-        total_efectivo, total_transferencia, total_gastos_calculado = _calcular_metricas_desde(
-            db, cierre.fecha_apertura,
-        )
-        total_ventas_efectivo = float(cierre.monto_ventas_efectivo + total_efectivo)
-        total_ventas_transferencia = float(cierre.monto_ventas_transferencia + total_transferencia)
-        total_gastos = float(cierre.monto_gastos + total_gastos_calculado)
-    else:
-        total_ventas_efectivo = float(cierre.monto_ventas_efectivo)
-        total_ventas_transferencia = float(cierre.monto_ventas_transferencia)
+        # Turno abierto: se suma lo que ya quedo asociado a esta caja.
+        metricas = calcular_metricas(db, cierre.id)
+        efectivo += metricas.efectivo
+        transferencia += metricas.transferencia
+        tarjeta += metricas.tarjeta
+        gastos += metricas.gastos
 
-    saldo_esperado = _efectivo_esperado(monto_inicial, total_ventas_efectivo, total_gastos)
+    saldo_esperado = efectivo_esperado(monto_inicial, efectivo, gastos)
 
     return CierreCajaResponse(
         id=cierre.id,
         monto_inicial=monto_inicial,
-        monto_ventas_efectivo=total_ventas_efectivo,
-        monto_ventas_transferencia=total_ventas_transferencia,
-        monto_gastos=total_gastos,
+        monto_ventas_efectivo=efectivo,
+        monto_ventas_transferencia=transferencia,
+        monto_ventas_tarjeta=tarjeta,
+        monto_gastos=gastos,
         monto_cierre=float(cierre.monto_cierre) if cierre.monto_cierre is not None else None,
         fecha_apertura=cierre.fecha_apertura,
         fecha_cierre=cierre.fecha_cierre,
         abierto_por=cierre.abierto_por,
         cerrado_por=cierre.cerrado_por,
         saldo_esperado=saldo_esperado,
-        total_ingresos=total_ventas_efectivo + total_ventas_transferencia,
+        total_ingresos=efectivo + transferencia + tarjeta,
         esta_abierta=esta_abierta,
         descuadre=cierre.esperado_vs_real if cierre.esperado_vs_real is not None
                   else (float(cierre.monto_cierre) - saldo_esperado if cierre.monto_cierre is not None else None),
@@ -223,18 +162,16 @@ def caja_cierre(
             detail="No hay una caja abierta. Debes abrirla antes de cerrar.",
         )
 
-    total_efectivo, total_transferencia, total_gastos = _calcular_metricas_desde(
-        db, caja.fecha_apertura,
-    )
-
-    caja.monto_ventas_efectivo = float(caja.monto_ventas_efectivo + total_efectivo)
-    caja.monto_ventas_transferencia = float(caja.monto_ventas_transferencia + total_transferencia)
-    caja.monto_gastos = float(caja.monto_gastos + total_gastos)
+    metricas = calcular_metricas(db, caja.id)
+    caja.monto_ventas_efectivo = float(caja.monto_ventas_efectivo + metricas.efectivo)
+    caja.monto_ventas_transferencia = float(caja.monto_ventas_transferencia + metricas.transferencia)
+    caja.monto_ventas_tarjeta = float(caja.monto_ventas_tarjeta + metricas.tarjeta)
+    caja.monto_gastos = float(caja.monto_gastos + metricas.gastos)
     caja.monto_cierre = payload.monto_cierre
     caja.fecha_cierre = datetime.now(UTC).replace(tzinfo=None)
     caja.cerrado_por = current_user.username
     caja.estado = "cerrada"
-    saldo_esperado = _efectivo_esperado(caja.monto_inicial, caja.monto_ventas_efectivo, caja.monto_gastos)
+    saldo_esperado = efectivo_esperado(caja.monto_inicial, caja.monto_ventas_efectivo, caja.monto_gastos)
     caja.esperado_vs_real = float(payload.monto_cierre) - saldo_esperado
 
     db.commit()
@@ -263,12 +200,13 @@ def caja_listar(
             monto_inicial=float(c.monto_inicial),
             monto_ventas_efectivo=float(c.monto_ventas_efectivo),
             monto_ventas_transferencia=float(c.monto_ventas_transferencia),
+            monto_ventas_tarjeta=float(c.monto_ventas_tarjeta or 0.0),
             monto_gastos=float(c.monto_gastos),
             monto_cierre=float(c.monto_cierre) if c.monto_cierre is not None else None,
             saldo_esperado=(
                 None
                 if _es_cierre_ciego(current_user, c.fecha_cierre is None)
-                else _efectivo_esperado(c.monto_inicial, c.monto_ventas_efectivo, c.monto_gastos)
+                else efectivo_esperado(c.monto_inicial, c.monto_ventas_efectivo, c.monto_gastos)
             ),
             esta_abierta=c.fecha_cierre is None,
             descuadre=float(c.esperado_vs_real) if c.esperado_vs_real is not None else None,
