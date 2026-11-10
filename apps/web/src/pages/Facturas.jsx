@@ -13,8 +13,14 @@ const EMPTY_ITEM = {
   cantidad: 1,
   aplica_iva: false,
   precio_unitario: '',
+  actualizar_precio: true,
+  precio_venta: '',
   search: '',
 };
+
+// Igual que el backend: el precio sugerido sube al siguiente multiplo de $50.
+const PASO_REDONDEO_PRECIO = 50;
+const redondearPrecioVenta = (valor) => Math.ceil(Math.round(valor * 1e6) / 1e6 / PASO_REDONDEO_PRECIO) * PASO_REDONDEO_PRECIO;
 
 const PORCENTAJE_DEFAULT = 0.70;
 const DRAFT_KEY = 'angelly.factura.draft';
@@ -156,7 +162,7 @@ const Facturas = () => {
       subtotal += base;
       if (item.aplica_iva) totalIva += base * ivaRate;
       const precioConIva = precio * (item.aplica_iva ? 1 + ivaRate : 1);
-      const pvs = precioConIva / pct;
+      const pvs = redondearPrecioVenta(precioConIva / pct);
       totalGanancia += (pvs - precioConIva) * cantidad;
     }
 
@@ -198,7 +204,10 @@ const Facturas = () => {
     const producto = productosById.get(Number(productoId));
     handleItemChange(index, 'producto_id', productoId);
     if (producto) {
-      handleItemChange(index, 'precio_unitario', String(producto.precio_costo || 0));
+      // El costo guardado incluye IVA cuando aplico: aqui se pide el precio de factura sin IVA.
+      const costo = Number(producto.precio_costo || 0);
+      const sinIva = items[index]?.aplica_iva ? costo / (1 + ivaRate) : costo;
+      handleItemChange(index, 'precio_unitario', String(Math.round(sinIva * 100) / 100));
     }
   };
 
@@ -219,6 +228,8 @@ const Facturas = () => {
         cantidad: Number(item.cantidad),
         aplica_iva: Boolean(item.aplica_iva),
         precio_unitario: Number(item.precio_unitario),
+        actualizar_precio: Boolean(item.actualizar_precio),
+        ...(item.actualizar_precio && Number(item.precio_venta) > 0 ? { precio_venta: Number(item.precio_venta) } : {}),
       }))
       .filter((item) => Number.isInteger(item.producto_id) && item.producto_id > 0 && Number.isFinite(item.cantidad) && item.cantidad > 0 && Number.isFinite(item.precio_unitario) && item.precio_unitario > 0);
 
@@ -376,7 +387,8 @@ const Facturas = () => {
               const iva = item.aplica_iva ? base * ivaRate : 0;
               const total = base + iva;
               const precioConIva = precio * (item.aplica_iva ? 1 + ivaRate : 1);
-              const pvs = precioConIva / pct;
+              const pvs = redondearPrecioVenta(precioConIva / pct);
+              const precioVentaFinal = item.precio_venta !== '' ? Number(item.precio_venta) : pvs;
               const ganancia = pvs - precioConIva;
 
               return (
@@ -483,6 +495,7 @@ const Facturas = () => {
                         onChange={(event) => handleItemChange(index, 'precio_unitario', event.target.value)}
                         className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
                         placeholder="0"
+                        aria-label="Precio de factura sin IVA"
                       />
                     </div>
                   </div>
@@ -506,6 +519,38 @@ const Facturas = () => {
                         <span className="text-xs text-emerald-600">Ganancia estimada</span>
                         <p className="text-sm font-bold text-emerald-800">{formatMoney(ganancia)}</p>
                       </div>
+                    </div>
+                  )}
+
+                  {precio > 0 && (
+                    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2">
+                      <label className="flex items-center gap-2 text-sm font-semibold text-violet-900">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(item.actualizar_precio)}
+                          onChange={(event) => handleItemChange(index, 'actualizar_precio', event.target.checked)}
+                        />
+                        Actualizar precio de venta
+                      </label>
+                      {item.actualizar_precio ? (
+                        <label className="flex items-center gap-2 text-sm text-violet-900">
+                          Nuevo precio
+                          <input
+                            type="number"
+                            min="0"
+                            step="50"
+                            value={item.precio_venta !== '' ? item.precio_venta : pvs}
+                            onChange={(event) => handleItemChange(index, 'precio_venta', event.target.value)}
+                            className="w-28 rounded-lg border border-gray-300 px-2 py-1 text-sm focus:border-rosewood focus:outline-none"
+                            aria-label="Nuevo precio de venta"
+                          />
+                          <span className="text-xs text-violet-700">
+                            (margen real {precioVentaFinal > 0 ? Math.round(((precioVentaFinal - precioConIva) / precioVentaFinal) * 100) : 0}%)
+                          </span>
+                        </label>
+                      ) : (
+                        <span className="text-xs text-violet-700">El precio de venta actual no cambia; solo costo y stock.</span>
+                      )}
                     </div>
                   )}
 
