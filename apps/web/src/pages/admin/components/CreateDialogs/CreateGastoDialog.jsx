@@ -3,7 +3,7 @@ import { apiRequest } from '../../../../api/httpClient';
 import Modal from '../../../../components/Modal';
 
 const CreateGastoDialog = ({ isOpen, onClose, onCreated }) => {
-  const [form, setForm] = useState({ categoria: '', descripcion: '', monto: '' });
+  const [form, setForm] = useState({ categoria: '', descripcion: '', monto: '', medio_pago: 'efectivo' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -19,9 +19,10 @@ const CreateGastoDialog = ({ isOpen, onClose, onCreated }) => {
           categoria: form.categoria.trim(),
           descripcion: form.descripcion.trim(),
           monto: Number(form.monto || 0),
+          medio_pago: form.medio_pago,
         },
       });
-      setForm({ categoria: '', descripcion: '', monto: '' });
+      setForm({ categoria: '', descripcion: '', monto: '', medio_pago: 'efectivo' });
       onCreated('Gasto creado');
     } catch (err) {
       setError(err.message || 'No se pudo crear gasto');
@@ -37,6 +38,11 @@ const CreateGastoDialog = ({ isOpen, onClose, onCreated }) => {
         <input value={form.categoria} onChange={(e) => setForm((c) => ({ ...c, categoria: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Categoria" required />
         <input value={form.descripcion} onChange={(e) => setForm((c) => ({ ...c, descripcion: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Descripcion" />
         <input type="number" min="0" value={form.monto} onChange={(e) => setForm((c) => ({ ...c, monto: e.target.value }))} className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none" placeholder="Monto" required />
+        <select value={form.medio_pago} onChange={(e) => setForm((c) => ({ ...c, medio_pago: e.target.value }))} aria-label="Pagado con" className="rounded-xl border border-blush-300 px-3 py-2 text-sm focus:border-blush-300 focus:outline-none">
+          <option value="efectivo">Efectivo (sale del cajón: exige caja abierta)</option>
+          <option value="transferencia">Transferencia</option>
+          <option value="tarjeta">Tarjeta</option>
+        </select>
         <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
           <button type="button" onClick={onClose} className="rounded-full border border-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-50">Cancelar</button>
           <button type="submit" disabled={saving} className="rounded-full bg-blush-300 px-4 py-2 text-sm font-semibold text-rosewood transition hover:bg-blush-300">{saving ? 'Guardando…' : 'Crear gasto'}</button>

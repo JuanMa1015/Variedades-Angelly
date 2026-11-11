@@ -49,7 +49,7 @@ const confirmarPrecio = (confirmar, nombre, form) => (
 );
 
 // Carga manual: un producto nuevo con todos sus datos.
-const FormularioManual = ({ proveedores, confirmar, onCreated }) => {
+const FormularioManual = ({ proveedores, confirmar, onCreated, sinStock = false }) => {
   const [form, setForm] = useState(VACIO);
   const [imagen, setImagen] = useState(IMAGEN_VACIA);
   const [error, setError] = useState('');
@@ -66,18 +66,18 @@ const FormularioManual = ({ proveedores, confirmar, onCreated }) => {
     setError('');
     try {
       const imagen_url = await resolveImageUrl(imagen.url.trim(), imagen.archivo);
-      await apiPost('/api/productos', {
+      const creado = await apiPost('/api/productos', {
         nombre,
         codigo_barras: form.codigo_barras.trim() || null,
         precio_costo: form.precio_costo,
         precio_venta: form.precio_venta,
-        stock_actual: Number(form.stock_actual || 0),
+        stock_actual: sinStock ? 0 : Number(form.stock_actual || 0),
         stock_minimo: Number(form.stock_minimo || 0),
         catalogo: 'tienda',
         proveedor_id: form.proveedor_id ? Number(form.proveedor_id) : null,
         imagen_url,
       });
-      await onCreated('Producto agregado correctamente');
+      await onCreated('Producto agregado correctamente', creado);
     } catch (err) {
       setError(err.message || 'No se pudo agregar el producto');
       setSaving(false);
@@ -94,9 +94,11 @@ const FormularioManual = ({ proveedores, confirmar, onCreated }) => {
         <input id="nuevo-codigo" type="text" value={form.codigo_barras} onChange={(e) => campo('codigo_barras')(e.target.value)} maxLength={64} placeholder="Opcional" className={INPUT} />
       </Campo>
       <Precios form={form} campo={campo} />
-      <Campo id="nuevo-stock" etiqueta="Stock inicial">
-        <input id="nuevo-stock" type="number" min="0" value={form.stock_actual} onChange={(e) => campo('stock_actual')(e.target.value)} placeholder="Ej: 20" className={INPUT} />
-      </Campo>
+      {!sinStock && (
+        <Campo id="nuevo-stock" etiqueta="Stock inicial">
+          <input id="nuevo-stock" type="number" min="0" value={form.stock_actual} onChange={(e) => campo('stock_actual')(e.target.value)} placeholder="Ej: 20" className={INPUT} />
+        </Campo>
+      )}
       <Campo id="nuevo-minimo" etiqueta="Stock mínimo">
         <input id="nuevo-minimo" type="number" min="0" value={form.stock_minimo} onChange={(e) => campo('stock_minimo')(e.target.value)} placeholder="Ej: 5" className={INPUT} />
       </Campo>
@@ -195,8 +197,11 @@ const PESTANAS = [
 ];
 
 // Cada pestaña se monta al abrirse: cerrar el cuadro siempre deja los formularios limpios.
-const Contenido = ({ proveedores, confirmar, onCreated }) => {
+// `soloManual`: sin la pestaña de codigo de barras (que suma stock) ni stock inicial; lo usa la factura de compra,
+// que es la que suma las unidades.
+const Contenido = ({ proveedores, confirmar, onCreated, soloManual = false }) => {
   const [pestana, setPestana] = useState('manual');
+  if (soloManual) return <FormularioManual proveedores={proveedores} confirmar={confirmar} onCreated={onCreated} sinStock />;
   const Formulario = pestana === 'manual' ? FormularioManual : FormularioCodigo;
   return (
     <>
@@ -212,8 +217,8 @@ const Contenido = ({ proveedores, confirmar, onCreated }) => {
   );
 };
 
-const CrearProductoModal = ({ abierto, onClose, ...resto }) => (
-  <Modal isOpen={abierto} onClose={onClose} title="Agregar producto al inventario" maxWidth="max-w-3xl">
+const CrearProductoModal = ({ abierto, onClose, titulo = 'Agregar producto al inventario', ...resto }) => (
+  <Modal isOpen={abierto} onClose={onClose} title={titulo} maxWidth="max-w-3xl">
     {abierto && <Contenido {...resto} />}
   </Modal>
 );

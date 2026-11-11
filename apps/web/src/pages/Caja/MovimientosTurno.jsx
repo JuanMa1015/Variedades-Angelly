@@ -9,7 +9,7 @@ const Monto = ({ movimiento }) => {
   if (movimiento.anulada) {
     return <span className="text-gray-400 line-through">{formatMoney(movimiento.total)}</span>;
   }
-  if (movimiento.tipo === 'gasto') return <span className="font-bold text-red-700">−{formatMoney(movimiento.monto)}</span>;
+  if (movimiento.tipo === 'gasto' || movimiento.tipo === 'compra') return <span className="font-bold text-red-700">−{formatMoney(movimiento.monto)}</span>;
   return (
     <span className="font-bold text-emerald-700">
       +{formatMoney(movimiento.monto)}
@@ -36,7 +36,7 @@ const FilaMovimiento = ({ movimiento }) => {
   );
 };
 
-// Todo lo que explica el efectivo del turno: ventas cobradas, abonos recibidos y gastos pagados.
+// Todo lo que explica el efectivo del turno: ventas cobradas, abonos recibidos, gastos y compras pagados.
 const MovimientosTurno = ({ cajaId, version = 0 }) => {
   const [movimientos, setMovimientos] = useState(null);
   const [error, setError] = useState('');

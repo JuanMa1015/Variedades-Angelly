@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from src.api.dependencies import AuthenticatedUser
 from src.api.services.auditoria import registrar_auditoria
+from src.api.services.compras import revertir_stock_de_factura
 from src.api.services.deuda import SIN_DEUDA, deuda_pendiente_tienda, mover_deuda_tienda
 from src.api.services.fidelizacion import revertir_puntos_de_venta
 from src.api.services.stock import mover_stock
@@ -23,6 +24,10 @@ from src.infrastructure.database.models import (
     AbonoTiendaModel,
     ClienteFiadoTiendaModel,
     DetalleVentaModel,
+    FacturaCompraDetalleModel,
+    FacturaCompraModel,
+    GastoModel,
+    PedidoProveedorModel,
     ProductoModel,
     UsuarioModel,
     VentaModel,
@@ -236,3 +241,110 @@ def anular_abono_tienda(
         ),
     )
     return abono
+
+
+def anular_gasto(
+    db: Session,
+    gasto_id: int,
+    *,
+    solicitante: str,
+    autorizado_por: str,
+    motivo: str,
+) -> GastoModel:
+    """Marca el gasto como anulado: deja de restar del efectivo de la caja. No borra nada.
+
+    Un gasto en efectivo solo se anula mientras su turno siga abierto (el cierre ya quedo guardado);
+    uno pagado por transferencia o tarjeta no toca el cajon y se puede anular siempre.
+    """
+    gasto = db.execute(
+        select(GastoModel).where(GastoModel.id == gasto_id).with_for_update(),
+    ).scalar_one_or_none()
+    if gasto is None:
+        raise HTTPException(status_code=404, detail="Gasto no encontrado")
+    if gasto.anulado:
+        raise HTTPException(status_code=409, detail="El gasto ya esta anulado")
+    if gasto.medio_pago == "efectivo" and gasto.caja_id is not None and gasto.caja_id != caja_abierta_id(db):
+        raise HTTPException(
+            status_code=409,
+            detail="Solo se pueden anular gastos en efectivo del turno de caja abierto: ese turno ya se cerro",
+        )
+
+    gasto.anulado = True
+    gasto.anulado_en = datetime.now(UTC).replace(tzinfo=None)
+    gasto.anulado_por = solicitante
+    gasto.autorizado_por = autorizado_por
+    gasto.motivo_anulacion = motivo
+    registrar_auditoria(
+        db,
+        usuario=solicitante,
+        modulo="gastos",
+        entidad="gasto",
+        accion="anular",
+        entidad_id=gasto.id,
+        detalle=f"{gasto.categoria}: {float(gasto.monto)} por {gasto.medio_pago}. Autorizo: {autorizado_por}. Motivo: {motivo}",
+    )
+    return gasto
+
+
+def anular_factura(
+    db: Session,
+    factura_id: int,
+    *,
+    solicitante: str,
+    autorizada_por: str,
+    motivo: str,
+) -> FacturaCompraModel:
+    """Marca la factura como anulada y le quita al stock lo que sumo. No borra nada.
+
+    No devuelve el costo ni el precio de venta que dejo la factura (no se sabe cual era el anterior: se
+    corrigen desde Inventario). Una compra en efectivo solo se anula con su turno abierto (el cierre ya
+    quedo guardado); si parte de la mercancia ya se vendio, no se puede (el stock quedaria negativo).
+    """
+    factura = db.execute(
+        select(FacturaCompraModel).where(FacturaCompraModel.id == factura_id).with_for_update(),
+    ).scalar_one_or_none()
+    if factura is None:
+        raise HTTPException(status_code=404, detail="Factura no encontrada")
+    if factura.anulada:
+        raise HTTPException(status_code=409, detail="La factura ya esta anulada")
+    if factura.medio_pago == "efectivo" and factura.caja_id is not None and factura.caja_id != caja_abierta_id(db):
+        raise HTTPException(
+            status_code=409,
+            detail="Solo se pueden anular compras en efectivo del turno de caja abierto: ese turno ya se cerro",
+        )
+
+    detalles = db.execute(
+        select(FacturaCompraDetalleModel).where(FacturaCompraDetalleModel.factura_id == factura.id),
+    ).scalars().all()
+    productos = db.execute(
+        select(ProductoModel)
+        .where(ProductoModel.id.in_({d.producto_id for d in detalles}))
+        .order_by(ProductoModel.id)
+        .with_for_update(),
+    ).scalars().all()
+    revertir_stock_de_factura(
+        db, detalles, {p.id: p for p in productos}, usuario=solicitante, factura_id=factura.id,
+        motivo="Factura de compra anulada",
+    )
+    # El pedido que esta factura cumplia vuelve a quedar pendiente.
+    for pedido in db.execute(select(PedidoProveedorModel).where(PedidoProveedorModel.factura_id == factura.id)).scalars():
+        pedido.estado = "enviado"
+        pedido.factura_id = None
+        pedido.fecha_resolucion = None
+        pedido.resuelto_por = None
+
+    factura.anulada = True
+    factura.anulada_en = datetime.now(UTC).replace(tzinfo=None)
+    factura.anulada_por = solicitante
+    factura.autorizada_por = autorizada_por
+    factura.motivo_anulacion = motivo
+    registrar_auditoria(
+        db,
+        usuario=solicitante,
+        modulo="facturas",
+        entidad="factura_compra",
+        accion="anular",
+        entidad_id=factura.id,
+        detalle=f"Total {float(factura.total_factura)}. Autorizo: {autorizada_por}. Motivo: {motivo}",
+    )
+    return factura

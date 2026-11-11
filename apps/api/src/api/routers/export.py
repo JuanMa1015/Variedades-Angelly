@@ -133,7 +133,7 @@ def export_gastos(
     gastos = db.execute(query).scalars().all()
 
     rows = [
-        ["id", "fecha", "categoria", "descripcion", "monto", "registrado_por"],
+        ["id", "fecha", "categoria", "descripcion", "monto", "medio_pago", "estado", "registrado_por"],
     ]
     for g in gastos:
         rows.append([
@@ -142,6 +142,8 @@ def export_gastos(
             _texto(g.categoria),
             _texto(g.descripcion),
             str(g.monto),
+            _texto(g.medio_pago),
+            "anulado" if g.anulado else "vigente",
             _texto(g.registrado_por),
         ])
 

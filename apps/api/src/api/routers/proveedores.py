@@ -10,6 +10,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from src.api.services.auditoria import registrar_auditoria
+from src.api.services.telefono import TelefonoInvalido, normalizar_telefono
 from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.pagination import PageInfo, build_page
 from src.infrastructure.database.connection import get_db
@@ -47,6 +48,35 @@ class ProveedorUpdateRequest(BaseModel):
     contacto: Annotated[str | None, Field(max_length=120)] = None
     telefono: Annotated[str | None, Field(max_length=25)] = None
     activo: bool | None = None
+
+
+def _telefono_o_400(valor: str | None) -> str | None:
+    """Telefono en el formato unico (57 + digitos) o None si viene vacio."""
+    try:
+        return normalizar_telefono(valor)
+    except TelefonoInvalido as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+def _validar_unicos(db: Session, *, nombre: str | None, telefono: str | None, excluir_id: int | None = None) -> None:
+    """Nombre (sin distinguir mayusculas) y telefono no pueden repetirse entre proveedores."""
+    if nombre is not None:
+        query = select(ProveedorModel).where(func.lower(ProveedorModel.nombre) == nombre.lower())
+        if excluir_id is not None:
+            query = query.where(ProveedorModel.id != excluir_id)
+        if db.execute(query).first() is not None:
+            raise HTTPException(status_code=409, detail="Ya existe un proveedor con ese nombre")
+    if telefono is not None:
+        query = select(ProveedorModel).where(ProveedorModel.telefono.is_not(None))
+        if excluir_id is not None:
+            query = query.where(ProveedorModel.id != excluir_id)
+        for otro in db.execute(query).scalars():
+            try:
+                igual = normalizar_telefono(otro.telefono) == telefono
+            except TelefonoInvalido:
+                igual = False  # un numero viejo con formato raro no bloquea
+            if igual:
+                raise HTTPException(status_code=409, detail=f"Ese telefono ya lo tiene el proveedor '{otro.nombre}'")
 
 
 def _to_proveedor_response(proveedor: ProveedorModel) -> ProveedorResponse:
@@ -96,21 +126,31 @@ def list_proveedores_paginados(
 def create_proveedor(
     payload: ProveedorCreateRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> ProveedorResponse:
-    existente = db.execute(
-        select(ProveedorModel).where(ProveedorModel.nombre == payload.nombre),
-    ).scalar_one_or_none()
-    if existente is not None:
-        raise HTTPException(status_code=409, detail="Ya existe un proveedor con ese nombre")
+    nombre = payload.nombre.strip()
+    if len(nombre) < 3:
+        raise HTTPException(status_code=400, detail="El nombre debe tener al menos 3 caracteres")
+    telefono = _telefono_o_400(payload.telefono)
+    _validar_unicos(db, nombre=nombre, telefono=telefono)
 
     proveedor = ProveedorModel(
-        nombre=payload.nombre,
-        contacto=payload.contacto,
-        telefono=payload.telefono,
+        nombre=nombre,
+        contacto=(payload.contacto or "").strip() or None,
+        telefono=telefono,
         activo=True,
     )
     db.add(proveedor)
+    db.flush()
+    registrar_auditoria(
+        db,
+        usuario=current_user.username,
+        modulo="proveedores",
+        entidad="proveedor",
+        accion="crear",
+        entidad_id=proveedor.id,
+        detalle=f"Creado: {proveedor.nombre}",
+    )
     db.commit()
     db.refresh(proveedor)
     return _to_proveedor_response(proveedor)
@@ -121,7 +161,7 @@ def update_proveedor(
     proveedor_id: int,
     payload: ProveedorUpdateRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> ProveedorResponse:
     proveedor = db.execute(
         select(ProveedorModel).where(ProveedorModel.id == proveedor_id),
@@ -129,30 +169,48 @@ def update_proveedor(
     if proveedor is None:
         raise HTTPException(status_code=404, detail="Proveedor no encontrado")
 
+    cambios: list[str] = []
+    nombre = None
     if payload.nombre is not None:
         nombre = payload.nombre.strip()
-        if not nombre:
-            raise HTTPException(status_code=400, detail="El nombre no puede estar vacio")
+        if len(nombre) < 3:
+            raise HTTPException(status_code=400, detail="El nombre debe tener al menos 3 caracteres")
+    telefono = _telefono_o_400(payload.telefono) if payload.telefono is not None else None
+    _validar_unicos(
+        db,
+        nombre=nombre if nombre is not None and nombre.lower() != proveedor.nombre.lower() else None,
+        telefono=telefono,
+        excluir_id=proveedor_id,
+    )
 
-        existente = db.execute(
-            select(ProveedorModel).where(
-                ProveedorModel.nombre == nombre,
-                ProveedorModel.id != proveedor_id,
-            ),
-        ).scalar_one_or_none()
-        if existente is not None:
-            raise HTTPException(status_code=409, detail="Ya existe un proveedor con ese nombre")
+    if nombre is not None and nombre != proveedor.nombre:
+        cambios.append(f"nombre: {proveedor.nombre} -> {nombre}")
         proveedor.nombre = nombre
 
     if payload.contacto is not None:
-        proveedor.contacto = payload.contacto.strip() or None
+        contacto = payload.contacto.strip() or None
+        if contacto != proveedor.contacto:
+            cambios.append(f"contacto: {proveedor.contacto or '-'} -> {contacto or '-'}")
+            proveedor.contacto = contacto
 
-    if payload.telefono is not None:
-        proveedor.telefono = payload.telefono.strip() or None
+    if payload.telefono is not None and telefono != proveedor.telefono:
+        cambios.append(f"telefono: {proveedor.telefono or '-'} -> {telefono or '-'}")
+        proveedor.telefono = telefono
 
-    if payload.activo is not None:
+    if payload.activo is not None and payload.activo != proveedor.activo:
+        cambios.append("activado" if payload.activo else "desactivado")
         proveedor.activo = payload.activo
 
+    if cambios:
+        registrar_auditoria(
+            db,
+            usuario=current_user.username,
+            modulo="proveedores",
+            entidad="proveedor",
+            accion="actualizar",
+            entidad_id=proveedor.id,
+            detalle="; ".join(cambios),
+        )
     db.commit()
     db.refresh(proveedor)
     return _to_proveedor_response(proveedor)
@@ -165,7 +223,7 @@ def update_proveedor(
 def toggle_proveedor_activo(
     proveedor_id: int,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> ProveedorResponse:
     proveedor = db.execute(
         select(ProveedorModel).where(ProveedorModel.id == proveedor_id),
@@ -174,6 +232,15 @@ def toggle_proveedor_activo(
         raise HTTPException(status_code=404, detail="Proveedor no encontrado")
 
     proveedor.activo = not proveedor.activo
+    registrar_auditoria(
+        db,
+        usuario=current_user.username,
+        modulo="proveedores",
+        entidad="proveedor",
+        accion="actualizar",
+        entidad_id=proveedor.id,
+        detalle="activado" if proveedor.activo else "desactivado",
+    )
     db.commit()
     db.refresh(proveedor)
     return _to_proveedor_response(proveedor)

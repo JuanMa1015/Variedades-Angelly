@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import os
-from datetime import date, datetime
-from typing import Annotated
+from datetime import UTC, date, datetime, timedelta
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from src.api.limiter import limiter, login_rate_limit
+from src.api.schemas.anulacion import AnularRequest
+from src.api.services.anulacion import anular_factura, quien_autoriza
 from src.api.services.auditoria import registrar_auditoria
 from src.api.services.compras import (
     aplicar_compra_a_producto,
@@ -19,18 +22,23 @@ from src.api.services.compras import (
     revertir_stock_de_factura,
 )
 from src.api.dependencies import AuthenticatedUser, require_roles
-from src.api.pagination import PageInfo, build_page
+from src.api.pagination import PageInfo, build_page, search_filter
+from src.api.services.venta_reglas import caja_abierta_id, exigir_caja_abierta
 from src.infrastructure.database.connection import get_db
 
 IVA_RATE = float(os.getenv("IVA_RATE", "0.19"))
 from src.infrastructure.database.models import (
     FacturaCompraDetalleModel,
     FacturaCompraModel,
+    PedidoProveedorModel,
     ProductoModel,
     ProveedorModel,
 )
 
 router = APIRouter(tags=["facturas-compra"])
+
+MedioPagoCompra = Literal["efectivo", "transferencia", "tarjeta", "credito"]
+NUMERO_MINIMO = 3
 
 
 class FacturaDetalleCreateRequest(BaseModel):
@@ -41,6 +49,8 @@ class FacturaDetalleCreateRequest(BaseModel):
     # Si es True el producto queda con `precio_venta` (o con el sugerido redondeado si no se envia).
     actualizar_precio: bool = False
     precio_venta: Annotated[float | None, Field(gt=0)] = None
+    # Vender por debajo del costo es una decision que se confirma: sin esto el servidor lo rechaza.
+    permitir_bajo_costo: bool = False
 
 
 class FacturaCompraCreateRequest(BaseModel):
@@ -49,6 +59,10 @@ class FacturaCompraCreateRequest(BaseModel):
     encomienda: Annotated[float, Field(ge=0)] = 0.0
     porcentaje_ganancia: Annotated[float, Field(ge=0.05, le=0.95)] = 0.70
     numero_factura: Annotated[str | None, Field(max_length=20)] = None
+    # Pedido a este proveedor que esta factura cumple: queda como recibido y enlazado.
+    pedido_id: Annotated[int | None, Field(gt=0)] = None
+    # Como se pago: solo el efectivo sale del cajon (exige caja abierta). Sin dato, no toca la caja.
+    medio_pago: MedioPagoCompra | None = None
 
 
 class FacturaDetalleResponse(BaseModel):
@@ -75,6 +89,13 @@ class FacturaCompraResponse(BaseModel):
     porcentaje_ganancia: float | None = None
     fecha_creacion: datetime
     items: list[FacturaDetalleResponse]
+    medio_pago: str | None = None
+    caja_id: int | None = None
+    anulada: bool = False
+    anulada_en: datetime | None = None
+    anulada_por: str | None = None
+    autorizada_por: str | None = None
+    motivo_anulacion: str | None = None
 
 
 class FacturaCompraPageResponse(BaseModel):
@@ -103,6 +124,13 @@ def _to_factura_response(
         encomienda=factura.encomienda,
         porcentaje_ganancia=factura.porcentaje_ganancia,
         fecha_creacion=factura.fecha_creacion,
+        medio_pago=factura.medio_pago,
+        caja_id=factura.caja_id,
+        anulada=bool(factura.anulada),
+        anulada_en=factura.anulada_en,
+        anulada_por=factura.anulada_por,
+        autorizada_por=factura.autorizada_por,
+        motivo_anulacion=factura.motivo_anulacion,
         items=[
             FacturaDetalleResponse(
                 producto_id=item.producto_id,
@@ -138,7 +166,8 @@ def list_facturas_compra(
     if fecha_desde:
         query = query.where(FacturaCompraModel.fecha_creacion >= fecha_desde)
     if fecha_hasta:
-        query = query.where(FacturaCompraModel.fecha_creacion <= fecha_hasta)
+        # Hasta el final de ese dia: comparar contra la medianoche dejaba fuera todo el dia final.
+        query = query.where(FacturaCompraModel.fecha_creacion < fecha_hasta + timedelta(days=1))
     facturas = db.execute(
         query.order_by(FacturaCompraModel.fecha_creacion.desc()),
     ).scalars().all()
@@ -177,14 +206,28 @@ def list_facturas_compra_paginadas(
     limit: int = Query(default=20, ge=1, le=200),
     fecha_desde: date | None = Query(default=None),
     fecha_hasta: date | None = Query(default=None),
+    q: str | None = Query(default=None, max_length=100, description="Numero de factura o nombre del proveedor"),
+    proveedor_id: int | None = Query(default=None, gt=0),
+    medio_pago: MedioPagoCompra | None = Query(default=None),
+    estado: Literal["todas", "vigentes", "anuladas"] = Query(default="todas"),
     db: Session = Depends(get_db),
     _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> FacturaCompraPageResponse:
-    query = select(FacturaCompraModel)
+    query = select(FacturaCompraModel).join(ProveedorModel, ProveedorModel.id == FacturaCompraModel.proveedor_id)
+    if proveedor_id is not None:
+        query = query.where(FacturaCompraModel.proveedor_id == proveedor_id)
+    if medio_pago:
+        query = query.where(FacturaCompraModel.medio_pago == medio_pago)
+    if estado != "todas":
+        query = query.where(FacturaCompraModel.anulada.is_(estado == "anuladas"))
+    termino = (q or "").strip()
+    if termino:
+        query = query.where(or_(*search_filter(termino, FacturaCompraModel.numero_factura, ProveedorModel.nombre)))
     if fecha_desde:
         query = query.where(FacturaCompraModel.fecha_creacion >= fecha_desde)
     if fecha_hasta:
-        query = query.where(FacturaCompraModel.fecha_creacion <= fecha_hasta)
+        # Hasta el final de ese dia: comparar contra la medianoche dejaba fuera todo el dia final.
+        query = query.where(FacturaCompraModel.fecha_creacion < fecha_hasta + timedelta(days=1))
     items, page_info = build_page(db, query, page, limit, FacturaCompraModel.fecha_creacion.desc())
 
     if not items:
@@ -218,6 +261,25 @@ def list_facturas_compra_paginadas(
     )
 
 
+def _validar_numero(db: Session, proveedor_id: int, numero: str | None) -> str | None:
+    """Numero limpio, de al menos 3 caracteres, y que no se haya registrado ya para ese proveedor."""
+    limpio = (numero or "").strip()
+    if not limpio:
+        return None
+    if len(limpio) < NUMERO_MINIMO:
+        raise HTTPException(status_code=400, detail=f"El numero de factura debe tener al menos {NUMERO_MINIMO} caracteres")
+    repetida = db.execute(
+        select(FacturaCompraModel.id).where(
+            FacturaCompraModel.proveedor_id == proveedor_id,
+            func.lower(FacturaCompraModel.numero_factura) == limpio.lower(),
+            FacturaCompraModel.anulada.is_(False),
+        ).limit(1),
+    ).scalar_one_or_none()
+    if repetida is not None:
+        raise HTTPException(status_code=409, detail=f"Esa factura ya esta registrada para este proveedor (#{repetida})")
+    return limpio
+
+
 @router.post("/api/facturas-compra", response_model=FacturaCompraResponse, status_code=201)
 def create_factura_compra(
     payload: FacturaCompraCreateRequest,
@@ -238,6 +300,22 @@ def create_factura_compra(
     if proveedor is None:
         raise HTTPException(status_code=404, detail="Proveedor no encontrado")
 
+    numero = _validar_numero(db, payload.proveedor_id, payload.numero_factura)
+    if payload.medio_pago == "efectivo":
+        exigir_caja_abierta(db, "registrar compras en efectivo")
+
+    pedido = None
+    if payload.pedido_id is not None:
+        pedido = db.execute(
+            select(PedidoProveedorModel).where(PedidoProveedorModel.id == payload.pedido_id).with_for_update(),
+        ).scalar_one_or_none()
+        if pedido is None:
+            raise HTTPException(status_code=404, detail="El pedido indicado no existe")
+        if pedido.proveedor_id != payload.proveedor_id:
+            raise HTTPException(status_code=400, detail="El pedido es de otro proveedor")
+        if pedido.estado != "enviado":
+            raise HTTPException(status_code=409, detail=f"El pedido #{pedido.id} ya esta {pedido.estado}")
+
     producto_ids = {item.producto_id for item in payload.items}
     productos = db.execute(
         select(ProductoModel).where(ProductoModel.id.in_(producto_ids)).with_for_update(),
@@ -246,6 +324,9 @@ def create_factura_compra(
 
     if len(productos_map) != len(producto_ids):
         raise HTTPException(status_code=404, detail="Uno o mas productos no existen")
+    inactivos = [p.nombre for p in productos if not p.activo]
+    if inactivos:
+        raise HTTPException(status_code=409, detail=f"Producto desactivado: {', '.join(inactivos)}. Reactivalo en Inventario para comprarlo")
 
     subtotal = 0.0
     total_iva = 0.0
@@ -259,6 +340,12 @@ def create_factura_compra(
         precio_con_iva = costo_unitario(item.precio_unitario, item.aplica_iva, IVA_RATE)
         precio_venta_sugerido = redondear_precio_venta(precio_con_iva / payload.porcentaje_ganancia)
         ganancia_estimada = precio_venta_sugerido - precio_con_iva
+        nuevo_precio = (item.precio_venta or precio_venta_sugerido) if item.actualizar_precio else None
+        if nuevo_precio is not None and nuevo_precio < precio_con_iva and not item.permitir_bajo_costo:
+            raise HTTPException(
+                status_code=400,
+                detail=f"'{producto.nombre}': el precio de venta {nuevo_precio:g} queda por debajo del costo {precio_con_iva:g}",
+            )
 
         subtotal += base
         total_iva += iva
@@ -273,9 +360,7 @@ def create_factura_compra(
                 "precio_venta_sugerido": round(precio_venta_sugerido, 2),
                 "ganancia_estimada": round(ganancia_estimada, 2),
                 "costo": precio_con_iva,
-                "nuevo_precio_venta": (
-                    (item.precio_venta or precio_venta_sugerido) if item.actualizar_precio else None
-                ),
+                "nuevo_precio_venta": nuevo_precio,
             },
         )
 
@@ -285,9 +370,10 @@ def create_factura_compra(
         subtotal=subtotal,
         total_iva=total_iva,
         total_factura=subtotal + total_iva - (payload.encomienda or 0),
-        numero_factura=payload.numero_factura.strip() if payload.numero_factura else None,
+        numero_factura=numero,
         encomienda=payload.encomienda or None,
         porcentaje_ganancia=payload.porcentaje_ganancia,
+        medio_pago=payload.medio_pago,
     )
     db.add(factura)
     db.flush()
@@ -330,6 +416,22 @@ def create_factura_compra(
             ),
         )
 
+    if pedido is not None:
+        pedido.estado = "recibido"
+        pedido.factura_id = factura.id
+        pedido.fecha_resolucion = datetime.now(UTC).replace(tzinfo=None)
+        pedido.resuelto_por = current_user.username
+        pedido.nota = None
+        registrar_auditoria(
+            db,
+            usuario=current_user.username,
+            modulo="proveedores",
+            entidad="pedido_proveedor",
+            accion="cambiar_estado",
+            entidad_id=pedido.id,
+            detalle=f"enviado -> recibido (factura #{factura.id})",
+        )
+
     db.commit()
     db.refresh(factura)
 
@@ -352,6 +454,11 @@ def update_factura_compra(
     ).scalar_one_or_none()
     if factura is None:
         raise HTTPException(status_code=404, detail="Factura no encontrada")
+
+    if factura.anulada:
+        raise HTTPException(status_code=409, detail="La factura esta anulada y no se puede editar")
+    if payload.total_factura is not None and factura.medio_pago == "efectivo" and factura.caja_id not in (None, caja_abierta_id(db)):
+        raise HTTPException(status_code=409, detail="La compra es de un turno de caja ya cerrado: no se puede cambiar su total")
 
     if payload.total_factura is not None:
         registrar_auditoria(
@@ -395,6 +502,8 @@ def delete_factura_compra(
     ).scalar_one_or_none()
     if factura is None:
         raise HTTPException(status_code=404, detail="Factura no encontrada")
+    if factura.medio_pago == "efectivo" and factura.caja_id is not None:
+        raise HTTPException(status_code=409, detail="La compra en efectivo ya hace parte de un turno de caja: anulala en vez de borrarla")
 
     detalles = db.execute(
         select(FacturaCompraDetalleModel).where(
@@ -418,7 +527,43 @@ def delete_factura_compra(
     revertir_stock_de_factura(
         db, detalles, {p.id: p for p in productos}, usuario=current_user.username, factura_id=factura.id,
     )
+    # El pedido que esta factura cumplia vuelve a quedar pendiente.
+    for pedido in db.execute(
+        select(PedidoProveedorModel).where(PedidoProveedorModel.factura_id == factura.id),
+    ).scalars():
+        pedido.estado = "enviado"
+        pedido.factura_id = None
+        pedido.fecha_resolucion = None
+        pedido.resuelto_por = None
     for detalle in detalles:
         db.delete(detalle)
+    db.flush()
     db.delete(factura)
     db.commit()
+
+
+@router.post("/api/facturas-compra/{factura_id}/anular", response_model=FacturaCompraResponse)
+@limiter.limit(login_rate_limit())
+def anular_factura_endpoint(
+    request: Request,
+    factura_id: int,
+    payload: AnularRequest,
+    db: Session = Depends(get_db),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+) -> FacturaCompraResponse:
+    """Anula una factura con motivo y autorizacion: devuelve el stock y deja de restar de la caja."""
+    with db.begin():
+        autorizada_por = quien_autoriza(db, current_user, payload.autorizador_usuario, payload.autorizador_password)
+        factura = anular_factura(
+            db,
+            factura_id,
+            solicitante=current_user.username,
+            autorizada_por=autorizada_por,
+            motivo=payload.motivo.strip(),
+        )
+        db.flush()
+        proveedor = db.get(ProveedorModel, factura.proveedor_id)
+        detalles = db.execute(
+            select(FacturaCompraDetalleModel).where(FacturaCompraDetalleModel.factura_id == factura.id),
+        ).scalars().all()
+        return _to_factura_response(factura, proveedor_nombre=proveedor.nombre if proveedor else "Proveedor", items=detalles)

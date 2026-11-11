@@ -56,6 +56,7 @@ def revertir_stock_de_factura(
     *,
     usuario: str,
     factura_id: int,
+    motivo: str = "Factura de compra eliminada",
 ) -> None:
     """Resta el stock que sumo la factura. Si ya se vendio parte, no deja stock negativo."""
     por_producto: dict[int, int] = defaultdict(int)
@@ -70,12 +71,12 @@ def revertir_stock_de_factura(
     if faltantes:
         raise HTTPException(
             status_code=409,
-            detail="No se puede eliminar: ya se vendio parte de esta compra. " + "; ".join(faltantes),
+            detail="No se puede revertir: ya se vendio parte de esta compra. " + "; ".join(faltantes),
         )
 
     for pid, cantidad in por_producto.items():
         if pid in productos:
             mover_stock(
                 db, productos[pid], -cantidad, tipo="eliminacion_factura", usuario=usuario,
-                motivo="Factura de compra eliminada", referencia_tipo="factura", referencia_id=factura_id,
+                motivo=motivo, referencia_tipo="factura", referencia_id=factura_id,
             )

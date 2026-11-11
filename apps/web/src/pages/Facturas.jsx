@@ -1,12 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FileText, Plus, Printer, Search, Trash2, X, ImageUp, Link as LinkIcon } from 'lucide-react';
+import { FileText, Plus, Trash2, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { apiGet, apiPost } from '../api/httpClient';
+import { fetchCajaEstado } from '../api/cajaApi';
 import ErrorMessage from '../components/ErrorMessage'
 import SuccessMessage from '../components/SuccessMessage'
 import Skeleton from '../components/Skeleton'
-import Modal from '../components/Modal';
-import { formatMoney, parseApiDate } from '../utils/format';
+import PaginationControls from '../components/PaginationControls';
+import useConfirm from '../components/useConfirm';
+import { formatDateTime, formatMoney, parseApiDate } from '../utils/format';
+import CrearProductoModal from './Inventario/CrearProductoModal';
+import FacturasLista from './Facturas/FacturasLista';
+import { MEDIOS_PAGO, TEXTO_PAGO } from './Facturas/facturasHelpers';
+import ProductoBuscador from './Facturas/ProductoBuscador';
+import { useFacturas } from './Facturas/useFacturas';
+import MoneyInput from './Ventas/MoneyInput';
 
 const EMPTY_ITEM = {
   producto_id: '',
@@ -23,6 +31,10 @@ const PASO_REDONDEO_PRECIO = 50;
 const redondearPrecioVenta = (valor) => Math.ceil(Math.round(valor * 1e6) / 1e6 / PASO_REDONDEO_PRECIO) * PASO_REDONDEO_PRECIO;
 
 const PORCENTAJE_DEFAULT = 0.70;
+const ETIQUETA = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500';
+const CAMPO = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none';
+const NUMERO_MINIMO = 3;
+
 const DRAFT_KEY = 'angelly.factura.draft';
 
 const loadDraft = () => {
@@ -42,13 +54,24 @@ const clearDraft = () => {
 };
 
 const Facturas = () => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const { confirm, ConfirmModal } = useConfirm();
+  const historial = useFacturas(token);
+  // Un administrador respalda la anulacion; quien no lo es debe pedir la clave de uno.
+  const pideAutorizacion = !(user?.role === 'admin' || user?.role === 'superadmin');
 
   const [proveedores, setProveedores] = useState([]);
   const [productos, setProductos] = useState([]);
-  const [facturas, setFacturas] = useState([]);
 
   const [proveedorId, setProveedorId] = useState('');
+  const [medioPago, setMedioPago] = useState('');
+  const [cajaAbierta, setCajaAbierta] = useState(null);
+  const [anulandoId, setAnulandoId] = useState(null);
+  const [savingAnulacion, setSavingAnulacion] = useState(false);
+  const [errorAnulacion, setErrorAnulacion] = useState('');
+  // Pedidos a este proveedor que siguen pendientes: la factura puede cumplir uno (queda recibido).
+  const [pedidosPendientes, setPedidosPendientes] = useState([]);
+  const [pedidoId, setPedidoId] = useState('');
   const [numeroFactura, setNumeroFactura] = useState('');
   const [encomienda, setEncomienda] = useState('');
   // El usuario piensa en "margen" (30 % sobre el precio de venta); la API guarda el
@@ -66,9 +89,26 @@ const Facturas = () => {
   const [success, setSuccess] = useState('');
   const [selectedPrintFactura, setSelectedPrintFactura] = useState(null);
 
-  const [isProductoModalOpen, setIsProductoModalOpen] = useState(false);
-  const [newProductoForm, setNewProductoForm] = useState({ nombre: '', codigo_barras: '', precio_costo: '', precio_venta: '', stock_actual: '' });
-  const [savingProducto, setSavingProducto] = useState(false);
+  const [creandoProducto, setCreandoProducto] = useState(false);
+
+  useEffect(() => {
+    if (!token) return undefined;
+    const controller = new AbortController();
+    // Para avisar si una compra en efectivo no se puede registrar; si falla, el servidor decide.
+    fetchCajaEstado({ signal: controller.signal })
+      .then((estado) => { if (!controller.signal.aborted) setCajaAbierta(typeof estado?.abierta === 'boolean' ? estado.abierta : null); })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [token]);
+
+  useEffect(() => {
+    if (!token || !proveedorId) return undefined;
+    const controller = new AbortController();
+    apiGet(`/api/proveedores/pedidos/paginados?estado=enviado&limit=50&proveedor_id=${proveedorId}`, { signal: controller.signal })
+      .then((payload) => { if (!controller.signal.aborted) setPedidosPendientes(Array.isArray(payload?.data) ? payload.data : []); })
+      .catch(() => { if (!controller.signal.aborted) setPedidosPendientes([]); });
+    return () => controller.abort();
+  }, [token, proveedorId]);
 
   useEffect(() => {
     if (!token) {
@@ -83,10 +123,9 @@ const Facturas = () => {
         setLoading(true);
         setError('');
 
-        const [proveedoresPayload, productosPayload, facturasPayload] = await Promise.all([
+        const [proveedoresPayload, productosPayload] = await Promise.all([
           apiGet('/api/proveedores', { signal: controller.signal }),
           apiGet('/api/productos?catalogo=tienda', { signal: controller.signal }),
-          apiGet('/api/facturas-compra', { signal: controller.signal }),
         ]);
 
         if (controller.signal.aborted) return;
@@ -99,17 +138,12 @@ const Facturas = () => {
           .catch(() => {});
 
         setProductos(Array.isArray(productosPayload) ? productosPayload : []);
-        setFacturas(Array.isArray(facturasPayload) ? facturasPayload : []);
-
-        setProveedorId((current) => {
-          if (current) return current;
-          return proveedoresList.length > 0 ? String(proveedoresList[0].id) : '';
-        });
 
         // Restore draft
         const draft = loadDraft();
         if (draft) {
           if (draft.proveedorId) setProveedorId(draft.proveedorId);
+          if (draft.medioPago) setMedioPago(draft.medioPago);
           if (draft.numeroFactura !== undefined) setNumeroFactura(draft.numeroFactura);
           if (draft.encomienda !== undefined) setEncomienda(draft.encomienda);
           if (draft.porcentajeGanancia) {
@@ -134,13 +168,13 @@ const Facturas = () => {
 
   // Auto-save draft to localStorage (and on unmount)
   useEffect(() => {
-    const cleanItems = items.map(({ search, _focus, _focused, ...rest }) => rest);
-    saveDraft({ proveedorId, numeroFactura, encomienda, porcentajeGanancia, items: cleanItems });
+    const cleanItems = items;
+    saveDraft({ proveedorId, medioPago, numeroFactura, encomienda, porcentajeGanancia, items: cleanItems });
     return () => {
-      saveDraft({ proveedorId, numeroFactura, encomienda, porcentajeGanancia, items: cleanItems });
+      saveDraft({ proveedorId, medioPago, numeroFactura, encomienda, porcentajeGanancia, items: cleanItems });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [proveedorId, encomienda, porcentajeGanancia, items]);
+  }, [proveedorId, medioPago, encomienda, porcentajeGanancia, items]);
 
   const productosById = useMemo(
     () => new Map(productos.map((item) => [Number(item.id), item])),
@@ -222,21 +256,58 @@ const Facturas = () => {
       return;
     }
 
-    const itemsPayload = items
-      .map((item) => ({
-        producto_id: Number(item.producto_id),
-        cantidad: Number(item.cantidad),
-        aplica_iva: Boolean(item.aplica_iva),
-        precio_unitario: Number(item.precio_unitario),
-        actualizar_precio: Boolean(item.actualizar_precio),
-        ...(item.actualizar_precio && Number(item.precio_venta) > 0 ? { precio_venta: Number(item.precio_venta) } : {}),
-      }))
+    if (!medioPago) {
+      setError('Elige cómo se pagó la compra');
+      return;
+    }
+    if (medioPago === 'efectivo' && cajaAbierta === false) {
+      setError('La caja está cerrada: ábrela para registrar una compra en efectivo, o elige otro medio de pago');
+      return;
+    }
+    const numero = numeroFactura.trim();
+    if (numero && numero.length < NUMERO_MINIMO) {
+      setError(`El número de factura debe tener al menos ${NUMERO_MINIMO} caracteres (o déjalo vacío)`);
+      return;
+    }
+
+    const lineas = items
+      .map((item) => {
+        const precioConIva = Number(item.precio_unitario) * (item.aplica_iva ? 1 + ivaRate : 1);
+        const nuevoPrecio = item.precio_venta !== '' ? Number(item.precio_venta) : redondearPrecioVenta(precioConIva / pct);
+        return {
+          producto_id: Number(item.producto_id),
+          cantidad: Number(item.cantidad),
+          aplica_iva: Boolean(item.aplica_iva),
+          precio_unitario: Number(item.precio_unitario),
+          actualizar_precio: Boolean(item.actualizar_precio),
+          ...(item.actualizar_precio && Number(item.precio_venta) > 0 ? { precio_venta: Number(item.precio_venta) } : {}),
+          _bajoCosto: Boolean(item.actualizar_precio) && nuevoPrecio < precioConIva,
+        };
+      })
       .filter((item) => Number.isInteger(item.producto_id) && item.producto_id > 0 && Number.isFinite(item.cantidad) && item.cantidad > 0 && Number.isFinite(item.precio_unitario) && item.precio_unitario > 0);
 
-    if (itemsPayload.length === 0) {
+    if (lineas.length === 0) {
       setError('Agrega al menos un producto válido');
       return;
     }
+
+    const nombreProveedor = proveedores.find((p) => p.id === proveedor)?.nombre ?? 'el proveedor';
+    const ok = await confirm({
+      title: 'Guardar factura',
+      message: `Factura de ${nombreProveedor} por ${formatMoney(resumen.totalFactura)}, pagada ${TEXTO_PAGO[medioPago]}. Sumará ${lineas.length} producto${lineas.length === 1 ? '' : 's'} al inventario y cambiará su costo.`,
+      variant: 'primary',
+    });
+    if (!ok) return;
+
+    const bajoCosto = lineas.filter((item) => item._bajoCosto).map((item) => productosById.get(item.producto_id)?.nombre ?? `Producto ${item.producto_id}`);
+    if (bajoCosto.length > 0) {
+      const sigue = await confirm({
+        title: 'Precio por debajo del costo',
+        message: `El precio de venta nuevo queda por debajo del costo en: ${bajoCosto.join(', ')}. Venderás con pérdida. ¿Registrar así?`,
+      });
+      if (!sigue) return;
+    }
+    const itemsPayload = lineas.map(({ _bajoCosto, ...item }) => (_bajoCosto ? { ...item, permitir_bajo_costo: true } : item));
 
     try {
       setSaving(true);
@@ -245,15 +316,21 @@ const Facturas = () => {
         items: itemsPayload,
         encomienda: Number(encomienda) || 0,
         porcentaje_ganancia: Number(porcentajeGanancia) || PORCENTAJE_DEFAULT,
-        numero_factura: numeroFactura.trim() || null,
+        numero_factura: numero || null,
+        medio_pago: medioPago,
+        ...(pedidoId ? { pedido_id: Number(pedidoId) } : {}),
       });
 
-      setFacturas((current) => [payload, ...current]);
+      await historial.reload({ silent: true });
+      if (pedidoId) setPedidosPendientes((current) => current.filter((pedido) => String(pedido.id) !== pedidoId));
+      setPedidoId('');
       setItems([{ ...EMPTY_ITEM }]);
       setEncomienda('');
       setNumeroFactura('');
+      setMedioPago('');
       clearDraft();
-      setSuccess(`Factura #${payload.id} registrada correctamente`);
+      if (medioPago === 'efectivo') setCajaAbierta(true);
+      setSuccess(`Factura #${payload.id} registrada correctamente${pedidoId ? ` y pedido #${pedidoId} marcado como recibido` : ''}`);
     } catch (err) {
       setError(err.message || 'No se pudo registrar la factura');
     } finally {
@@ -261,34 +338,40 @@ const Facturas = () => {
     }
   };
 
-  const handleCreateProducto = async (event) => {
-    event.preventDefault();
-    setError('');
+  // El producto recien creado entra a la primera linea vacia (o a una nueva) con stock 0: la factura es la que suma las unidades.
+  const handleProductoCreado = async (mensaje, producto) => {
+    setCreandoProducto(false);
+    setSuccess(`Producto "${producto.nombre}" creado: ya está en la factura`);
+    setProductos((actual) => [...actual, producto]);
+    setItems((actual) => {
+      const vacio = actual.findIndex((item) => !item.producto_id);
+      const nueva = { ...EMPTY_ITEM, producto_id: String(producto.id), precio_unitario: producto.precio_costo > 0 ? String(producto.precio_costo) : '' };
+      if (vacio === -1) return [...actual, nueva];
+      return actual.map((item, indice) => (indice === vacio ? { ...item, ...nueva } : item));
+    });
+  };
 
-    if (!newProductoForm.nombre.trim()) {
-      setError('El nombre es obligatorio');
-      return;
-    }
+  const handleToggleAnular = (id) => {
+    setErrorAnulacion('');
+    setAnulandoId((actual) => (actual === id ? null : id));
+  };
 
+  const handleAnular = async (factura, datos) => {
+    setSavingAnulacion(true);
+    setErrorAnulacion('');
     try {
-      setSavingProducto(true);
-      const producto = await apiPost('/api/productos', {
-        nombre: newProductoForm.nombre.trim(),
-        codigo_barras: newProductoForm.codigo_barras.trim() || null,
-        precio_costo: Number(newProductoForm.precio_costo || 0),
-        precio_venta: Number(newProductoForm.precio_venta || 0),
-        stock_actual: Number(newProductoForm.stock_actual || 0),
-        stock_minimo: 0,
-        catalogo: 'tienda',
+      await apiPost(`/api/facturas-compra/${factura.id}/anular`, {
+        motivo: datos.motivo,
+        autorizador_usuario: datos.autorizadorUsuario || null,
+        autorizador_password: datos.autorizadorPassword || null,
       });
-      setProductos((current) => [...current, producto]);
-      setNewProductoForm({ nombre: '', codigo_barras: '', precio_costo: '', precio_venta: '', stock_actual: '' });
-      setIsProductoModalOpen(false);
-      setSuccess(`Producto "${producto.nombre}" creado`);
+      await historial.reload({ silent: true });
+      setAnulandoId(null);
+      setSuccess(`Factura #${factura.id} anulada: se devolvió el stock. El costo y el precio de venta que dejó no se restauran: revísalos en Inventario.`);
     } catch (err) {
-      setError(err.message || 'No se pudo crear el producto');
+      setErrorAnulacion(err.message || 'No fue posible anular la factura');
     } finally {
-      setSavingProducto(false);
+      setSavingAnulacion(false);
     }
   };
 
@@ -327,57 +410,72 @@ const Facturas = () => {
         <h2 className="mb-4 text-xl font-bold text-gray-900">Añadir factura</h2>
 
         <form className="space-y-4" onSubmit={handleCreateFactura}>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-            <select
-              value={proveedorId}
-              onChange={(event) => setProveedorId(event.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
-            >
-              <option value="">Selecciona proveedor</option>
-              {proveedores.map((proveedor) => (
-                <option key={proveedor.id} value={proveedor.id}>{proveedor.nombre}</option>
-              ))}
-            </select>
-
-            <div className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm focus-within:border-rosewood">
-              <span className="text-gray-500">No. Factura:</span>
-              <input
-                type="text"
-                value={numeroFactura}
-                onChange={(e) => setNumeroFactura(e.target.value)}
-                className="w-full border-0 p-0 text-sm focus:outline-none"
-                placeholder="FEV-36965"
-              />
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-5">
+            <div>
+              <label htmlFor="factura-proveedor" className={ETIQUETA}>Proveedor</label>
+              <select
+                id="factura-proveedor"
+                value={proveedorId}
+                onChange={(event) => { setProveedorId(event.target.value); setPedidoId(''); setPedidosPendientes([]); }}
+                className={CAMPO}
+              >
+                <option value="">Selecciona proveedor</option>
+                {proveedores.map((proveedor) => (
+                  <option key={proveedor.id} value={proveedor.id}>{proveedor.nombre}</option>
+                ))}
+              </select>
             </div>
 
-            <div className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm focus-within:border-rosewood">
-              <span className="text-gray-500" title="Porcentaje del precio de venta que es ganancia. Precio de venta = costo ÷ (1 − margen)">Margen s/ venta:</span>
-              <input
-                type="number"
-                min="5"
-                max="95"
-                step="1"
-                value={margenPct}
-                onChange={(e) => setMargenPct(e.target.value)}
-                className="w-16 border-0 p-0 text-sm focus:outline-none"
-                placeholder="30"
-                aria-label="Margen de ganancia sobre el precio de venta, en porcentaje"
-              />
-              <span className="text-gray-500">%</span>
+            <div>
+              <label htmlFor="factura-medio" className={ETIQUETA}>Pagado con</label>
+              <select id="factura-medio" value={medioPago} onChange={(event) => setMedioPago(event.target.value)} className={CAMPO}>
+                <option value="">¿Cómo se pagó?</option>
+                {MEDIOS_PAGO.map(({ id, etiqueta }) => <option key={id} value={id}>{etiqueta}</option>)}
+              </select>
             </div>
 
-            <div className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm focus-within:border-rosewood">
-              <span className="text-gray-500">Encomienda:</span>
-              <input
-                type="number"
-                min="0"
-                value={encomienda}
-                onChange={(e) => setEncomienda(e.target.value)}
-                className="w-full border-0 p-0 text-sm focus:outline-none"
-                placeholder="0"
-              />
+            <div>
+              <label htmlFor="factura-numero" className={ETIQUETA}>No. factura</label>
+              <input id="factura-numero" type="text" value={numeroFactura} onChange={(e) => setNumeroFactura(e.target.value)} className={CAMPO} placeholder="FEV-36965" maxLength={20} />
+            </div>
+
+            <div>
+              <label htmlFor="factura-margen" className={ETIQUETA} title="Porcentaje del precio de venta que es ganancia. Precio de venta = costo ÷ (1 − margen)">Margen sobre la venta (%)</label>
+              <input id="factura-margen" type="number" min="5" max="95" step="1" value={margenPct} onChange={(e) => setMargenPct(e.target.value)} className={CAMPO} placeholder="30" />
+            </div>
+
+            <div>
+              <label htmlFor="factura-encomienda" className={ETIQUETA} title="Se resta del total de la factura">Encomienda (−)</label>
+              <MoneyInput id="factura-encomienda" label="Encomienda" value={encomienda} onChange={setEncomienda} placeholder="0" />
             </div>
           </div>
+
+          {medioPago === 'efectivo' && cajaAbierta === false && (
+            <p role="alert" className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">La caja está cerrada: ábrela para registrar una compra en efectivo, o elige otro medio de pago.</p>
+          )}
+          {medioPago === 'efectivo' && cajaAbierta !== false && (
+            <p className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">Sale del cajón: el total de la factura se descuenta del efectivo del turno abierto.</p>
+          )}
+
+          {pedidosPendientes.length > 0 && (
+            <div>
+              <label htmlFor="factura-pedido" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">¿Esta factura cumple un pedido?</label>
+              <select
+                id="factura-pedido"
+                value={pedidoId}
+                onChange={(event) => setPedidoId(event.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
+              >
+                <option value="">No, es una compra sin pedido</option>
+                {pedidosPendientes.map((pedido) => (
+                  <option key={pedido.id} value={pedido.id}>
+                    {`Pedido #${pedido.id} · ${formatDateTime(pedido.fecha_creacion)} · ${formatMoney(pedido.monto_estimado)}`}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500">Al guardar, el pedido queda como recibido y enlazado a esta factura.</p>
+            </div>
+          )}
 
           <div className="space-y-2">
             {items.map((item, index) => {
@@ -397,69 +495,23 @@ const Facturas = () => {
                   <div className="grid grid-cols-2 gap-2 md:grid-cols-[1.5fr_90px_80px_130px]">
                     <div className="col-span-2 md:col-span-1">
                       <label className="mb-1 block text-xs font-semibold text-gray-500 uppercase tracking-wide">Producto</label>
-                      <div className="relative">
-                        {item.producto_id ? (
-                          <div className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm bg-gray-50">
-                            <span className="flex-1 font-medium text-gray-900">
-                              {productosById.get(Number(item.producto_id))?.nombre || 'Producto'}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => handleItemChange(index, 'producto_id', '')}
-                              className="text-gray-400 hover:text-gray-600"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="relative">
-                            <input
-                              type="text"
-                              value={item.search}
-                              onChange={(event) => handleItemChange(index, 'search', event.target.value)}
-                              onFocus={() => handleItemChange(index, '_focused', true)}
-                              onBlur={() => setTimeout(() => handleItemChange(index, '_focused', false), 200)}
-                              className="w-full rounded-lg border border-gray-300 pl-8 pr-3 py-2 text-sm focus:border-rosewood focus:outline-none"
-                              placeholder="Buscar producto..."
-                              autoComplete="off"
-                            />
-                            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                          </div>
-                        )}
-
-                        {!item.producto_id && item._focused && (
-                          <div className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-                            {(() => {
-                              const q = (item.search || '').toLowerCase();
-                              const filtered = productos.filter((p) =>
-                                !q || p.nombre.toLowerCase().includes(q) || (p.codigo_barras && p.codigo_barras.toLowerCase().includes(q))
-                              ).sort((a, b) => a.nombre.localeCompare(b.nombre));
-
-                              if (filtered.length === 0) {
-                                return <div className="px-3 py-2 text-sm text-gray-500">Sin resultados</div>;
-                              }
-                              return filtered.map((producto) => (
-                                <button
-                                  key={producto.id}
-                                  type="button"
-                                  onMouseDown={(e) => e.preventDefault()}
-                                  onClick={() => {
-                                    handleSelectProducto(index, String(producto.id));
-                                    handleItemChange(index, 'search', '');
-                                    handleItemChange(index, '_focused', false);
-                                  }}
-                                  className="w-full px-3 py-2 text-left text-sm transition hover:bg-rosewood/10 focus:bg-rosewood/10 focus:outline-none"
-                                >
-                                  <span className="font-medium text-gray-900">{producto.nombre}</span>
-                                  {producto.codigo_barras && (
-                                    <span className="ml-2 text-xs text-gray-400">{producto.codigo_barras}</span>
-                                  )}
-                                </button>
-                              ));
-                            })()}
-                          </div>
-                        )}
-                      </div>
+                      {item.producto_id ? (
+                        <div className="flex items-center gap-2 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm">
+                          <span className="flex-1 font-medium text-gray-900">
+                            {productosById.get(Number(item.producto_id))?.nombre || 'Producto'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleItemChange(index, 'producto_id', '')}
+                            aria-label="Quitar producto de la línea"
+                            className="text-gray-400 hover:text-gray-600"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <ProductoBuscador productos={productos} onSelect={(producto) => handleSelectProducto(index, String(producto.id))} />
+                      )}
                     </div>
 
                     <div>
@@ -581,7 +633,7 @@ const Facturas = () => {
             </button>
             <button
               type="button"
-              onClick={() => setIsProductoModalOpen(true)}
+              onClick={() => setCreandoProducto(true)}
               className="inline-flex items-center gap-2 rounded-lg bg-rosewood px-3 py-2 text-sm font-semibold text-white transition hover:opacity-90"
             >
               <Plus className="h-4 w-4" />
@@ -592,14 +644,14 @@ const Facturas = () => {
           <div className="grid grid-cols-1 gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm md:grid-cols-5">
             <p>Subtotal: <span className="font-semibold">{formatMoney(resumen.subtotal)}</span></p>
             <p>IVA: <span className="font-semibold">{formatMoney(resumen.totalIva)}</span></p>
-            <p>Encomienda: <span className="font-semibold text-red-600">-{formatMoney(resumen.encomienda)}</span></p>
+            <p>Encomienda (se resta): <span className="font-semibold text-red-600">-{formatMoney(resumen.encomienda)}</span></p>
             <p>Total factura: <span className="font-semibold text-gray-900">{formatMoney(resumen.totalFactura)}</span></p>
             <p>Ganancia estimada: <span className="font-semibold text-emerald-700">{formatMoney(resumen.totalGanancia)}</span></p>
           </div>
 
           <button
             type="submit"
-            disabled={saving || loading}
+            disabled={saving || loading || (medioPago === 'efectivo' && cajaAbierta === false)}
             className="w-full rounded-lg bg-rosewood px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300"
           >
             {saving ? 'Guardando factura...' : 'Guardar factura'}
@@ -607,124 +659,36 @@ const Facturas = () => {
         </form>
       </section>
 
-      <Modal isOpen={isProductoModalOpen} onClose={() => setIsProductoModalOpen(false)} title="Crear producto rápido">
-        <form className="space-y-3" onSubmit={handleCreateProducto}>
-          <input type="text" value={newProductoForm.nombre} onChange={(e) => setNewProductoForm((c) => ({ ...c, nombre: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none" placeholder="Nombre del producto" />
-          <input type="text" value={newProductoForm.codigo_barras} onChange={(e) => setNewProductoForm((c) => ({ ...c, codigo_barras: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none" placeholder="Código de barras (opcional)" />
-          <div className="grid grid-cols-2 gap-3">
-            <input type="number" min="0" value={newProductoForm.precio_costo} onChange={(e) => setNewProductoForm((c) => ({ ...c, precio_costo: e.target.value }))} className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none" placeholder="Precio costo" />
-            <input type="number" min="0" value={newProductoForm.precio_venta} onChange={(e) => setNewProductoForm((c) => ({ ...c, precio_venta: e.target.value }))} className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none" placeholder="Precio venta" />
-          </div>
-          <input type="number" min="0" value={newProductoForm.stock_actual} onChange={(e) => setNewProductoForm((c) => ({ ...c, stock_actual: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none" placeholder="Stock inicial" />
-          <button type="submit" disabled={savingProducto} className="w-full rounded-lg bg-rosewood px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:bg-gray-300">{savingProducto ? 'Creando...' : 'Crear producto'}</button>
-        </form>
-      </Modal>
+      {ConfirmModal}
+
+      <CrearProductoModal
+        abierto={creandoProducto}
+        titulo="Producto nuevo para la factura"
+        soloManual
+        proveedores={proveedores}
+        confirmar={confirm}
+        onCreated={handleProductoCreado}
+        onClose={() => setCreandoProducto(false)}
+      />
 
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
         <h2 className="mb-4 text-xl font-bold text-gray-900">Facturas registradas</h2>
-
-        {loading && <Skeleton lines={3} />}
-
-        {!loading && facturas.length === 0 && (
-          <p className="py-8 text-center text-sm text-gray-500">No hay facturas registradas.</p>
-        )}
-
-        {!loading && (
-          <>
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="border-b border-gray-200 bg-gray-50">
-                  <tr>
-                    <th className="px-3 py-3 font-semibold text-gray-700">Factura</th>
-                    <th className="px-3 py-3 font-semibold text-gray-700">No. Factura</th>
-                    <th className="px-3 py-3 font-semibold text-gray-700">Proveedor</th>
-                    <th className="px-3 py-3 font-semibold text-gray-700">Subtotal</th>
-                    <th className="px-3 py-3 font-semibold text-gray-700">IVA</th>
-                    <th className="px-3 py-3 font-semibold text-gray-700">Encomienda</th>
-                    <th className="px-3 py-3 font-semibold text-gray-700">Total</th>
-                    <th className="px-3 py-3 font-semibold text-gray-700">Margen</th>
-                    <th className="px-3 py-3 font-semibold text-gray-700">Items</th>
-                    <th className="px-3 py-3 font-semibold text-gray-700">Accion</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {facturas.map((factura) => (
-                    <tr key={factura.id} className="border-b border-gray-100">
-                      <td className="px-3 py-3 font-semibold text-gray-900">#{factura.id}</td>
-                      <td className="px-3 py-3 text-gray-700">{factura.numero_factura || '-'}</td>
-                      <td className="px-3 py-3 text-gray-700">{factura.proveedor_nombre}</td>
-                      <td className="px-3 py-3 text-gray-700">{formatMoney(factura.subtotal)}</td>
-                      <td className="px-3 py-3 text-gray-700">{formatMoney(factura.total_iva)}</td>
-                      <td className="px-3 py-3 text-gray-700">{factura.encomienda ? formatMoney(factura.encomienda) : '-'}</td>
-                      <td className="px-3 py-3 font-semibold text-gray-900">{formatMoney(factura.total_factura)}</td>
-                      <td className="px-3 py-3 text-gray-700">{factura.porcentaje_ganancia ? `${((1 - factura.porcentaje_ganancia) * 100).toFixed(0)}%` : '-'}</td>
-                      <td className="px-3 py-3 text-gray-700">{Array.isArray(factura.items) ? factura.items.length : 0}</td>
-                      <td className="px-3 py-3">
-                        <button
-                          type="button"
-                          onClick={() => handlePrintFactura(factura)}
-                          className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2.5 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-200"
-                        >
-                          <Printer className="h-3.5 w-3.5" />
-                          Ticket
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="space-y-3 md:hidden">
-              {facturas.map((factura) => (
-                <div key={factura.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                  <div className="mb-2 flex items-start justify-between gap-2">
-                    <span className="font-semibold text-gray-900">#{factura.id} - {factura.proveedor_nombre}</span>
-                  </div>
-                  {factura.numero_factura && (
-                    <div className="mb-1 flex items-center justify-between text-sm">
-                      <span className="text-gray-500">No. Factura:</span>
-                      <span className="font-semibold text-gray-900">{factura.numero_factura}</span>
-                    </div>
-                  )}
-                  <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="text-gray-500">Subtotal:</span>
-                    <span className="text-gray-900">{formatMoney(factura.subtotal)}</span>
-                  </div>
-                  <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="text-gray-500">IVA:</span>
-                    <span className="text-gray-900">{formatMoney(factura.total_iva)}</span>
-                  </div>
-                  {factura.encomienda ? (
-                    <div className="mb-1 flex items-center justify-between text-sm">
-                      <span className="text-gray-500">Encomienda:</span>
-                      <span className="text-gray-900">{formatMoney(factura.encomienda)}</span>
-                    </div>
-                  ) : null}
-                  <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="text-gray-500">Margen:</span>
-                    <span className="text-gray-900">{factura.porcentaje_ganancia ? `${((1 - factura.porcentaje_ganancia) * 100).toFixed(0)}%` : '-'}</span>
-                  </div>
-                  <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="text-gray-500">Total:</span>
-                    <span className="font-semibold text-gray-900">{formatMoney(factura.total_factura)}</span>
-                  </div>
-                  <div className="mb-3 flex items-center justify-between text-sm">
-                    <span className="text-gray-500">Ítems:</span>
-                    <span className="text-gray-900">{Array.isArray(factura.items) ? factura.items.length : 0}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handlePrintFactura(factura)}
-                    className="w-full rounded-lg bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
-                  >
-                    <Printer className="mr-1.5 inline-block h-4 w-4" />
-                    Imprimir ticket
-                  </button>
-                </div>
-              ))}
-            </div>
-          </>
+        <FacturasLista
+          facturas={historial.lista.data}
+          loading={historial.loading}
+          hayFiltros={Boolean(historial.texto || historial.filtros.proveedorId || historial.filtros.medio || historial.filtros.estado !== 'todas' || historial.filtros.desde || historial.filtros.hasta)}
+          texto={historial.texto}
+          onTexto={historial.setTexto}
+          filtros={historial.filtros}
+          onFiltro={historial.setFiltro}
+          proveedores={proveedores}
+          onPrint={handlePrintFactura}
+          anulacion={{ id: anulandoId, pideAutorizacion, saving: savingAnulacion, error: errorAnulacion, onToggle: handleToggleAnular, onAnular: handleAnular }}
+        />
+        {historial.lista.totalPages > 1 && (
+          <div className="mt-4">
+            <PaginationControls currentPage={historial.filtros.page} totalPages={historial.lista.totalPages} onPageChange={historial.setPagina} />
+          </div>
         )}
       </section>
 
