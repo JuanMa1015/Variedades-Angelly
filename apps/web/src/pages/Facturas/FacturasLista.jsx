@@ -85,8 +85,8 @@ const Medio = ({ factura }) => (['efectivo', 'transferencia', 'tarjeta'].include
   ? <PaymentBadge method={factura.medio_pago} compact />
   : <span className="text-xs text-gray-500">{etiquetaMedio(factura.medio_pago)}</span>);
 
-const Acciones = ({ factura, abierta, onToggleDetalle, onPrint, anulacion, ancho = false }) => (
-  <div className={`flex flex-wrap items-center gap-2 ${ancho ? '' : ''}`}>
+const Acciones = ({ factura, abierta, onToggleDetalle, onPrint, anulacion }) => (
+  <div className="flex flex-wrap items-center gap-2">
     <button type="button" onClick={() => onToggleDetalle(factura.id)} aria-expanded={abierta} aria-label={`${abierta ? 'Ocultar' : 'Ver'} detalle de la factura ${factura.id}`} className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2.5 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-200">
       {abierta ? <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />}
       Detalle
