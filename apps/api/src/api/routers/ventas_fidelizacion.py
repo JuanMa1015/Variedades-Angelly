@@ -17,6 +17,7 @@ from src.api.limiter import limiter, login_rate_limit
 from src.api.services.anulacion import anular_venta, quien_autoriza
 from src.api.services.auditoria import registrar_auditoria
 from src.api.services.fidelizacion import acumular_puntos, canjear_puntos, revertir_puntos_de_venta
+from src.api.services.stock import mover_stock
 from src.api.services.deuda import SIN_DEUDA, deuda_pendiente_tienda, mover_deuda_tienda
 from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.services.venta_reglas import (
@@ -145,6 +146,7 @@ def create_venta(
 ) -> VentaResponse:
     total = 0.0
     detalle_payload: list[VentaDetalleResponse] = []
+    movimientos_stock = []
     cliente: ClienteModel | None = None
     cliente_tienda: ClienteFiadoTiendaModel | None = None
     cliente_nombre: str | None = None
@@ -241,7 +243,9 @@ def create_venta(
                         ),
                     )
 
-                producto.stock_actual -= item.cantidad
+                movimientos_stock.append(
+                    mover_stock(db, producto, -item.cantidad, tipo="venta", usuario=current_user.username, referencia_tipo="venta"),
+                )
                 subtotal = float(item.cantidad * producto.precio_venta)
                 total += subtotal
 
@@ -308,6 +312,8 @@ def create_venta(
 
             db.add(venta)
             db.flush()
+            for movimiento in movimientos_stock:
+                movimiento.referencia_id = venta.id
 
             for detalle in detalle_payload:
                 db.add(
@@ -660,7 +666,10 @@ def delete_venta(
                 .with_for_update(),
             ).scalar_one_or_none()
             if producto is not None:
-                producto.stock_actual = int(producto.stock_actual + detalle.cantidad)
+                mover_stock(
+                    db, producto, detalle.cantidad, tipo="eliminacion_venta", usuario=current_user.username,
+                    motivo="Venta eliminada", referencia_tipo="venta", referencia_id=venta.id,
+                )
 
         for detalle in detalles:
             db.delete(detalle)

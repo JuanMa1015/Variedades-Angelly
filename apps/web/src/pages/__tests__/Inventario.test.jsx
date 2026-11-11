@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const useAuthMock = vi.hoisted(() => vi.fn());
@@ -69,6 +69,17 @@ const mockProductos = [
   { id: 2, nombre: 'Aceite Gourmet', codigo_barras: null, precio_costo: 8000, precio_venta: 11000, stock_actual: 3, stock_minimo: 5, catalogo: 'tienda', activo: true, imagen_url: '/uploads/aceite.jpg', proveedor_id: 1 },
 ];
 
+const mockResumen = {
+  total: 229,
+  stock_total: 2854,
+  agotados: 12,
+  bajo_stock: 80,
+  urgentes: [
+    { id: 9, nombre: 'Agua Sabor 235ml', stock_actual: 0, stock_minimo: 3 },
+    { id: 8, nombre: 'Alkalina Tronex AAA x1', stock_actual: 2, stock_minimo: 5 },
+  ],
+};
+
 const mockProveedores = [
   { id: 1, nombre: 'Distribuidora XYZ', activo: true },
 ];
@@ -78,8 +89,11 @@ describe('Inventario', () => {
     vi.clearAllMocks();
     useAuthMock.mockReturnValue({ token: 'test-token', user: { username: 'admin', role: 'admin' } });
     apiGetMock.mockImplementation((endpoint) => {
+      if (endpoint.includes('productos/resumen')) {
+        return Promise.resolve(mockResumen);
+      }
       if (endpoint.includes('productos/paginados')) {
-        return Promise.resolve({ data: mockProductos, total: 2 });
+        return Promise.resolve({ data: mockProductos, page: { total: 2, total_pages: 1, current_page: 1, limit: 25 } });
       }
       if (endpoint.includes('proveedores')) {
         return Promise.resolve(mockProveedores);
@@ -111,7 +125,7 @@ describe('Inventario', () => {
     });
 
     fireEvent.click(screen.getByText('Agregar producto'));
-    expect(screen.getByTestId('modal-title')).toHaveTextContent('Agregar producto al inventario');
+    expect(screen.getAllByTestId('modal-title')[0]).toHaveTextContent('Agregar producto al inventario');
   });
 
   it('abre modal de edicion al hacer clic en editar', async () => {
@@ -125,7 +139,7 @@ describe('Inventario', () => {
     const editButtons = screen.getAllByTitle('Editar producto');
     fireEvent.click(editButtons[0]);
 
-    expect(screen.getByTestId('modal-title')).toHaveTextContent('Editar producto');
+    expect(screen.getAllByTestId('modal-title').some((t) => t.textContent === 'Editar producto')).toBe(true);
   });
 
   it('confirma desactivacion al hacer clic en desactivar', async () => {
@@ -223,5 +237,283 @@ describe('Inventario', () => {
 
     expect(await screen.findByText(/no esta permitida/)).toBeTruthy();
     expect(apiPostMock).not.toHaveBeenCalledWith('/api/productos', expect.anything());
+  });
+
+  // -- Resumen, busqueda, filtros y paginacion: los resuelve el servidor sobre TODO el catalogo --
+
+  const consultas = () => apiGetMock.mock.calls.map(([url]) => url).filter((url) => url.includes('productos/paginados'));
+
+  it('las tarjetas cuentan todo el catalogo, no solo la pagina visible', async () => {
+    const Inventario = (await import('../Inventario')).default;
+    render(<Inventario />);
+
+    expect(await screen.findByText('229')).toBeTruthy();
+    expect(screen.getByText('2854 u')).toBeTruthy();
+    expect(screen.getByText('12')).toBeTruthy();
+    expect(screen.getByText('80')).toBeTruthy();
+    expect(screen.getByText('Agua Sabor 235ml')).toBeTruthy();
+  });
+
+  it('tocar "Agotados" o "Bajo stock" filtra la lista en el servidor', async () => {
+    const Inventario = (await import('../Inventario')).default;
+    render(<Inventario />);
+    await screen.findByText('229');
+
+    // La tarjeta y el chip de la tabla hacen lo mismo: se prueba cada uno.
+    fireEvent.click(screen.getAllByRole('button', { name: /Agotados/ })[0]);
+    await waitFor(() => expect(consultas().at(-1)).toContain('estado=agotado'));
+    fireEvent.click(screen.getAllByRole('button', { name: /Bajo stock/ })[0]);
+    await waitFor(() => expect(consultas().at(-1)).toContain('estado=bajo'));
+    fireEvent.click(screen.getByRole('button', { name: 'Con stock' }));
+    await waitFor(() => expect(consultas().at(-1)).toContain('estado=ok'));
+  });
+
+  it('el buscador consulta al servidor despues de que dejas de escribir', async () => {
+    const Inventario = (await import('../Inventario')).default;
+    render(<Inventario />);
+    await screen.findByText('229');
+    const antes = consultas().length;
+
+    fireEvent.change(screen.getByLabelText('Buscar productos'), { target: { value: 'zumo' } });
+
+    await waitFor(() => expect(consultas().at(-1)).toContain('q=zumo'));
+    expect(consultas().length).toBe(antes + 1);
+  });
+
+  it('con varias paginas se puede avanzar y el servidor recibe la pagina pedida', async () => {
+    apiGetMock.mockImplementation((endpoint) => {
+      if (endpoint.includes('productos/resumen')) return Promise.resolve(mockResumen);
+      return Promise.resolve({ data: mockProductos, page: { total: 229, total_pages: 10, current_page: 1, limit: 25 } });
+    });
+    const Inventario = (await import('../Inventario')).default;
+    render(<Inventario />);
+    await screen.findByText('Arroz Diana');
+
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente/ }));
+
+    await waitFor(() => expect(consultas().at(-1)).toContain('page=2'));
+  });
+
+  it('el stock se ve de un vistazo: agotado y bajo llevan etiqueta', async () => {
+    apiGetMock.mockImplementation((endpoint) => {
+      if (endpoint.includes('productos/resumen')) return Promise.resolve(mockResumen);
+      return Promise.resolve({
+        data: [
+          { ...mockProductos[0], id: 5, nombre: 'Sin Stock', stock_actual: 0, stock_minimo: 3 },
+          { ...mockProductos[0], id: 6, nombre: 'Poco Stock', stock_actual: 2, stock_minimo: 3 },
+          { ...mockProductos[0], id: 7, nombre: 'Buen Stock', stock_actual: 30, stock_minimo: 3 },
+        ],
+        page: { total: 3, total_pages: 1, current_page: 1, limit: 25 },
+      });
+    });
+    const Inventario = (await import('../Inventario')).default;
+    render(<Inventario />);
+    await screen.findByText('Sin Stock');
+
+    expect(within(screen.getByText('Sin Stock').closest('tr')).getByText('Agotado')).toBeTruthy();
+    expect(within(screen.getByText('Poco Stock').closest('tr')).getByText('Bajo')).toBeTruthy();
+    expect(within(screen.getByText('Buen Stock').closest('tr')).queryByText('Agotado')).toBeNull();
+  });
+
+  // -- Edicion segura --
+
+  const abrirEdicion = async (nombre = 'Arroz Diana') => {
+    const Inventario = (await import('../Inventario')).default;
+    render(<Inventario />);
+    const fila = (await screen.findByText(nombre)).closest('tr');
+    fireEvent.click(within(fila).getByTitle('Editar producto'));
+    return screen.findByRole('button', { name: 'Guardar cambios' });
+  };
+
+  it('el cuadro de editar tiene etiquetas y muestra el margen', async () => {
+    await abrirEdicion();
+
+    ['Nombre', 'Código de barras', 'Precio de costo', 'Precio de venta', 'Stock mínimo', 'Proveedor'].forEach((etiqueta) => {
+      expect(screen.getAllByLabelText(etiqueta).length).toBeGreaterThan(0);
+    });
+    expect(screen.getByText(/Margen: 29%/)).toBeTruthy();
+    expect(screen.getByText('50 u')).toBeTruthy();
+  });
+
+  it('editar solo el precio envia solo el precio (nunca el stock)', async () => {
+    const guardar = await abrirEdicion();
+
+    fireEvent.change(screen.getAllByLabelText('Precio de venta', { selector: 'input' })[0], { target: { value: '3000' } });
+    fireEvent.click(guardar);
+
+    await waitFor(() => expect(apiPatchMock).toHaveBeenCalledWith('/api/productos/1', { precio_venta: 3000 }));
+  });
+
+  it('sin cambios no envia nada y lo dice', async () => {
+    const guardar = await abrirEdicion();
+
+    fireEvent.click(guardar);
+
+    expect(await screen.findByText('No hay cambios para guardar')).toBeTruthy();
+    expect(apiPatchMock).not.toHaveBeenCalled();
+  });
+
+  it('quitar el proveedor se envia como null', async () => {
+    const guardar = await abrirEdicion('Aceite Gourmet');
+
+    fireEvent.change(screen.getByLabelText('Proveedor'), { target: { value: '' } });
+    fireEvent.click(guardar);
+
+    await waitFor(() => expect(apiPatchMock).toHaveBeenCalledWith('/api/productos/2', { proveedor_id: null }));
+  });
+
+  it('quitar la imagen se envia como null', async () => {
+    const guardar = await abrirEdicion('Aceite Gourmet');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar imagen' }));
+    fireEvent.click(guardar);
+
+    await waitFor(() => expect(apiPatchMock).toHaveBeenCalledWith('/api/productos/2', { imagen_url: null }));
+  });
+
+  it('vender por debajo del costo pide confirmar y, si dices que no, no guarda', async () => {
+    const guardar = await abrirEdicion();
+    confirmMock.mockResolvedValue(false);
+
+    fireEvent.change(screen.getAllByLabelText('Precio de venta', { selector: 'input' })[0], { target: { value: '1500' } });
+    expect(screen.getByText(/por debajo del costo/)).toBeTruthy();
+    fireEvent.click(guardar);
+
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: 'Precio por debajo del costo' })));
+    expect(apiPatchMock).not.toHaveBeenCalled();
+  });
+
+  it('si confirma vender por debajo del costo, se guarda', async () => {
+    const guardar = await abrirEdicion();
+    confirmMock.mockResolvedValue(true);
+
+    fireEvent.change(screen.getAllByLabelText('Precio de venta', { selector: 'input' })[0], { target: { value: '1500' } });
+    fireEvent.click(guardar);
+
+    await waitFor(() => expect(apiPatchMock).toHaveBeenCalledWith('/api/productos/1', { precio_venta: 1500 }));
+  });
+
+  it('el precio de venta en cero no se envia', async () => {
+    const guardar = await abrirEdicion();
+
+    fireEvent.change(screen.getAllByLabelText('Precio de venta', { selector: 'input' })[0], { target: { value: '0' } });
+    fireEvent.click(guardar);
+
+    expect(await screen.findByText('El precio de venta debe ser mayor a 0')).toBeTruthy();
+    expect(apiPatchMock).not.toHaveBeenCalled();
+  });
+
+  // -- Ajuste de stock con motivo --
+
+  const abrirAjuste = async () => {
+    await abrirEdicion();
+    fireEvent.click(screen.getByRole('button', { name: 'Ajustar' }));
+    return screen.findByRole('button', { name: 'Ajustar stock' });
+  };
+
+  it('ajustar stock: contar muestra cuanto cambia y envia el conteo con su motivo', async () => {
+    apiPostMock.mockResolvedValue({ producto: { id: 1, nombre: 'Arroz Diana' }, movimiento: { delta: -5, stock_resultante: 45 } });
+    const ajustar = await abrirAjuste();
+
+    fireEvent.change(screen.getByLabelText('Unidades contadas en el estante'), { target: { value: '45' } });
+    expect(screen.getByText(/50 → 45 unidades \(-5\)/)).toBeTruthy();
+    fireEvent.click(ajustar);
+
+    await waitFor(() => expect(apiPostMock).toHaveBeenCalledWith('/api/productos/1/ajustes-stock', { modo: 'contar', cantidad: 45, motivo: 'conteo' }));
+    expect(await screen.findByText(/Stock de "Arroz Diana": 50 → 45/)).toBeTruthy();
+  });
+
+  it('sumar y restar ofrecen solo los motivos que tienen sentido', async () => {
+    await abrirAjuste();
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Restar' }));
+    expect(screen.getByRole('option', { name: 'Merma' })).toBeTruthy();
+    expect(screen.queryByRole('option', { name: 'Ingreso sin factura' })).toBeNull();
+    fireEvent.click(screen.getByRole('radio', { name: 'Sumar' }));
+    expect(screen.getByRole('option', { name: 'Ingreso sin factura' })).toBeTruthy();
+    expect(screen.queryByRole('option', { name: 'Merma' })).toBeNull();
+  });
+
+  it('no deja restar mas de lo que hay ni guardar sin cantidad', async () => {
+    const ajustar = await abrirAjuste();
+
+    fireEvent.click(ajustar);
+    expect(await screen.findByText('Escribe una cantidad válida')).toBeTruthy();
+    fireEvent.click(screen.getByRole('radio', { name: 'Restar' }));
+    fireEvent.change(screen.getByLabelText('Cantidad'), { target: { value: '60' } });
+    fireEvent.click(ajustar);
+
+    expect(await screen.findByText('No se pueden restar 60: solo hay 50')).toBeTruthy();
+    expect(apiPostMock).not.toHaveBeenCalled();
+  });
+
+  it('el motivo "otro" exige explicar y un conteo igual al stock no ajusta nada', async () => {
+    const ajustar = await abrirAjuste();
+
+    fireEvent.change(screen.getByLabelText('Unidades contadas en el estante'), { target: { value: '50' } });
+    fireEvent.click(ajustar);
+    expect(await screen.findByText('Nada que ajustar: el stock ya es ese')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Sumar' }));
+    fireEvent.change(screen.getByLabelText('Motivo'), { target: { value: 'otro' } });
+    fireEvent.change(screen.getByLabelText('Cantidad'), { target: { value: '2' } });
+    fireEvent.click(ajustar);
+    expect(await screen.findByText('Explica qué pasó en la nota')).toBeTruthy();
+    expect(apiPostMock).not.toHaveBeenCalled();
+  });
+
+  it('si el servidor rechaza el ajuste muestra el motivo', async () => {
+    apiPostMock.mockRejectedValue(new Error('El stock no puede quedar negativo'));
+    const ajustar = await abrirAjuste();
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Restar' }));
+    fireEvent.change(screen.getByLabelText('Cantidad'), { target: { value: '5' } });
+    fireEvent.click(ajustar);
+
+    expect(await screen.findByText('El stock no puede quedar negativo')).toBeTruthy();
+  });
+
+  // -- Ingreso por codigo de barras --
+
+  const procesarCodigo = async (codigo, extra = {}) => {
+    const Inventario = (await import('../Inventario')).default;
+    render(<Inventario />);
+    await screen.findByText('Arroz Diana');
+    fireEvent.click(screen.getByText('Agregar producto'));
+    fireEvent.click(screen.getByRole('button', { name: /Por código de barras/ }));
+    fireEvent.change(screen.getByPlaceholderText('Escanear código de barras'), { target: { value: codigo } });
+    if (extra.nombre) fireEvent.change(screen.getByPlaceholderText('Nombre (si es nuevo)'), { target: { value: extra.nombre } });
+    fireEvent.change(screen.getByPlaceholderText('Cantidad a ingresar (ej: 6)'), { target: { value: '6' } });
+    fireEvent.click(screen.getByRole('button', { name: /Procesar código/ }));
+  };
+
+  it('un codigo que ya existe suma stock con motivo, buscandolo en todo el catalogo', async () => {
+    apiGetMock.mockImplementation((endpoint) => {
+      if (endpoint.includes('productos/resumen')) return Promise.resolve(mockResumen);
+      if (endpoint.includes('q=7700000000099')) {
+        return Promise.resolve({ data: [{ id: 99, nombre: 'Zumo Hit', codigo_barras: '7700000000099' }], page: { total: 1, total_pages: 1 } });
+      }
+      if (endpoint.includes('productos/paginados')) return Promise.resolve({ data: mockProductos, page: { total: 2, total_pages: 1 } });
+      return Promise.resolve([]);
+    });
+    apiPostMock.mockResolvedValue({ producto: { id: 99 }, movimiento: { delta: 6, stock_resultante: 6 } });
+
+    await procesarCodigo('7700000000099');
+
+    await waitFor(() => expect(apiPostMock).toHaveBeenCalledWith('/api/productos/99/ajustes-stock', { modo: 'sumar', cantidad: 6, motivo: 'ingreso_sin_factura' }));
+    expect(await screen.findByText('Stock actualizado para Zumo Hit')).toBeTruthy();
+  });
+
+  it('un codigo nuevo crea el producto', async () => {
+    apiGetMock.mockImplementation((endpoint) => {
+      if (endpoint.includes('productos/resumen')) return Promise.resolve(mockResumen);
+      if (endpoint.includes('q=7709999999999')) return Promise.resolve({ data: [], page: { total: 0, total_pages: 1 } });
+      if (endpoint.includes('productos/paginados')) return Promise.resolve({ data: mockProductos, page: { total: 2, total_pages: 1 } });
+      return Promise.resolve([]);
+    });
+
+    await procesarCodigo('7709999999999', { nombre: 'Producto Nuevo' });
+
+    await waitFor(() => expect(apiPostMock).toHaveBeenCalledWith('/api/productos', expect.objectContaining({ nombre: 'Producto Nuevo', codigo_barras: '7709999999999', stock_actual: 6 })));
   });
 });

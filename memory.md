@@ -726,3 +726,24 @@ apps\api\.venv\Scripts\python.exe -m alembic -c apps\api\alembic.ini upgrade hea
 - El abono responde con `cliente_nombre` y `deuda_anterior` para el comprobante imprimible y el aviso por WhatsApp.
 - Pendiente: cupo de crédito para clientes de tienda (decisión del dueño), abonos de cartera con caja abierta.
 
+## 21. Inventario: stock con historial, ajustes con motivo y búsqueda en servidor
+
+- **Todo cambio de stock pasa por `services/stock.mover_stock`**, que registra un `MovimientoStockModel` (tabla `movimientos_stock`,
+  migración `e2f3a4b5c6d7`): tipo (`venta`, `venta_cartera`, `anulacion_venta`, `eliminacion_venta`, `factura_compra`,
+  `eliminacion_factura`, `stock_inicial`, `ajuste`), delta, stock resultante, motivo, usuario y referencia (venta/factura). No escribir
+  `producto.stock_actual` directamente. El historial empieza con esta migración: no hay movimientos anteriores.
+- `POST /api/productos/{id}/ajustes-stock` (admin/vendedor/superadmin, por decisión del dueño: hoy el vendedor es el mismo admin):
+  `modo` sumar/restar/contar + `cantidad` + `motivo` (ingreso_sin_factura, conteo, merma, dano, devolucion_proveedor, correccion,
+  otro). Solo valen las combinaciones modo-motivo de `MOTIVOS_POR_MODO`; "otro" exige nota. "Contar" calcula la diferencia sobre el
+  stock bloqueado en ese instante (no pisa ventas hechas mientras se contaba). Queda además en auditoría (`ajuste_stock`).
+  `GET /api/productos/{id}/movimientos-stock` pagina el historial.
+- `PATCH /api/productos/{id}` **ya no cambia el stock** (el campo se ignora): corregía con el valor viejo y pisaba ventas. Solo cambia
+  lo enviado (`model_fields_set`): `proveedor_id: null` e `imagen_url: null` los quitan. Audita lo que cambió (antes -> después).
+  `precio_venta` debe ser > 0 (crear, editar e inline); los nombres se comparan sin importar mayúsculas.
+- Lista: `GET /api/productos/paginados` con `q` (nombre, código o proveedor), `estado` (agotado = 0, bajo = 1..mínimo, ok), `proveedor_id`,
+  `orden` (nombre, stock, precio), `solo_inactivos`. `GET /api/productos/resumen` cuenta todo el catálogo (antes la pantalla cargaba solo
+  200 productos y los demás eran inalcanzables). Frontend: `pages/Inventario/*`, `api/inventarioApi.js`.
+- El ingreso por código de barras busca el producto en todo el catálogo y suma con motivo `ingreso_sin_factura`.
+- Pendiente (paso 2): formularios de alta con etiquetas y miles, tabla en tarjetas para celular, ver y reactivar desactivados, historial
+  de movimientos dentro del producto, "pedir al proveedor" desde bajo stock.
+

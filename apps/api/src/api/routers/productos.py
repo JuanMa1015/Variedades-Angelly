@@ -7,19 +7,23 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.api.services.auditoria import registrar_auditoria
+from src.api.services.stock import mover_stock
 from src.api.dependencies import AuthenticatedUser, require_roles
-from src.api.pagination import PageInfo, build_page, search_filter
+from src.api.pagination import PageInfo, search_filter
 from src.domain.producto import Producto
 from src.infrastructure.database.connection import get_db
-from src.infrastructure.database.models import ProductoModel
+from src.infrastructure.database.models import MovimientoStockModel, ProductoModel, ProveedorModel
 from src.infrastructure.repositories.sqlalchemy_repository import SqlAlchemyProductoRepository
 
 router = APIRouter(tags=["productos"])
+
+EstadoStock = Literal["todos", "agotado", "bajo", "ok"]
+OrdenProductos = Literal["nombre", "stock", "precio"]
 
 
 class ProductoResponse(BaseModel):
@@ -37,6 +41,7 @@ class ProductoResponse(BaseModel):
     imagen_url: str | None = None
     proveedor_id: int | None = None
     proveedor_nombre: str | None = None
+    activo: bool = True
 
 
 class ProductoCreateRequest(BaseModel):
@@ -46,7 +51,7 @@ class ProductoCreateRequest(BaseModel):
     codigo_barras: Annotated[str | None, Field(max_length=64)] = None
     catalogo: Literal["tienda", "cartera"] = "tienda"
     precio_costo: Annotated[float, Field(ge=0)]
-    precio_venta: Annotated[float, Field(ge=0)]
+    precio_venta: Annotated[float, Field(gt=0)]
     stock_actual: Annotated[int, Field(ge=0)] = 0
     stock_minimo: Annotated[int, Field(ge=0)] = 0
     imagen_url: str | None = None
@@ -54,31 +59,20 @@ class ProductoCreateRequest(BaseModel):
 
 
 class ProductoUpdateRequest(BaseModel):
-    """DTO para edicion administrativa de producto."""
+    """DTO para editar un producto. El stock no se edita aqui: se corrige con un ajuste que deja motivo y registro.
+
+    Solo se cambian los campos enviados; ``proveedor_id`` o ``imagen_url`` en ``null`` los quitan.
+    """
 
     nombre: Annotated[str | None, Field(min_length=2, max_length=120)] = None
     codigo_barras: Annotated[str | None, Field(max_length=64)] = None
     catalogo: Literal["tienda", "cartera"] | None = None
     precio_costo: Annotated[float | None, Field(ge=0)] = None
-    precio_venta: Annotated[float | None, Field(ge=0)] = None
-    stock_actual: Annotated[int | None, Field(ge=0)] = None
+    precio_venta: Annotated[float | None, Field(gt=0)] = None
     stock_minimo: Annotated[int | None, Field(ge=0)] = None
     imagen_url: str | None = None
     proveedor_id: int | None = None
     activo: bool | None = None
-
-
-class ProductoStockPatchRequest(BaseModel):
-    """DTO para ajustes rapidos de stock por delta."""
-
-    delta: int
-
-    @field_validator("delta")
-    @classmethod
-    def validate_non_zero_delta(cls, value: int) -> int:
-        if value == 0:
-            raise ValueError("delta no puede ser 0")
-        return value
 
 
 class ProductoPageResponse(BaseModel):
@@ -91,7 +85,20 @@ class ProductoPageResponse(BaseModel):
 class ProductoPrecioPatchRequest(BaseModel):
     """DTO para edicion inline de precio de venta."""
 
-    precio_venta: Annotated[float, Field(ge=0)]
+    precio_venta: Annotated[float, Field(gt=0)]
+
+
+class ProductoStockPatchRequest(BaseModel):
+    """DTO para ajustes rapidos de stock por delta (queda registrado como ajuste rapido)."""
+
+    delta: int
+
+    @field_validator("delta")
+    @classmethod
+    def validate_non_zero_delta(cls, value: int) -> int:
+        if value == 0:
+            raise ValueError("delta no puede ser 0")
+        return value
 
 
 def _to_producto_response(producto: Producto) -> ProductoResponse:
@@ -123,14 +130,44 @@ def _to_producto_response_from_model(p: ProductoModel) -> ProductoResponse:
         imagen_url=p.imagen_url,
         proveedor_id=p.proveedor_id,
         proveedor_nombre=p.proveedor.nombre if p.proveedor else None,
+        activo=bool(p.activo),
     )
 
 
 def _producto_search_filter(query, q: str | None):
-    filters = search_filter(q.strip() if q else None, ProductoModel.nombre, ProductoModel.codigo_barras)
-    if filters:
-        query = query.where(or_(*filters))
+    """Busca por nombre, codigo de barras o nombre del proveedor."""
+    termino = q.strip() if q else None
+    if not termino:
+        return query
+    filters = search_filter(termino, ProductoModel.nombre, ProductoModel.codigo_barras, ProveedorModel.nombre)
+    return query.outerjoin(ProveedorModel, ProveedorModel.id == ProductoModel.proveedor_id).where(or_(*filters))
+
+
+def _filtrar_por_stock(query, estado: EstadoStock):
+    """Agotado: sin unidades. Bajo: quedan pero no pasan del minimo. Ok: por encima del minimo."""
+    if estado == "agotado":
+        return query.where(ProductoModel.stock_actual == 0)
+    if estado == "bajo":
+        return query.where(ProductoModel.stock_actual > 0, ProductoModel.stock_actual <= ProductoModel.stock_minimo)
+    if estado == "ok":
+        return query.where(ProductoModel.stock_actual > ProductoModel.stock_minimo)
     return query
+
+
+def _orden(orden: OrdenProductos):
+    if orden == "stock":
+        return (ProductoModel.stock_actual.asc(), ProductoModel.nombre.asc())
+    if orden == "precio":
+        return (ProductoModel.precio_venta.desc(), ProductoModel.nombre.asc())
+    return (ProductoModel.nombre.asc(),)
+
+
+def _nombre_repetido(db: Session, nombre: str, excluir_id: int | None = None) -> bool:
+    """Los nombres se comparan sin importar mayusculas: 'Arroz' y 'arroz' son el mismo producto."""
+    consulta = select(ProductoModel.id).where(func.lower(ProductoModel.nombre) == nombre.strip().lower())
+    if excluir_id is not None:
+        consulta = consulta.where(ProductoModel.id != excluir_id)
+    return db.execute(consulta.limit(1)).first() is not None
 
 
 @router.get("/api/productos", response_model=list[ProductoResponse])
@@ -160,22 +197,33 @@ def list_productos_paginados(
     catalogo: str = Query("todos", pattern="^(todos|tienda|cartera)$"),
     q: str | None = Query(default=None, min_length=1, max_length=100),
     include_inactivos: bool = Query(default=False),
+    solo_inactivos: bool = Query(default=False),
+    estado: EstadoStock = Query(default="todos"),
+    proveedor_id: int | None = Query(default=None, gt=0),
+    orden: OrdenProductos = Query(default="nombre"),
     db: Session = Depends(get_db),
     _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> ProductoPageResponse:
-    """Lista paginada de productos. Opcionalmente filtra por texto en nombre o código de barras."""
+    """Lista paginada de productos con busqueda, filtro por estado de stock, proveedor y orden."""
     query = select(ProductoModel)
-    if not include_inactivos:
+    if solo_inactivos:
+        query = query.where(ProductoModel.activo == False)
+    elif not include_inactivos:
         query = query.where(ProductoModel.activo == True)
     if catalogo != "todos":
         query = query.where(ProductoModel.catalogo == catalogo)
+    if proveedor_id is not None:
+        query = query.where(ProductoModel.proveedor_id == proveedor_id)
+    query = _filtrar_por_stock(query, estado)
     query = _producto_search_filter(query, q)
 
-    items, page_info = build_page(db, query, page, limit, ProductoModel.nombre.asc())
+    total = db.execute(select(func.count()).select_from(query.subquery())).scalar_one()
+    total_pages = max(1, (total + limit - 1) // limit) if total > 0 else 1
+    items = db.execute(query.order_by(*_orden(orden)).offset((page - 1) * limit).limit(limit)).scalars().all()
 
     return ProductoPageResponse(
         data=[_to_producto_response_from_model(p) for p in items],
-        page=page_info,
+        page=PageInfo(total=total, total_pages=total_pages, current_page=page, limit=limit),
     )
 
 
@@ -183,12 +231,12 @@ def list_productos_paginados(
 def create_producto(
     payload: ProductoCreateRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> ProductoResponse:
     """Crea un producto nuevo para inventario."""
     repository = SqlAlchemyProductoRepository(db)
 
-    if repository.get_by_nombre(payload.nombre) is not None:
+    if _nombre_repetido(db, payload.nombre):
         raise HTTPException(status_code=409, detail="Ya existe un producto con ese nombre")
 
     if payload.codigo_barras:
@@ -197,7 +245,7 @@ def create_producto(
             raise HTTPException(status_code=409, detail="Ya existe un producto con ese codigo de barras")
 
     producto = Producto(
-        nombre=payload.nombre,
+        nombre=payload.nombre.strip(),
         codigo_barras=(payload.codigo_barras or "").strip() or None,
         precio_costo=payload.precio_costo,
         precio_venta=payload.precio_venta,
@@ -216,14 +264,40 @@ def create_producto(
             detail="No se pudo crear el producto por restriccion de unicidad",
         ) from exc
 
+    model = db.execute(select(ProductoModel).where(ProductoModel.id == created.id)).scalar_one()
     if payload.proveedor_id is not None:
-        model = db.execute(select(ProductoModel).where(ProductoModel.id == created.id)).scalar_one()
         model.proveedor_id = payload.proveedor_id
-        db.commit()
-        db.refresh(model)
-        return _to_producto_response_from_model(model)
+    if payload.stock_actual > 0:
+        db.add(MovimientoStockModel(
+            producto_id=model.id, tipo="stock_inicial", delta=payload.stock_actual, stock_resultante=payload.stock_actual,
+            motivo="Stock inicial al crear el producto", usuario=current_user.username,
+        ))
+    registrar_auditoria(
+        db,
+        usuario=current_user.username,
+        modulo="productos",
+        entidad="producto",
+        accion="crear",
+        entidad_id=model.id,
+        detalle=f"{model.nombre}: costo {payload.precio_costo}, venta {payload.precio_venta}, stock {payload.stock_actual}",
+    )
+    db.commit()
+    db.refresh(model)
+    return _to_producto_response_from_model(model)
 
-    return _to_producto_response(created)
+
+def _texto_valor(valor) -> str:
+    """Los precios se muestran siempre como decimales (500.0), vengan del tipo que vengan."""
+    return str(float(valor)) if isinstance(valor, (int, float)) and not isinstance(valor, bool) else str(valor)
+
+
+def _cambios_producto(producto: ProductoModel, campos: dict) -> list[str]:
+    """Texto 'campo: antes -> despues' de lo que realmente cambia (para la auditoria)."""
+    return [
+        f"{nombre}: {_texto_valor(getattr(producto, nombre))} -> {_texto_valor(nuevo)}"
+        for nombre, nuevo in campos.items()
+        if getattr(producto, nombre) != nuevo
+    ]
 
 
 @router.patch("/api/productos/{producto_id}", response_model=ProductoResponse)
@@ -231,76 +305,61 @@ def update_producto(
     producto_id: int,
     payload: ProductoUpdateRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> ProductoResponse:
-    """Edita datos de producto en inventario."""
+    """Edita datos del producto. Solo cambia lo enviado; el stock se corrige con un ajuste."""
     producto = db.execute(select(ProductoModel).where(ProductoModel.id == producto_id)).scalar_one_or_none()
     if producto is None:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
 
-    if payload.nombre is not None:
+    enviados = payload.model_fields_set
+    campos: dict = {}
+
+    if "nombre" in enviados and payload.nombre is not None:
         nombre = payload.nombre.strip()
         if not nombre:
             raise HTTPException(status_code=400, detail="El nombre no puede estar vacio")
-
-        existente = db.execute(
-            select(ProductoModel).where(ProductoModel.nombre == nombre, ProductoModel.id != producto_id)
-        ).scalar_one_or_none()
-        if existente is not None:
+        if _nombre_repetido(db, nombre, excluir_id=producto_id):
             raise HTTPException(status_code=409, detail="Ya existe un producto con ese nombre")
-        producto.nombre = nombre
+        campos["nombre"] = nombre
 
-    if payload.codigo_barras is not None:
-        codigo = payload.codigo_barras.strip() or None
+    if "codigo_barras" in enviados:
+        codigo = (payload.codigo_barras or "").strip() or None
         if codigo is not None:
             existente_codigo = db.execute(
                 select(ProductoModel).where(ProductoModel.codigo_barras == codigo, ProductoModel.id != producto_id)
             ).scalar_one_or_none()
             if existente_codigo is not None:
                 raise HTTPException(status_code=409, detail="Ya existe un producto con ese codigo de barras")
-        producto.codigo_barras = codigo
+        campos["codigo_barras"] = codigo
 
-    if payload.precio_costo is not None:
-        producto.precio_costo = payload.precio_costo
+    for nombre in ("precio_costo", "precio_venta", "stock_minimo", "catalogo", "activo"):
+        if nombre in enviados and getattr(payload, nombre) is not None:
+            campos[nombre] = getattr(payload, nombre)
 
-    if payload.catalogo is not None:
-        producto.catalogo = payload.catalogo
+    # Quitar el proveedor o la imagen es enviarlos en null; no enviarlos los deja como estan.
+    if "proveedor_id" in enviados:
+        campos["proveedor_id"] = payload.proveedor_id
+    if "imagen_url" in enviados:
+        campos["imagen_url"] = payload.imagen_url or None
 
-    if payload.precio_venta is not None:
-        producto.precio_venta = payload.precio_venta
-
-    if payload.stock_actual is not None:
-        producto.stock_actual = payload.stock_actual
-
-    if payload.stock_minimo is not None:
-        producto.stock_minimo = payload.stock_minimo
-
-    if payload.proveedor_id is not None:
-        producto.proveedor_id = payload.proveedor_id
-
-    if payload.imagen_url is not None:
-        producto.imagen_url = payload.imagen_url
-
-    if payload.activo is not None:
-        producto.activo = payload.activo
+    cambios = _cambios_producto(producto, campos)
+    for nombre, valor in campos.items():
+        setattr(producto, nombre, valor)
+    if cambios:
+        registrar_auditoria(
+            db,
+            usuario=current_user.username,
+            modulo="productos",
+            entidad="producto",
+            accion="editar",
+            entidad_id=producto.id,
+            detalle=f"{producto.nombre}: " + "; ".join(cambios),
+        )
 
     db.commit()
     db.refresh(producto)
-
-    return ProductoResponse(
-        id=producto.id,
-        nombre=producto.nombre,
-        codigo_barras=producto.codigo_barras,
-        precio_costo=producto.precio_costo,
-        precio_venta=producto.precio_venta,
-        catalogo=producto.catalogo,
-        stock_actual=producto.stock_actual,
-        stock_minimo=producto.stock_minimo,
-        stock_critico=producto.stock_actual <= producto.stock_minimo,
-        imagen_url=producto.imagen_url,
-        proveedor_id=producto.proveedor_id,
-        proveedor_nombre=producto.proveedor.nombre if producto.proveedor else None,
-    )
+    return _to_producto_response_from_model(producto)
 
 
 @router.delete(
@@ -362,20 +421,16 @@ def patch_producto_stock(
     producto_id: int,
     payload: ProductoStockPatchRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> ProductoResponse:
-    """Ajusta stock de forma rapida sumando o restando unidades."""
-    repository = SqlAlchemyProductoRepository(db)
-
-    try:
-        updated = repository.update_stock(producto_id, payload.delta)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    if updated is None:
+    """Ajuste rapido por delta. Se conserva por compatibilidad; para corregir con motivo usa /ajustes-stock."""
+    producto = db.execute(select(ProductoModel).where(ProductoModel.id == producto_id).with_for_update()).scalar_one_or_none()
+    if producto is None:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
-
-    return _to_producto_response(updated)
+    mover_stock(db, producto, payload.delta, tipo="ajuste", usuario=current_user.username, motivo="Ajuste rapido")
+    db.commit()
+    db.refresh(producto)
+    return _to_producto_response_from_model(producto)
 
 
 @router.patch("/api/productos/{producto_id}/precio_venta", response_model=ProductoResponse)

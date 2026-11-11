@@ -41,6 +41,7 @@ from src.api.routers.fidelizacion_clientes import router as fidelizacion_cliente
 from src.api.routers.gastos import router as gastos_router
 from src.api.routers.pedidos_proveedor import router as pedidos_proveedor_router
 from src.api.routers.productos import router as productos_router
+from src.api.routers.productos_stock import router as productos_stock_router
 from src.api.routers.proveedores import router as proveedores_router
 from src.api.routers.superadmin import router as superadmin_router
 from src.api.routers.upload import router as upload_router
@@ -514,6 +515,7 @@ def health_check():
 # ─── Routers ───
 app.include_router(auth_router)
 app.include_router(productos_router)
+app.include_router(productos_stock_router)
 app.include_router(dashboard_router)
 app.include_router(superadmin_router)
 app.include_router(ventas_fidelizacion_router)
