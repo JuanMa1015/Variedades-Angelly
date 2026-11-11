@@ -82,6 +82,24 @@ class ClienteFidelizacionModel(Base):
         )
 
 
+class MovimientoPuntosModel(Base):
+    """Historial de puntos de un cliente de fidelizacion: cada compra, canje, anulacion o ajuste, con quien y por que."""
+
+    __tablename__ = "movimientos_puntos"
+    __table_args__ = (Index("ix_movimientos_puntos_cliente_fecha", "cliente_id", "fecha"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    cliente_id: Mapped[int] = mapped_column(ForeignKey("clientes_fidelizacion.id"), nullable=False)
+    fecha: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, default=_utcnow_naive)
+    tipo: Mapped[str] = mapped_column(String(30), nullable=False)
+    puntos: Mapped[int] = mapped_column(Integer, nullable=False)  # lo realmente aplicado (+ suma, - resta)
+    saldo: Mapped[int] = mapped_column(Integer, nullable=False)  # puntos del cliente despues del movimiento
+    motivo: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    usuario: Mapped[str] = mapped_column(String(50), nullable=False)
+    referencia_tipo: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    referencia_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
 class ClienteFiadoTiendaModel(Base):
     """Clientes fiados operativos del punto de venta (no cartera admin)."""
 

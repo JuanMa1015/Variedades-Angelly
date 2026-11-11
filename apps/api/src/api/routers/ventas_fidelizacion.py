@@ -90,13 +90,13 @@ def _to_detalle_response(detalle: DetalleVentaModel) -> VentaDetalleResponse:
     )
 
 
-def _aplicar_canje(db: Session, payload: VentaCreateRequest, total: float) -> float:
+def _aplicar_canje(db: Session, payload: VentaCreateRequest, total: float, usuario: str, movimientos_puntos: list) -> float:
     """Descuento en pesos por los puntos que el cliente usa en esta venta (0 si no canjea)."""
     if payload.puntos_a_canjear <= 0:
         return 0.0
     if payload.cliente_fidelizacion_id is None:
         raise HTTPException(status_code=400, detail="Para usar puntos debes elegir el cliente de fidelizacion")
-    descuento = canjear_puntos(db, payload.cliente_fidelizacion_id, payload.puntos_a_canjear)
+    descuento = canjear_puntos(db, payload.cliente_fidelizacion_id, payload.puntos_a_canjear, usuario=usuario, movimientos=movimientos_puntos)
     if descuento > total:
         raise HTTPException(status_code=400, detail="El descuento por puntos supera el total de la venta")
     return descuento
@@ -147,6 +147,7 @@ def create_venta(
     total = 0.0
     detalle_payload: list[VentaDetalleResponse] = []
     movimientos_stock = []
+    movimientos_puntos = []
     cliente: ClienteModel | None = None
     cliente_tienda: ClienteFiadoTiendaModel | None = None
     cliente_nombre: str | None = None
@@ -259,7 +260,7 @@ def create_venta(
                     ),
                 )
 
-            descuento = _aplicar_canje(db, payload, total)
+            descuento = _aplicar_canje(db, payload, total, current_user.username, movimientos_puntos)
             total = total - descuento
 
             if payload.es_fiado:
@@ -308,11 +309,15 @@ def create_venta(
                 # Los puntos salen del dinero realmente cobrado (un fiado solo cuenta su abono).
                 cobrado = abono_inicial if payload.es_fiado else float(total)
                 venta.cliente_fidelizacion_id = payload.cliente_fidelizacion_id
-                venta.puntos_otorgados = acumular_puntos(db, payload.cliente_fidelizacion_id, cobrado)
+                venta.puntos_otorgados = acumular_puntos(
+                    db, payload.cliente_fidelizacion_id, cobrado, usuario=current_user.username, movimientos=movimientos_puntos,
+                )
 
             db.add(venta)
             db.flush()
             for movimiento in movimientos_stock:
+                movimiento.referencia_id = venta.id
+            for movimiento in movimientos_puntos:
                 movimiento.referencia_id = venta.id
 
             for detalle in detalle_payload:
@@ -642,7 +647,7 @@ def delete_venta(
             )
 
         mover_deuda_tienda(db, deuda_pendiente_tienda(venta), SIN_DEUDA)
-        revertir_puntos_de_venta(db, venta)
+        revertir_puntos_de_venta(db, venta, usuario=current_user.username, tipo="eliminacion_venta")
 
         detalles = db.execute(
             select(DetalleVentaModel)

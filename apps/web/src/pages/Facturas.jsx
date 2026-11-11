@@ -7,6 +7,7 @@ import ErrorMessage from '../components/ErrorMessage'
 import SuccessMessage from '../components/SuccessMessage'
 import Skeleton from '../components/Skeleton'
 import PaginationControls from '../components/PaginationControls';
+import SelectBuscable from '../components/SelectBuscable';
 import useConfirm from '../components/useConfirm';
 import { formatDateTime, formatMoney, parseApiDate } from '../utils/format';
 import CrearProductoModal from './Inventario/CrearProductoModal';
@@ -175,6 +176,8 @@ const Facturas = () => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proveedorId, medioPago, encomienda, porcentajeGanancia, items]);
+
+  const opcionesProveedor = useMemo(() => proveedores.map((p) => ({ valor: String(p.id), etiqueta: p.nombre })), [proveedores]);
 
   const productosById = useMemo(
     () => new Map(productos.map((item) => [Number(item.id), item])),
@@ -413,17 +416,13 @@ const Facturas = () => {
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-5">
             <div>
               <label htmlFor="factura-proveedor" className={ETIQUETA}>Proveedor</label>
-              <select
+              <SelectBuscable
                 id="factura-proveedor"
                 value={proveedorId}
-                onChange={(event) => { setProveedorId(event.target.value); setPedidoId(''); setPedidosPendientes([]); }}
-                className={CAMPO}
-              >
-                <option value="">Selecciona proveedor</option>
-                {proveedores.map((proveedor) => (
-                  <option key={proveedor.id} value={proveedor.id}>{proveedor.nombre}</option>
-                ))}
-              </select>
+                onChange={(valor) => { setProveedorId(valor); setPedidoId(''); setPedidosPendientes([]); }}
+                opciones={opcionesProveedor}
+                placeholder="Selecciona proveedor"
+              />
             </div>
 
             <div>
