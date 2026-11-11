@@ -744,6 +744,5 @@ apps\api\.venv\Scripts\python.exe -m alembic -c apps\api\alembic.ini upgrade hea
   `orden` (nombre, stock, precio), `solo_inactivos`. `GET /api/productos/resumen` cuenta todo el catálogo (antes la pantalla cargaba solo
   200 productos y los demás eran inalcanzables). Frontend: `pages/Inventario/*`, `api/inventarioApi.js`.
 - El ingreso por código de barras busca el producto en todo el catálogo y suma con motivo `ingreso_sin_factura`.
-- Pendiente (paso 2): formularios de alta con etiquetas y miles, tabla en tarjetas para celular, ver y reactivar desactivados, historial
-  de movimientos dentro del producto, "pedir al proveedor" desde bajo stock.
-
+- Paso 2 (hecho): alta de producto con etiquetas, miles y margen (`CrearProductoModal`, `ImagenCampo`); lista en tabla (md+) y tarjetas (celular) en `ProductosLista`; filtro por proveedor y «Desactivados» (solo admin) con reactivar; historial de movimientos por producto (`HistorialStockModal`); «Reponer stock» (`ReposicionModal`) agrupa por proveedor con `GET /api/productos/reposicion` (sugerido = max(1, minimo*2 - stock)), registra el pedido en `/api/proveedores/pedidos` y abre WhatsApp (`utils/whatsapp.js`). Los productos sin proveedor no se pueden pedir.
+- Pruebas: `tests/conftest.py` fuerza `DATABASE_URL` a un SQLite temporal; antes el arranque de la app en los tests usaba la base del `.env` (Neon). Nunca quitar esa guarda.

@@ -445,3 +445,46 @@ def test_el_stock_rapido_por_delta_tambien_queda_en_el_historial(auth_client) ->
 
     assert r.status_code == 200 and r.json()["stock_actual"] == 8
     assert [(m.tipo, m.delta, m.motivo) for m in _movimientos(sf, producto)] == [("ajuste", 3, "Ajuste rapido")]
+
+
+# -- Reposicion: que pedir a cada proveedor --
+
+
+def test_la_reposicion_agrupa_por_proveedor_con_lo_sugerido_y_el_costo(auth_client) -> None:
+    client, sf = auth_client
+    bimbo = _proveedor(sf, "Bimbo Real")
+    alpina = _proveedor(sf, "Alpina")
+    _producto(sf, "Pan", stock=1, minimo=5, precio_costo=1000.0, proveedor_id=bimbo)        # sugerido 5*2-1 = 9
+    _producto(sf, "Galleta", stock=0, minimo=3, precio_costo=500.0, proveedor_id=bimbo)     # sugerido 6
+    _producto(sf, "Yogurt", stock=2, minimo=2, precio_costo=2000.0, proveedor_id=alpina)    # sugerido 2
+    _producto(sf, "Suelto", stock=0, minimo=0, precio_costo=100.0)                          # sin proveedor, sugerido 1
+    _producto(sf, "Con Stock", stock=50, minimo=5, precio_costo=1.0, proveedor_id=bimbo)    # no se repone
+    _producto(sf, "Apagado", stock=0, minimo=5, precio_costo=1.0, activo=False)             # desactivado: no cuenta
+
+    r = client.get("/api/productos/reposicion", headers=_h(_vendedor(client))).json()
+
+    assert r["total_productos"] == 4
+    nombres = [g["proveedor_nombre"] for g in r["grupos"]]
+    assert nombres == ["Alpina", "Bimbo Real", None]  # por nombre y lo que no tiene proveedor al final
+    bimbo_grupo = r["grupos"][1]
+    assert [(p["nombre"], p["sugerido"]) for p in bimbo_grupo["productos"]] == [("Galleta", 6), ("Pan", 9)]  # agotados primero
+    assert bimbo_grupo["monto_estimado"] == 500.0 * 6 + 1000.0 * 9
+    assert bimbo_grupo["telefono"] == "3000000000"
+    sin = r["grupos"][2]
+    assert sin["proveedor_id"] is None and [p["nombre"] for p in sin["productos"]] == ["Suelto"] and sin["productos"][0]["sugerido"] == 1
+
+
+def test_la_reposicion_sin_faltantes_esta_vacia(auth_client) -> None:
+    client, sf = auth_client
+    _producto(sf, "Sobrado", stock=50, minimo=5)
+
+    r = client.get("/api/productos/reposicion", headers=_h(_vendedor(client))).json()
+
+    assert r == {"grupos": [], "total_productos": 0}
+
+
+def test_la_reposicion_exige_sesion(auth_client) -> None:
+    client, _ = auth_client
+    client.cookies.clear()
+
+    assert client.get("/api/productos/reposicion").status_code == 401

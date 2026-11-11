@@ -61,3 +61,36 @@ export const FILTROS_STOCK = [
   { id: 'bajo', etiqueta: 'Bajo stock' },
   { id: 'ok', etiqueta: 'Con stock' },
 ];
+
+// "Venta #12" / "Factura #3": a que documento corresponde un movimiento (vacio si fue un ajuste manual).
+export const describirReferencia = (mov) => {
+  if (!mov.referencia_id) return '';
+  const nombre = { venta: 'Venta', factura: 'Factura' }[mov.referencia_tipo] ?? 'Documento';
+  return `${nombre} #${mov.referencia_id}`;
+};
+
+const MAX_DESCRIPCION = 255;
+
+// Descripcion corta del pedido (el servidor admite 255 caracteres): si no cabe todo, avisa cuantos productos faltan.
+export const descripcionPedido = (items) => {
+  const lineas = items.map((item) => `${item.cantidad}× ${item.nombre}`);
+  let texto = lineas.join('; ');
+  if (texto.length <= MAX_DESCRIPCION) return texto;
+  let incluidas = lineas.length;
+  while (incluidas > 1 && `${lineas.slice(0, incluidas).join('; ')}… y ${lineas.length - incluidas} más`.length > MAX_DESCRIPCION) incluidas -= 1;
+  texto = `${lineas.slice(0, incluidas).join('; ')}… y ${lineas.length - incluidas} más`;
+  return texto.slice(0, MAX_DESCRIPCION);
+};
+
+// Mensaje completo para el proveedor (el detalle entero, sin el limite de la descripcion guardada).
+export const mensajePedido = ({ proveedor, items, pedidoId, monto, formatMoney }) => [
+  `Hola ${proveedor}, un saludo de Tienda Angelly.`,
+  '',
+  `Quisiera hacer el pedido #${pedidoId}:`,
+  ...items.map((item) => `- ${item.cantidad}× ${item.nombre}`),
+  '',
+  `Valor estimado: ${formatMoney(monto)}`,
+  'Quedo atento a la confirmación y al tiempo de entrega. ¡Gracias!',
+];
+
+export const montoDeItems = (items) => items.reduce((total, item) => total + item.cantidad * item.costo, 0);

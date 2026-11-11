@@ -7,7 +7,7 @@ const SEARCH_DELAY_MS = 300;
 // Lista del inventario con busqueda, filtro y orden resueltos por el servidor (llega a todo el catalogo),
 // mas el resumen de TODO el catalogo (no solo de la pagina visible).
 export const useInventario = (token) => {
-  const [filtros, setFiltros] = useState({ q: '', estado: 'todos', orden: 'nombre', page: 1 });
+  const [filtros, setFiltros] = useState({ q: '', estado: 'todos', orden: 'nombre', proveedorId: null, soloInactivos: false, page: 1 });
   const [texto, setTexto] = useState('');
   const [lista, setLista] = useState({ data: [], total: 0, totalPages: 1 });
   const [resumen, setResumen] = useState(null);

@@ -10,6 +10,13 @@ from pathlib import Path
 os.environ["APP_ENV"] = "test"
 os.environ.setdefault("LOGIN_RATE_LIMIT", "10000/minute")
 
+# Las pruebas NUNCA deben tocar la base real: connection.py lee DATABASE_URL del .env
+# (Neon) y el arranque de la app (create_all, ALTER, semillas) usaria ese motor global.
+# Se fuerza una base SQLite desechable antes de importar cualquier modulo de `src`.
+import tempfile
+
+os.environ["DATABASE_URL"] = f"sqlite:///{Path(tempfile.gettempdir()).as_posix()}/angelly_pytest_{os.getpid()}.db"
+
 import pytest
 
 # Permite importar el paquete src incluso cuando pytest se ejecuta como script.
