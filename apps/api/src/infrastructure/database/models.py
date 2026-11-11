@@ -119,6 +119,24 @@ class ProductoModel(Base):
         return f"ProductoModel(id={self.id!r}, nombre={self.nombre!r})"
 
 
+class MovimientoStockModel(Base):
+    """Historial del stock: cada venta, compra, anulacion o ajuste que lo cambia, con quien y por que."""
+
+    __tablename__ = "movimientos_stock"
+    __table_args__ = (Index("ix_movimientos_stock_producto_fecha", "producto_id", "fecha"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    producto_id: Mapped[int] = mapped_column(ForeignKey("productos.id"), nullable=False)
+    fecha: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, default=_utcnow_naive)
+    tipo: Mapped[str] = mapped_column(String(30), nullable=False)
+    delta: Mapped[int] = mapped_column(Integer, nullable=False)
+    stock_resultante: Mapped[int] = mapped_column(Integer, nullable=False)
+    motivo: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    usuario: Mapped[str] = mapped_column(String(50), nullable=False)
+    referencia_tipo: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    referencia_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
 class VentaModel(Base):
     """Representacion persistente de una venta."""
 

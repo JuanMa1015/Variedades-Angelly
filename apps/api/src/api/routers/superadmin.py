@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from src.api.services.auditoria import registrar_auditoria
 from src.api.services.caja_calculos import efectivo_esperado
+from src.api.services.stock import mover_stock
 from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.services.vendedor import (
     create_vendedor as _create_vendedor,
@@ -31,6 +32,7 @@ from src.infrastructure.database.models import (
     DetalleVentaModel,
     FacturaCompraDetalleModel,
     FacturaCompraModel,
+    MovimientoStockModel,
     ProductoModel,
     ProveedorModel,
     UsuarioModel,
@@ -309,7 +311,7 @@ def list_productos(
 
 
 @router.post("/api/superadmin/productos", response_model=ProductoSchema, status_code=201)
-def create_producto(payload: ProductoCreateUpdate, db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_roles("superadmin"))):
+def create_producto(payload: ProductoCreateUpdate, db: Session = Depends(get_db), current_user: AuthenticatedUser = Depends(require_roles("superadmin"))):
     producto = ProductoModel(
         nombre=payload.nombre.strip(),
         codigo_barras=payload.codigo_barras,
@@ -321,6 +323,12 @@ def create_producto(payload: ProductoCreateUpdate, db: Session = Depends(get_db)
         imagen_url=payload.imagen_url,
     )
     db.add(producto)
+    db.flush()
+    if payload.stock_actual > 0:
+        db.add(MovimientoStockModel(
+            producto_id=producto.id, tipo="stock_inicial", delta=payload.stock_actual, stock_resultante=payload.stock_actual,
+            motivo="Stock inicial al crear el producto", usuario=current_user.username,
+        ))
     db.commit()
     db.refresh(producto)
     return ProductoSchema(
@@ -341,9 +349,9 @@ def update_producto(
     producto_id: int,
     payload: ProductoCreateUpdate,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
 ):
-    producto = db.execute(select(ProductoModel).where(ProductoModel.id == producto_id)).scalar_one_or_none()
+    producto = db.execute(select(ProductoModel).where(ProductoModel.id == producto_id).with_for_update()).scalar_one_or_none()
     if producto is None:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     producto.nombre = payload.nombre.strip()
@@ -351,7 +359,11 @@ def update_producto(
     producto.precio_costo = payload.precio_costo
     producto.precio_venta = payload.precio_venta
     producto.catalogo = payload.catalogo
-    producto.stock_actual = payload.stock_actual
+    if payload.stock_actual != producto.stock_actual:
+        mover_stock(
+            db, producto, payload.stock_actual - int(producto.stock_actual), tipo="ajuste",
+            usuario=current_user.username, motivo="Edicion administrativa del producto",
+        )
     producto.stock_minimo = payload.stock_minimo
     if payload.imagen_url is not None:
         producto.imagen_url = payload.imagen_url

@@ -1,27 +1,62 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, Barcode, ImageUp, Link, Package, Pencil, Plus, RotateCcw, Search, Trash2, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
-import { apiDelete, apiGet, apiPatch, apiPost, apiUpload } from '../api/httpClient';
-import { importImageFromUrl, isRemoteImageUrl } from '../api/imagesApi';
+import { apiDelete, apiGet, apiPatch, apiPost } from '../api/httpClient';
+import { resolveImageUrl } from '../api/imagesApi';
+import { ajustarStock, buscarPorCodigo } from '../api/inventarioApi';
 import ErrorMessage from '../components/ErrorMessage';
 import SuccessMessage from '../components/SuccessMessage';
 import Skeleton, { SkeletonCard } from '../components/Skeleton';
 import useConfirm from '../components/useConfirm';
 import { formatMoney } from '../utils/format';
 import Modal from '../components/Modal';
+import PaginationControls from '../components/PaginationControls';
+import AjusteStockModal from './Inventario/AjusteStockModal';
+import EditarProductoModal from './Inventario/EditarProductoModal';
+import { ESTADOS_STOCK, FILTROS_STOCK, estadoStock } from './Inventario/inventarioHelpers';
+import { useInventario } from './Inventario/useInventario';
 
 const EMPTY_MANUAL_FORM = { nombre: '', codigo_barras: '', precio_costo: '', precio_venta: '', stock_actual: '', stock_minimo: '', proveedor_id: '' };
+
+const TarjetaResumen = ({ titulo, valor, tono = 'text-gray-900', activa = false, onClick, children }) => {
+  const contenido = (
+    <>
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">{titulo}</p>
+      <p className={`mt-2 text-2xl font-bold sm:text-3xl ${tono}`}>{valor}</p>
+      {children}
+    </>
+  );
+  const base = 'rounded-2xl border bg-white p-4 text-left shadow-sm sm:p-5';
+  if (!onClick) return <div className={`${base} border-gray-200`}>{contenido}</div>;
+  return (
+    <button type="button" onClick={onClick} aria-pressed={activa} className={`${base} transition hover:shadow-md ${activa ? 'border-rosewood ring-2 ring-rosewood/20' : 'border-gray-200'}`}>
+      {contenido}
+    </button>
+  );
+};
+
+// El stock se lee de un vistazo: agotado en rojo, bajo en ambar, el resto normal.
+const StockCelda = ({ producto }) => {
+  const estado = estadoStock(producto);
+  const { etiqueta, clase } = ESTADOS_STOCK[estado];
+  return (
+    <span className="inline-flex items-center gap-2">
+      <span className={estado === 'ok' ? clase : `font-bold ${estado === 'agotado' ? 'text-red-700' : 'text-amber-700'}`}>{producto.stock_actual}</span>
+      {etiqueta && <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${clase}`}>{etiqueta}</span>}
+    </span>
+  );
+};
 
 const Inventario = () => {
   const { token, user } = useAuth();
   // Desactivar productos es solo de admin/superadmin (el backend responde 403 al vendedor).
   const canDeactivate = user?.role === 'admin' || user?.role === 'superadmin';
 
-  const [productos, setProductos] = useState([]);
   const [proveedores, setProveedores] = useState([]);
   const [activeMode, setActiveMode] = useState('manual');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingProducto, setEditingProducto] = useState(null);
+  const [ajustando, setAjustando] = useState(null);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState('');
 
@@ -36,8 +71,6 @@ const Inventario = () => {
     proveedor_id: '',
   });
 
-  const [editForm, setEditForm] = useState({ ...EMPTY_MANUAL_FORM });
-
   const [manualImageMode, setManualImageMode] = useState('upload');
   const [manualImageFile, setManualImageFile] = useState(null);
   const [manualImagePreview, setManualImagePreview] = useState(null);
@@ -46,92 +79,28 @@ const Inventario = () => {
   const [barcodeImageFile, setBarcodeImageFile] = useState(null);
   const [barcodeImagePreview, setBarcodeImagePreview] = useState(null);
   const [barcodeImageUrl, setBarcodeImageUrl] = useState('');
-  const [editImageMode, setEditImageMode] = useState('upload');
-  const [editImageFile, setEditImageFile] = useState(null);
-  const [editImagePreview, setEditImagePreview] = useState(null);
-  const [editImageUrl, setEditImageUrl] = useState('');
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
+  const { filtros, setFiltro, setPagina, texto, setTexto, lista, resumen, loading, error, setError, reload } = useInventario(token);
+  const productos = lista.data;
   const { confirm, ConfirmModal } = useConfirm();
+  const recargar = useCallback(() => reload({ silent: true }), [reload]);
 
   const clearMessages = () => {
     setError('');
     setSuccess('');
   };
 
-  const loadProductos = useCallback(async (signal) => {
-    if (!token) return;
-    const payload = await apiGet('/api/productos/paginados?catalogo=tienda&limit=200', { signal });
-    if (signal?.aborted) return;
-    setProductos(Array.isArray(payload?.data) ? payload.data : (Array.isArray(payload) ? payload : []));
-  }, [token]);
-
-  const loadProveedores = useCallback(async (signal) => {
-    if (!token) return;
-    const payload = await apiGet('/api/proveedores', { signal });
-    if (signal?.aborted) return;
-    setProveedores(Array.isArray(payload) ? payload : []);
-  }, [token]);
-
   useEffect(() => {
     if (!token) {
-      setProductos([]);
       setProveedores([]);
-      setLoading(false);
-      return;
+      return undefined;
     }
-
     const controller = new AbortController();
-
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError('');
-        await Promise.all([
-          loadProductos(controller.signal),
-          loadProveedores(controller.signal),
-        ]);
-      } catch (err) {
-        if (controller.signal.aborted) return;
-        setError(err.message || 'No fue posible cargar el inventario');
-        setProductos([]);
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
-      }
-    };
-
-    fetchData();
+    apiGet('/api/proveedores', { signal: controller.signal })
+      .then((payload) => { if (!controller.signal.aborted) setProveedores(Array.isArray(payload) ? payload : []); })
+      .catch(() => { /* sin proveedores el formulario sigue funcionando */ });
     return () => controller.abort();
-  }, [token, loadProductos, loadProveedores]);
-
-  function dataUrlToFile(dataUrl) {
-    const parts = dataUrl.split(',', 2);
-    if (parts.length !== 2) return null;
-    const mime = (parts[0].match(/:(.*?);/) || [])[1] || 'image/jpeg';
-    const raw = parts[1].replace(/\s/g, '');
-    const bin = atob(raw);
-    const arr = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-    return new File([arr], 'imagen.jpg', { type: mime });
-  }
-
-  const uploadImageAndGetUrl = async (file) => {
-    const result = await apiUpload('/api/upload-imagen', file);
-    return result.url;
-  };
-
-  const resolveImageUrl = async (url, file) => {
-    if (file) return uploadImageAndGetUrl(file);
-    if (url && url.startsWith('data:')) {
-      const f = dataUrlToFile(url);
-      if (f) return uploadImageAndGetUrl(f);
-    }
-    // Una direccion de internet se descarga en el servidor y se guarda como copia propia (permanente).
-    if (isRemoteImageUrl(url)) return importImageFromUrl(url);
-    return url || null;
-  };
+  }, [token]);
 
   const createProducto = async (payload) => {
     return apiPost('/api/productos', payload);
@@ -173,7 +142,7 @@ const Inventario = () => {
       setManualImageFile(null);
       setManualImagePreview(null);
       setManualImageUrl('');
-      await loadProductos();
+      await recargar();
       setSuccess('Producto agregado correctamente');
       setIsCreateModalOpen(false);
     } catch (err) {
@@ -202,20 +171,22 @@ const Inventario = () => {
       return;
     }
 
-    const existing = productos.find((item) => String(item.codigo_barras || '').trim() === code);
     try {
       setSaving(true);
+      const existing = await buscarPorCodigo(code);
 
       if (existing) {
-        await apiPatch(`/api/productos/${existing.id}/stock`, {
-          delta: Number(barcodeForm.stock_actual || 1),
+        await ajustarStock(existing.id, {
+          modo: 'sumar',
+          cantidad: Number(barcodeForm.stock_actual || 1),
+          motivo: 'ingreso_sin_factura',
         });
         if (barcodeForm.proveedor_id) {
           await apiPatch(`/api/productos/${existing.id}`, {
             proveedor_id: Number(barcodeForm.proveedor_id),
           });
         }
-        await loadProductos();
+        await recargar();
         setSuccess(`Stock actualizado para ${existing.nombre}`);
         setIsCreateModalOpen(false);
       } else {
@@ -234,7 +205,7 @@ const Inventario = () => {
           proveedor_id: barcodeForm.proveedor_id ? Number(barcodeForm.proveedor_id) : null,
           imagen_url,
         });
-        await loadProductos();
+        await recargar();
         setSuccess('Producto creado por código de barras');
         setIsCreateModalOpen(false);
       }
@@ -258,68 +229,21 @@ const Inventario = () => {
   };
 
   const handleEdit = (producto) => {
-    setEditForm({
-      nombre: producto.nombre || '',
-      codigo_barras: producto.codigo_barras || '',
-      precio_costo: String(producto.precio_costo || ''),
-      precio_venta: String(producto.precio_venta || ''),
-      stock_actual: String(producto.stock_actual || ''),
-      stock_minimo: String(producto.stock_minimo || ''),
-      proveedor_id: producto.proveedor_id ? String(producto.proveedor_id) : '',
-    });
-    setEditImageFile(null);
-    setEditImagePreview(null);
-    setEditImageUrl('');
-    setEditImageMode('upload');
+    clearMessages();
     setEditingProducto(producto);
   };
 
-  const handleSubmitEdit = async (event) => {
-    event.preventDefault();
-    clearMessages();
+  const handleGuardado = async (nombre) => {
+    setEditingProducto(null);
+    setSuccess(`Producto "${nombre}" actualizado`);
+    await recargar();
+  };
 
-    const producto = editingProducto;
-    if (!producto) return;
-
-    if (!editForm.nombre.trim()) {
-      setError('El nombre del producto es obligatorio');
-      return;
-    }
-
-    if (Number(editForm.precio_costo) < 0 || Number(editForm.precio_venta) < 0 ||
-        Number(editForm.stock_actual) < 0 || Number(editForm.stock_minimo) < 0) {
-      setError('Los valores numéricos no pueden ser negativos.');
-      return;
-    }
-
-    try {
-      setSaving(true);
-      let imagen_url;
-      if (editImageUrl === '__remove__') {
-        imagen_url = null;
-      } else if (editImageUrl.trim() || editImageFile) {
-        imagen_url = await resolveImageUrl(editImageUrl.trim(), editImageFile);
-      } else {
-        imagen_url = producto.imagen_url;
-      }
-      await apiPatch(`/api/productos/${producto.id}`, {
-        nombre: editForm.nombre.trim(),
-        codigo_barras: editForm.codigo_barras.trim() || null,
-        precio_costo: Number(editForm.precio_costo || 0),
-        precio_venta: Number(editForm.precio_venta || 0),
-        stock_actual: Number(editForm.stock_actual || 0),
-        stock_minimo: Number(editForm.stock_minimo || 0),
-        proveedor_id: editForm.proveedor_id ? Number(editForm.proveedor_id) : null,
-        imagen_url,
-      });
-      await loadProductos();
-      setSuccess(`Producto "${editForm.nombre.trim()}" actualizado`);
-      setEditingProducto(null);
-    } catch (err) {
-      setError(err.message || 'No se pudo actualizar el producto');
-    } finally {
-      setSaving(false);
-    }
+  const handleAjustado = async ({ producto, movimiento }) => {
+    setAjustando(null);
+    setEditingProducto(null);
+    setSuccess(`Stock de "${producto.nombre}": ${movimiento.stock_resultante - movimiento.delta} → ${movimiento.stock_resultante}`);
+    await recargar();
   };
 
   const handleDelete = async (producto) => {
@@ -329,33 +253,12 @@ const Inventario = () => {
 
     try {
       await apiDelete(`/api/productos/${producto.id}`);
-      await loadProductos();
+      await recargar();
       setSuccess(`Producto "${producto.nombre}" desactivado`);
     } catch (err) {
       setError(err.message || 'No se pudo desactivar el producto');
     }
   };
-
-  const filtered = useMemo(() => {
-    if (!searchTerm.trim()) return productos;
-    const q = searchTerm.trim().toLowerCase();
-    return productos.filter(
-      (p) => p.nombre.toLowerCase().includes(q)
-        || (p.codigo_barras && p.codigo_barras.toLowerCase().includes(q))
-        || (p.proveedor_nombre && p.proveedor_nombre.toLowerCase().includes(q)),
-    );
-  }, [productos, searchTerm]);
-
-  const resumen = useMemo(() => {
-    const totalStock = productos.reduce((sum, producto) => sum + Number(producto.stock_actual || 0), 0);
-    const bajoStock = productos.filter((producto) => Number(producto.stock_actual || 0) <= Number(producto.stock_minimo || 0)).length;
-
-    return {
-      productos: productos.length,
-      totalStock,
-      bajoStock,
-    };
-  }, [productos]);
 
   return (
     <div className="space-y-6">
@@ -622,164 +525,41 @@ const Inventario = () => {
             )}
       </Modal>
 
-      <Modal isOpen={editingProducto !== null} onClose={() => { setEditingProducto(null); setEditImageFile(null); setEditImagePreview(null); setEditImageUrl(''); setEditImageMode('upload'); }} title="Editar producto">
+      <EditarProductoModal
+        producto={editingProducto}
+        proveedores={proveedores}
+        confirmar={confirm}
+        onSaved={handleGuardado}
+        onAjustar={setAjustando}
+        onClose={() => setEditingProducto(null)}
+      />
+      <AjusteStockModal producto={ajustando} onAjustado={handleAjustado} onClose={() => setAjustando(null)} />
 
-            <form className="space-y-3" onSubmit={handleSubmitEdit}>
-              <input
-                type="text"
-                value={editForm.nombre}
-                onChange={(event) => setEditForm((c) => ({ ...c, nombre: event.target.value }))}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
-                placeholder="Nombre"
-              />
-              <input
-                type="text"
-                value={editForm.codigo_barras}
-                onChange={(event) => setEditForm((c) => ({ ...c, codigo_barras: event.target.value }))}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
-                placeholder="Código barras"
-              />
-              <div className="grid grid-cols-2 gap-3">
-                <input
-                  type="number"
-                  min="0"
-                  value={editForm.precio_costo}
-                  onChange={(event) => setEditForm((c) => ({ ...c, precio_costo: event.target.value }))}
-                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
-                  placeholder="Precio costo"
-                />
-                <input
-                  type="number"
-                  min="0"
-                  value={editForm.precio_venta}
-                  onChange={(event) => setEditForm((c) => ({ ...c, precio_venta: event.target.value }))}
-                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
-                  placeholder="Precio venta"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <input
-                  type="number"
-                  min="0"
-                  value={editForm.stock_actual}
-                  onChange={(event) => setEditForm((c) => ({ ...c, stock_actual: event.target.value }))}
-                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
-                  placeholder="Stock actual"
-                />
-                <input
-                  type="number"
-                  min="0"
-                  value={editForm.stock_minimo}
-                  onChange={(event) => setEditForm((c) => ({ ...c, stock_minimo: event.target.value }))}
-                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
-                  placeholder="Stock mínimo"
-                />
-              </div>
-              <select
-                value={editForm.proveedor_id}
-                onChange={(event) => setEditForm((c) => ({ ...c, proveedor_id: event.target.value }))}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
-              >
-                <option value="">Sin proveedor</option>
-                {proveedores.filter((p) => p.activo).map((prov) => (
-                  <option key={prov.id} value={prov.id}>{prov.nombre}</option>
-                ))}
-              </select>
-
-              <div>
-                <div className="flex gap-1 rounded-lg border border-gray-300 p-0.5 bg-gray-50 mb-2">
-                  {['upload', 'url'].map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setEditImageMode(m)}
-                      className={`flex-1 flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition ${editImageMode === m ? 'bg-white text-rosewood shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                    >
-                      {m === 'upload' ? <><ImageUp className="h-3.5 w-3.5" /> Subir archivo</> : <><Link className="h-3.5 w-3.5" /> Pegar URL</>}
-                    </button>
-                  ))}
-                </div>
-                {editImageMode === 'upload' ? (
-                  editImagePreview ? (
-                    <div className="relative inline-block">
-                      <img src={editImagePreview} alt="Vista previa de la nueva imagen del producto" className="h-20 w-20 rounded-lg border border-gray-300 object-cover" />
-                      <button type="button" onClick={() => { setEditImageFile(null); setEditImagePreview(null); setEditImageUrl(''); }} className="absolute -right-2 -top-2 rounded-full border border-gray-300 bg-white p-0.5 text-gray-500 hover:text-red-600"><X className="h-4 w-4" /></button>
-                    </div>
-                  ) : editingProducto?.imagen_url && !editImageUrl ? (
-                    <div className="relative inline-block">
-                      <img src={editingProducto.imagen_url.startsWith('http') ? editingProducto.imagen_url : `${import.meta.env.VITE_API_URL ?? ''}${editingProducto.imagen_url}`} alt={editingProducto.nombre || 'Imagen del producto'} className="h-20 w-20 rounded-lg border border-gray-300 object-cover" />
-                      <button type="button" onClick={() => { setEditImageFile(null); setEditImagePreview(null); setEditImageUrl('__remove__'); }} className="absolute -right-2 -top-2 rounded-full border border-gray-300 bg-white p-0.5 text-gray-500 hover:text-red-600" title="Eliminar imagen"><X className="h-4 w-4" /></button>
-                    </div>
-                  ) : (
-                    <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-gray-300 px-3 py-2.5 text-sm text-gray-500 hover:border-rosewood hover:text-rosewood">
-                      <ImageUp className="h-4 w-4" />
-                      <span>Seleccionar archivo</span>
-                      <input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; setEditImageFile(f); setEditImageUrl(''); setEditImagePreview(URL.createObjectURL(f)); }} className="hidden" />
-                    </label>
-                  )
-                ) : (
-                  <input
-                    type="text"
-                    value={editImageUrl}
-                    onChange={(e) => { setEditImageUrl(e.target.value); setEditImageFile(null); setEditImagePreview(null); }}
-                    placeholder="https://ejemplo.com/imagen.jpg"
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
-                  />
-                )}
-              </div>
-
-              <button
-                type="submit"
-                disabled={saving}
-                className="w-full rounded-lg bg-rosewood px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300"
-              >
-                {saving ? 'Guardando...' : 'Guardar cambios'}
-              </button>
-            </form>
-      </Modal>
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-        {loading ? (
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {loading && !resumen ? (
           <>
+            <SkeletonCard />
             <SkeletonCard />
             <SkeletonCard />
             <SkeletonCard />
           </>
-        ) : (
+        ) : resumen && (
           <>
-            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Productos</p>
-              <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">{resumen.productos}</p>
-            </div>
-            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Stock total</p>
-              <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">{`${resumen.totalStock} u`}</p>
-            </div>
-            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Bajo stock</p>
-                  <p className="mt-2 text-2xl font-bold text-orange-600 sm:text-3xl">{resumen.bajoStock}</p>
-                </div>
-                <AlertTriangle className="h-5 w-5 text-orange-500 sm:h-6 sm:w-6" />
-              </div>
-              {resumen.bajoStock > 0 && (
-                <ul className="mt-3 space-y-1">
-                  {productos
-                    .filter((p) => Number(p.stock_actual || 0) <= Number(p.stock_minimo || 0))
-                    .slice(0, 5)
-                    .map((p) => (
-                      <li key={p.id} className="flex items-center justify-between text-sm">
-                        <span className="truncate text-gray-700">{p.nombre}</span>
-                        <span className="ml-2 shrink-0 font-semibold text-orange-600">{p.stock_actual} u</span>
-                      </li>
-                    ))}
-                  {resumen.bajoStock > 5 && (
-                    <li className="text-xs text-gray-400">...y {resumen.bajoStock - 5} más</li>
-                  )}
+            <TarjetaResumen titulo="Productos" valor={resumen.total} />
+            <TarjetaResumen titulo="Stock total" valor={`${resumen.stock_total} u`} />
+            <TarjetaResumen titulo="Agotados" valor={resumen.agotados} tono="text-red-700" activa={filtros.estado === 'agotado'} onClick={() => setFiltro({ estado: filtros.estado === 'agotado' ? 'todos' : 'agotado' })} />
+            <TarjetaResumen titulo="Bajo stock" valor={resumen.bajo_stock} tono="text-orange-600" activa={filtros.estado === 'bajo'} onClick={() => setFiltro({ estado: filtros.estado === 'bajo' ? 'todos' : 'bajo' })}>
+              {resumen.urgentes.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {resumen.urgentes.slice(0, 3).map((p) => (
+                    <li key={p.id} className="flex items-center justify-between text-xs">
+                      <span className="truncate text-gray-700">{p.nombre}</span>
+                      <span className="ml-2 shrink-0 font-semibold text-orange-600">{p.stock_actual} u</span>
+                    </li>
+                  ))}
                 </ul>
               )}
-            </div>
+            </TarjetaResumen>
           </>
         )}
       </div>
@@ -792,30 +572,47 @@ const Inventario = () => {
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
-                placeholder="Buscar por nombre o código..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-56 rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-rosewood focus:outline-none"
+                placeholder="Buscar por nombre, código o proveedor"
+                aria-label="Buscar productos"
+                value={texto}
+                onChange={(e) => setTexto(e.target.value)}
+                className="w-64 rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-rosewood focus:outline-none"
               />
-              {searchTerm && (
-                <button
-                  type="button"
-                  onClick={() => setSearchTerm('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
+              {texto && (
+                <button type="button" onClick={() => setTexto('')} aria-label="Borrar búsqueda" className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   <X className="h-4 w-4" />
                 </button>
               )}
             </div>
             <button
               type="button"
-              onClick={() => window.location.reload()}
+              onClick={recargar}
               className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
             >
               <RotateCcw className="h-4 w-4" />
               Recargar
             </button>
           </div>
+        </div>
+
+        <div className="mb-3 flex flex-wrap gap-2">
+          {FILTROS_STOCK.map((filtro) => (
+            <button
+              key={filtro.id}
+              type="button"
+              aria-pressed={filtros.estado === filtro.id}
+              onClick={() => setFiltro({ estado: filtro.id })}
+              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${filtros.estado === filtro.id ? 'border-rosewood bg-rosewood text-white' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}
+            >
+              {filtro.etiqueta}
+            </button>
+          ))}
+          <label htmlFor="orden-productos" className="sr-only">Ordenar por</label>
+          <select id="orden-productos" value={filtros.orden} onChange={(e) => setFiltro({ orden: e.target.value })} className="ml-auto rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs font-semibold text-gray-700 focus:border-rosewood focus:outline-none">
+            <option value="nombre">Nombre</option>
+            <option value="stock">Menos stock primero</option>
+            <option value="precio">Mayor precio</option>
+          </select>
         </div>
 
         <div className="overflow-x-auto">
@@ -839,14 +636,14 @@ const Inventario = () => {
                     <Skeleton lines={4} />
                   </td>
                 </tr>
-              ) : filtered.length === 0 ? (
+              ) : productos.length === 0 ? (
                 <tr className="border-b border-gray-100 hover:bg-gray-50">
                   <td colSpan="8" className="py-8 text-center text-gray-500">
-                    {searchTerm ? 'No se encontraron productos con ese criterio' : 'No hay productos registrados en el catálogo de tienda'}
+                    {texto || filtros.estado !== 'todos' ? 'No se encontraron productos con ese criterio' : 'No hay productos registrados en el catálogo de tienda'}
                   </td>
                 </tr>
               ) : (
-                filtered.map((producto) => (
+                productos.map((producto) => (
                   <tr key={producto.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-900">{producto.nombre}</td>
                     <td className="hidden px-4 py-3 md:table-cell">
@@ -857,7 +654,7 @@ const Inventario = () => {
                       )}
                     </td>
                     <td className="hidden px-4 py-3 text-gray-700 md:table-cell">{producto.codigo_barras || '-'}</td>
-                    <td className="px-4 py-3 text-gray-700">{producto.stock_actual}</td>
+                    <td className="px-4 py-3"><StockCelda producto={producto} /></td>
                     <td className="hidden px-4 py-3 text-gray-700 sm:table-cell">{producto.stock_minimo}</td>
                     <td className="px-4 py-3 text-gray-700">{producto.proveedor_nombre || '-'}</td>
                     <td className="px-4 py-3 text-gray-700">{formatMoney(producto.precio_venta)}</td>
@@ -887,6 +684,11 @@ const Inventario = () => {
             </tbody>
           </table>
         </div>
+        {lista.totalPages > 1 && (
+          <div className="mt-4">
+            <PaginationControls currentPage={filtros.page} totalPages={lista.totalPages} onPageChange={setPagina} />
+          </div>
+        )}
       </section>
 
       {ConfirmModal}

@@ -16,6 +16,7 @@ from src.api.dependencies import AuthenticatedUser
 from src.api.services.auditoria import registrar_auditoria
 from src.api.services.deuda import SIN_DEUDA, deuda_pendiente_tienda, mover_deuda_tienda
 from src.api.services.fidelizacion import revertir_puntos_de_venta
+from src.api.services.stock import mover_stock
 from src.api.services.venta_reglas import caja_abierta_id
 from src.auth.security import hash_password, verify_password
 from src.infrastructure.database.models import (
@@ -135,7 +136,7 @@ def _exigir_sin_abonos_posteriores(db: Session, venta: VentaModel) -> None:
         )
 
 
-def _devolver_stock(db: Session, venta_id: int) -> None:
+def _devolver_stock(db: Session, venta_id: int, usuario: str) -> None:
     detalles = db.execute(
         select(DetalleVentaModel).where(DetalleVentaModel.venta_id == venta_id),
     ).scalars().all()
@@ -145,7 +146,10 @@ def _devolver_stock(db: Session, venta_id: int) -> None:
             select(ProductoModel).where(ProductoModel.id == detalle.producto_id).with_for_update(),
         ).scalar_one_or_none()
         if producto is not None:
-            producto.stock_actual = int(producto.stock_actual + detalle.cantidad)
+            mover_stock(
+                db, producto, detalle.cantidad, tipo="anulacion_venta", usuario=usuario,
+                motivo="Venta anulada", referencia_tipo="venta", referencia_id=venta_id,
+            )
 
 
 def anular_venta(
@@ -166,7 +170,7 @@ def anular_venta(
 
     mover_deuda_tienda(db, deuda_pendiente_tienda(venta), SIN_DEUDA)
     revertir_puntos_de_venta(db, venta)
-    _devolver_stock(db, venta.id)
+    _devolver_stock(db, venta.id, solicitante)
 
     venta.anulada = True
     venta.anulada_en = datetime.now(UTC).replace(tzinfo=None)

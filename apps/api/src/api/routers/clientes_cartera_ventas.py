@@ -13,6 +13,7 @@ from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.routers.cartera_shared import normalize_naive_datetime
 from src.application.services.ventas_service import build_recibo_text
 from src.infrastructure.database.connection import get_db
+from src.api.services.stock import mover_stock
 from src.infrastructure.database.models import ClienteModel, DetalleVentaModel, ProductoModel, VentaModel, AbonoCarteraModel
 from src.api.schemas.cartera import (
     CarteraVentaCreateRequest,
@@ -30,10 +31,11 @@ FIADO_ORIGEN_CARTERA = "cartera"
 def create_cartera_venta(
     payload: CarteraVentaCreateRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> VentaResponse:
     total = 0.0
     detalle_payload: list[VentaDetalleResponse] = []
+    movimientos_stock = []
 
     try:
         with db.begin():
@@ -68,7 +70,9 @@ def create_cartera_venta(
                         ),
                     )
 
-                producto.stock_actual -= item.cantidad
+                movimientos_stock.append(
+                    mover_stock(db, producto, -item.cantidad, tipo="venta_cartera", usuario=current_user.username, referencia_tipo="venta"),
+                )
                 subtotal = float(item.cantidad * producto.precio_venta)
                 total += subtotal
 
@@ -105,6 +109,8 @@ def create_cartera_venta(
             )
             db.add(venta)
             db.flush()
+            for movimiento in movimientos_stock:
+                movimiento.referencia_id = venta.id
 
             for detalle in detalle_payload:
                 db.add(

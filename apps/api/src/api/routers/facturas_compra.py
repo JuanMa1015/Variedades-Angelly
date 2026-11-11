@@ -309,10 +309,13 @@ def create_factura_compra(
         detalles_creados.append(detalle)
 
         anteriores = aplicar_compra_a_producto(
+            db,
             productos_map[item["producto_id"]],
             cantidad=item["cantidad"],
             costo=item["costo"],
             nuevo_precio_venta=item["nuevo_precio_venta"],
+            usuario=current_user.username,
+            factura_id=factura.id,
         )
         registrar_auditoria(
             db,
@@ -412,7 +415,9 @@ def delete_factura_compra(
         .where(ProductoModel.id.in_({d.producto_id for d in detalles}))
         .with_for_update(),
     ).scalars().all()
-    revertir_stock_de_factura(detalles, {p.id: p for p in productos})
+    revertir_stock_de_factura(
+        db, detalles, {p.id: p for p in productos}, usuario=current_user.username, factura_id=factura.id,
+    )
     for detalle in detalles:
         db.delete(detalle)
     db.delete(factura)

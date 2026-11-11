@@ -8,6 +8,7 @@ from collections.abc import Iterable
 
 from fastapi import HTTPException
 
+from src.api.services.stock import mover_stock
 from src.infrastructure.database.models import FacturaCompraDetalleModel, ProductoModel
 
 PASO_REDONDEO_PRECIO = 50
@@ -24,18 +25,24 @@ def costo_unitario(precio_unitario: float, aplica_iva: bool, iva_rate: float) ->
 
 
 def aplicar_compra_a_producto(
+    db,
     producto: ProductoModel,
     *,
     cantidad: int,
     costo: float,
     nuevo_precio_venta: float | None,
+    usuario: str,
+    factura_id: int,
 ) -> dict[str, float]:
     """Suma el stock comprado, deja el ultimo costo y, si se pidio, el nuevo precio de venta.
 
     Retorna los valores anteriores para poder auditar el cambio.
     """
     anteriores = {"costo": float(producto.precio_costo), "venta": float(producto.precio_venta)}
-    producto.stock_actual = int(producto.stock_actual) + cantidad
+    mover_stock(
+        db, producto, cantidad, tipo="factura_compra", usuario=usuario,
+        motivo="Compra a proveedor", referencia_tipo="factura", referencia_id=factura_id,
+    )
     producto.precio_costo = costo
     if nuevo_precio_venta is not None:
         producto.precio_venta = nuevo_precio_venta
@@ -43,8 +50,12 @@ def aplicar_compra_a_producto(
 
 
 def revertir_stock_de_factura(
+    db,
     detalles: Iterable[FacturaCompraDetalleModel],
     productos: dict[int, ProductoModel],
+    *,
+    usuario: str,
+    factura_id: int,
 ) -> None:
     """Resta el stock que sumo la factura. Si ya se vendio parte, no deja stock negativo."""
     por_producto: dict[int, int] = defaultdict(int)
@@ -64,4 +75,7 @@ def revertir_stock_de_factura(
 
     for pid, cantidad in por_producto.items():
         if pid in productos:
-            productos[pid].stock_actual = int(productos[pid].stock_actual) - cantidad
+            mover_stock(
+                db, productos[pid], -cantidad, tipo="eliminacion_factura", usuario=usuario,
+                motivo="Factura de compra eliminada", referencia_tipo="factura", referencia_id=factura_id,
+            )
