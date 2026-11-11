@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle, MessageCircle } from 'lucide-react';
-import { fetchReposicion, registrarPedido } from '../../api/inventarioApi';
+import { fetchReposicion } from '../../api/inventarioApi';
+import { registrarPedido } from '../../api/proveedoresApi';
 import Modal from '../../components/Modal';
 import { formatMoney } from '../../utils/format';
+import { descripcionPedido, mensajePedido, montoDeItems } from '../../utils/pedidosProveedor';
 import { buildWhatsappUrl } from '../../utils/whatsapp';
-import { descripcionPedido, mensajePedido, montoDeItems } from './inventarioHelpers';
 
 const INPUT_NUM = 'w-16 rounded-md border border-gray-300 px-2 py-1 text-right text-sm tabular-nums focus:border-rosewood focus:outline-none';
 

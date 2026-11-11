@@ -23,7 +23,7 @@ const TurnoResumen = ({ caja }) => (
         icono={Wallet}
         titulo="Efectivo esperado"
         valor={formatMoney(caja.saldo_esperado)}
-        detalle={`${formatMoney(caja.monto_inicial)} inicial + ventas − gastos`}
+        detalle={`${formatMoney(caja.monto_inicial)} inicial + ventas − gastos y compras`}
         tono="text-rosewood"
         fondo="bg-rosewood/5"
       />
@@ -35,7 +35,7 @@ const TurnoResumen = ({ caja }) => (
     <Tarjeta icono={CreditCard} titulo="Tarjeta" valor={formatMoney(caja.monto_ventas_tarjeta)} detalle="Datáfono" tono="text-sky-700" />
     <div className="col-span-2 flex items-center gap-2 rounded-xl bg-gray-50 px-4 py-2 text-sm text-gray-600 lg:col-span-4">
       <Receipt className="h-4 w-4 text-red-500" aria-hidden="true" />
-      Gastos pagados en efectivo: <strong className="text-red-700">{formatMoney(caja.monto_gastos)}</strong>
+      Gastos y compras pagados en efectivo: <strong className="text-red-700">{formatMoney(caja.monto_gastos)}</strong>
     </div>
   </div>
 );

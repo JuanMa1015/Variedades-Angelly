@@ -1,4 +1,4 @@
-"""Movimientos de un turno de caja: lo que explica el efectivo esperado (ventas, abonos y gastos)."""
+"""Movimientos de un turno de caja: lo que explica el efectivo esperado (ventas, abonos, gastos y compras)."""
 
 from __future__ import annotations
 
@@ -14,7 +14,9 @@ from src.infrastructure.database.models import (
     CierreCajaModel,
     ClienteFiadoTiendaModel,
     ClienteModel,
+    FacturaCompraModel,
     GastoModel,
+    ProveedorModel,
     VentaModel,
 )
 from src.infrastructure.repositories.ingresos import cobrado_en_venta
@@ -92,15 +94,36 @@ def _gastos(db: Session, caja: CierreCajaModel, hasta: datetime) -> list[Movimie
             id=g.id,
             fecha=g.fecha,
             descripcion=f"{g.categoria} · {g.descripcion}",
-            metodo_pago=None,
+            metodo_pago=g.medio_pago,
             monto=float(g.monto),
+            total=float(g.monto),
+            anulada=bool(g.anulado),
         )
         for g in gastos
+    ]
+
+
+def _compras(db: Session, caja: CierreCajaModel) -> list[MovimientoCajaResponse]:
+    """Facturas de compra del turno (solo las que quedaron en esta caja; no hay turnos viejos que reconstruir)."""
+    facturas = db.execute(select(FacturaCompraModel).where(FacturaCompraModel.caja_id == caja.id)).scalars().all()
+    proveedores = _nombres(db, ProveedorModel, {f.proveedor_id for f in facturas})
+    return [
+        MovimientoCajaResponse(
+            tipo="compra",
+            id=f.id,
+            fecha=f.fecha_creacion,
+            descripcion=f"Factura #{f.id} · {proveedores.get(f.proveedor_id, 'proveedor')}",
+            metodo_pago=f.medio_pago if f.medio_pago in ("efectivo", "transferencia", "tarjeta") else None,
+            monto=float(f.total_factura),
+            total=float(f.total_factura),
+            anulada=bool(f.anulada),
+        )
+        for f in facturas
     ]
 
 
 def movimientos_de_turno(db: Session, caja: CierreCajaModel) -> list[MovimientoCajaResponse]:
     """Ventas (lo cobrado), abonos y gastos del turno, del mas reciente al mas antiguo."""
     hasta = caja.fecha_cierre or datetime.now(UTC).replace(tzinfo=None)
-    todos = [*_ventas(db, caja, hasta), *_abonos(db, caja, hasta), *_gastos(db, caja, hasta)]
+    todos = [*_ventas(db, caja, hasta), *_abonos(db, caja, hasta), *_gastos(db, caja, hasta), *_compras(db, caja)]
     return sorted(todos, key=lambda m: m.fecha, reverse=True)

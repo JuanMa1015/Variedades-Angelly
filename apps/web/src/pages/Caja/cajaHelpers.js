@@ -36,6 +36,7 @@ export const TIPOS_MOVIMIENTO = {
   abono_tienda: { etiqueta: 'Abono', clase: 'bg-sky-50 text-sky-700' },
   abono_cartera: { etiqueta: 'Abono cartera', clase: 'bg-sky-50 text-sky-700' },
   gasto: { etiqueta: 'Gasto', clase: 'bg-red-50 text-red-700' },
+  compra: { etiqueta: 'Compra', clase: 'bg-orange-50 text-orange-700' },
 };
 
 const fila = (etiqueta, valor, fuerte = false) => (
@@ -61,7 +62,7 @@ export const buildCierreHtml = (caja, { site }) => {
   const lineas = [
     fila('Efectivo inicial:', formatMoney(caja.monto_inicial)),
     fila('Ventas en efectivo:', formatMoney(caja.monto_ventas_efectivo)),
-    fila('Gastos:', `-${formatMoney(caja.monto_gastos)}`),
+    fila('Gastos y compras en efectivo:', `-${formatMoney(caja.monto_gastos)}`),
     esperado != null ? fila('Efectivo esperado:', formatMoney(esperado), true) : '',
     caja.monto_cierre != null ? fila('Efectivo contado:', formatMoney(caja.monto_cierre), true) : '',
   ];

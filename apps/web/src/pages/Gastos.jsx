@@ -1,157 +1,69 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ListChecks, Receipt, WalletCards } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Receipt, WalletCards } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
-import { apiGet, apiPost } from '../api/httpClient';
-import ErrorMessage from '../components/ErrorMessage'
-import SuccessMessage from '../components/SuccessMessage'
-import Skeleton from '../components/Skeleton'
-import { formatDateTime, formatMoney, parseApiDate } from '../utils/format';
-
-const isCurrentMonth = (value, referenceDate) => {
-  const date = parseApiDate(value);
-  if (Number.isNaN(date.getTime())) return false;
-  return (
-    date.getMonth() === referenceDate.getMonth()
-    && date.getFullYear() === referenceDate.getFullYear()
-  );
-};
-
-const CATEGORIAS_BASE = [
-  'arriendo',
-  'servicios',
-  'nomina',
-  'pagos vendedores',
-  'transporte',
-  'otros',
-];
+import { apiPost } from '../api/httpClient';
+import { fetchCajaEstado } from '../api/cajaApi';
+import ErrorMessage from '../components/ErrorMessage';
+import PaginationControls from '../components/PaginationControls';
+import SuccessMessage from '../components/SuccessMessage';
+import GastoForm from './Gastos/GastoForm';
+import GastosLista from './Gastos/GastosLista';
+import { ResumenTarjetas, TopCategorias } from './Gastos/GastosResumen';
+import { useGastos } from './Gastos/useGastos';
 
 const Gastos = () => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  // Un administrador respalda la anulacion; quien no lo es debe pedir la clave de uno.
+  const pideAutorizacion = !(user?.role === 'admin' || user?.role === 'superadmin');
+  const { filtros, setFiltro, setPagina, texto, setTexto, lista, resumen, loading, error, setError, reload } = useGastos(token);
 
-  const [gastos, setGastos] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [cajaAbierta, setCajaAbierta] = useState(null);
   const [success, setSuccess] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  const [form, setForm] = useState({
-    categoria: 'servicios',
-    descripcion: '',
-    monto: '',
-  });
+  const [anulandoId, setAnulandoId] = useState(null);
+  const [savingAnulacion, setSavingAnulacion] = useState(false);
+  const [errorAnulacion, setErrorAnulacion] = useState('');
 
   useEffect(() => {
-    if (!token) {
-      setGastos([]);
-      setLoading(false);
-      return;
-    }
-
+    if (!token) return undefined;
     const controller = new AbortController();
-
-    const loadGastos = async () => {
-      try {
-        setLoading(true);
-        setError('');
-
-        const payload = await apiGet('/api/gastos', { signal: controller.signal });
-
-        if (controller.signal.aborted) return;
-        setGastos(Array.isArray(payload) ? payload : []);
-      } catch (err) {
-        if (controller.signal.aborted) return;
-        setError(err.message || 'No se pudo cargar gastos');
-        setGastos([]);
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadGastos();
+    // Para avisar si un gasto en efectivo no se puede registrar; si falla, el servidor decide.
+    fetchCajaEstado({ signal: controller.signal })
+      .then((estado) => { if (!controller.signal.aborted) setCajaAbierta(typeof estado?.abierta === 'boolean' ? estado.abierta : null); })
+      .catch(() => {});
     return () => controller.abort();
   }, [token]);
 
-  const resumen = useMemo(() => {
-    const now = new Date();
-    const gastosMes = gastos.filter((item) => isCurrentMonth(item.fecha, now));
-
-    const totalMes = gastosMes.reduce((acc, item) => acc + Number(item.monto || 0), 0);
-    const categorias = new Set(gastosMes.map((item) => String(item.categoria || '').toLowerCase()));
-
-    const categoriaTotalsMap = gastosMes.reduce((acc, item) => {
-      const categoria = String(item.categoria || 'sin categoría').toLowerCase();
-      acc.set(categoria, (acc.get(categoria) || 0) + Number(item.monto || 0));
-      return acc;
-    }, new Map());
-
-    const topCategorias = Array.from(categoriaTotalsMap.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([categoria, total]) => ({ categoria, total }));
-
-    return {
-      totalMes,
-      registrosMes: gastosMes.length,
-      categoriasActivas: categorias.size,
-      topCategorias,
-    };
-  }, [gastos]);
-
-  const handleFormChange = (key, value) => {
-    setForm((current) => ({
-      ...current,
-      [key]: value,
-    }));
-  };
-
-  const handleCreateGasto = async (event) => {
-    event.preventDefault();
+  const handleCreado = async () => {
     setError('');
-    setSuccess('');
+    setSuccess('Gasto registrado correctamente');
+    await reload({ silent: true });
+  };
 
-    const categoria = form.categoria.trim();
-    const descripcion = form.descripcion.trim();
-    const monto = Number(form.monto);
+  const handleToggleAnular = (id) => {
+    setErrorAnulacion('');
+    setAnulandoId((actual) => (actual === id ? null : id));
+  };
 
-    if (!categoria) {
-      setError('La categoría es obligatoria');
-      return;
-    }
-
-    if (!descripcion) {
-      setError('La descripción del gasto es obligatoria');
-      return;
-    }
-
-    if (!Number.isFinite(monto) || monto <= 0) {
-      setError('El monto debe ser mayor a cero');
-      return;
-    }
-
+  const handleAnular = async (gasto, datos) => {
+    setSavingAnulacion(true);
+    setErrorAnulacion('');
     try {
-      setSubmitting(true);
-
-      const payload = await apiPost('/api/gastos', {
-        categoria,
-        descripcion,
-        monto,
+      await apiPost(`/api/gastos/${gasto.id}/anular`, {
+        motivo: datos.motivo,
+        autorizador_usuario: datos.autorizadorUsuario || null,
+        autorizador_password: datos.autorizadorPassword || null,
       });
-
-      setGastos((current) => [payload, ...current]);
-      setForm((current) => ({
-        ...current,
-        descripcion: '',
-        monto: '',
-      }));
-      setSuccess('Gasto registrado correctamente');
+      setAnulandoId(null);
+      setSuccess(`Gasto #${gasto.id} anulado: ya no cuenta en la caja`);
+      await reload({ silent: true });
     } catch (err) {
-      setError(err.message || 'No se pudo registrar el gasto');
+      setErrorAnulacion(err.message || 'No fue posible anular el gasto');
     } finally {
-      setSubmitting(false);
+      setSavingAnulacion(false);
     }
   };
+
+  const hayFiltros = Boolean(texto || filtros.categoria || filtros.medio || filtros.estado !== 'todos');
 
   return (
     <div className="space-y-6">
@@ -163,109 +75,17 @@ const Gastos = () => {
         </div>
       </div>
 
-      {loading ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"><Skeleton lines={2} /></div>
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"><Skeleton lines={2} /></div>
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"><Skeleton lines={2} /></div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Total mes</p>
-            <p className="mt-2 text-3xl font-bold text-gray-900">{formatMoney(resumen.totalMes)}</p>
-          </div>
-
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Registros mes</p>
-            <p className="mt-2 text-3xl font-bold text-gray-900">{resumen.registrosMes}</p>
-          </div>
-
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Categorías activas</p>
-            <p className="mt-2 text-3xl font-bold text-gray-900">{resumen.categoriasActivas}</p>
-          </div>
-        </div>
-      )}
+      <ResumenTarjetas resumen={resumen} loading={loading} mes={filtros.mes} onMes={(mes) => setFiltro({ mes })} />
 
       <ErrorMessage message={error} onDismiss={() => setError('')} />
       <SuccessMessage message={success} onDismiss={() => setSuccess('')} />
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <section className="xl:col-span-2 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6 xl:col-span-2">
           <h2 className="mb-4 text-xl font-bold text-gray-900">Registrar gasto</h2>
-
-          <form className="space-y-3" onSubmit={handleCreateGasto}>
-            <select
-              value={form.categoria}
-              onChange={(event) => handleFormChange('categoria', event.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
-            >
-              {CATEGORIAS_BASE.map((categoria) => (
-                <option key={categoria} value={categoria}>
-                  {categoria}
-                </option>
-              ))}
-            </select>
-
-            <textarea
-              value={form.descripcion}
-              onChange={(event) => handleFormChange('descripcion', event.target.value)}
-              className="h-24 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
-              placeholder="Detalle del gasto"
-              maxLength={255}
-            />
-
-            <input
-              type="number"
-              min="1"
-              value={form.monto}
-              onChange={(event) => handleFormChange('monto', event.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none"
-              placeholder="Monto"
-            />
-
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full rounded-lg bg-rosewood px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300"
-            >
-              {submitting ? 'Guardando gasto...' : 'Guardar gasto'}
-            </button>
-          </form>
+          <GastoForm cajaAbierta={cajaAbierta} onCreated={handleCreado} />
         </section>
-
-        <aside className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
-          <div className="mb-3 flex items-center gap-2">
-            <ListChecks className="h-5 w-5 text-rosewood" />
-            <h3 className="text-lg font-bold text-gray-900">Top categorías del mes</h3>
-          </div>
-
-          {resumen.topCategorias.length === 0 ? (
-            <p className="text-sm text-gray-500">Aún no hay gastos para este mes.</p>
-          ) : (
-            <div className="space-y-3">
-              {resumen.topCategorias.map((item) => (
-                <div key={item.categoria}>
-                  <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="font-medium text-gray-700">{item.categoria}</span>
-                    <span className="font-semibold text-gray-900">{formatMoney(item.total)}</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-gray-200">
-                    <div
-                      className="h-full rounded-full bg-rosewood"
-                      style={{
-                        width: `${
-                          resumen.totalMes > 0 ? Math.min(100, (item.total / resumen.totalMes) * 100) : 0
-                        }%`,
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </aside>
+        <TopCategorias resumen={resumen} />
       </div>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
@@ -273,51 +93,21 @@ const Gastos = () => {
           <Receipt className="h-5 w-5 text-rosewood" />
           Historial de gastos
         </h2>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[820px] text-left text-sm">
-            <thead className="border-b border-gray-200 bg-gray-50">
-              <tr>
-                <th className="px-3 py-3 font-semibold text-gray-700">Fecha</th>
-                <th className="px-3 py-3 font-semibold text-gray-700">Categoría</th>
-                <th className="px-3 py-3 font-semibold text-gray-700">Descripción</th>
-                <th className="px-3 py-3 font-semibold text-gray-700">Monto</th>
-                <th className="px-3 py-3 font-semibold text-gray-700">Registrado por</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && (
-                <tr>
-                  <td colSpan="5" className="px-3 py-8 text-center text-gray-500">
-                    <Skeleton lines={1} />
-                  </td>
-                </tr>
-              )}
-
-              {!loading && gastos.length === 0 && (
-                <tr>
-                  <td colSpan="5" className="px-3 py-8 text-center text-gray-500">
-                    No hay gastos registrados.
-                  </td>
-                </tr>
-              )}
-
-              {!loading && gastos.map((gasto) => (
-                <tr key={gasto.id} className="border-b border-gray-100">
-                  <td className="px-3 py-3 text-gray-700">{formatDateTime(gasto.fecha)}</td>
-                  <td className="px-3 py-3">
-                    <span className="rounded-full bg-blush-100 px-2 py-1 text-xs font-semibold text-rosewood">
-                      {gasto.categoria}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3 text-gray-700">{gasto.descripcion}</td>
-                  <td className="px-3 py-3 font-semibold text-gray-900">{formatMoney(gasto.monto)}</td>
-                  <td className="px-3 py-3 text-gray-700">{gasto.registrado_por}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <GastosLista
+          gastos={lista.data}
+          loading={loading}
+          hayFiltros={hayFiltros}
+          texto={texto}
+          onTexto={setTexto}
+          filtros={filtros}
+          onFiltro={setFiltro}
+          anulacion={{ id: anulandoId, pideAutorizacion, saving: savingAnulacion, error: errorAnulacion, onToggle: handleToggleAnular, onAnular: handleAnular }}
+        />
+        {lista.totalPages > 1 && (
+          <div className="mt-4">
+            <PaginationControls currentPage={filtros.page} totalPages={lista.totalPages} onPageChange={setPagina} />
+          </div>
+        )}
       </section>
     </div>
   );

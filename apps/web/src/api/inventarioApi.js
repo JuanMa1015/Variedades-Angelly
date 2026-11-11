@@ -31,7 +31,3 @@ export const fetchMovimientosStock = (productoId, { page = 1, limit = 10, signal
 
 // Productos agotados o por agotarse agrupados por proveedor, con la cantidad sugerida y el costo estimado.
 export const fetchReposicion = ({ signal } = {}) => apiGet('/api/productos/reposicion?catalogo=tienda', sinCache(signal));
-
-export const registrarPedido = ({ proveedorId, descripcion, monto }) => (
-  apiPost('/api/proveedores/pedidos', { proveedor_id: proveedorId, descripcion, monto_estimado: monto })
-);

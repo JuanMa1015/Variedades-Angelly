@@ -36,7 +36,7 @@ const DetalleTurno = ({ caja, version, isSuperadmin, onPrint, onEdit, onDelete }
       <Dato titulo="Efectivo" valor={formatMoney(caja.monto_ventas_efectivo)} />
       <Dato titulo="Transferencias" valor={formatMoney(caja.monto_ventas_transferencia)} />
       <Dato titulo="Tarjeta" valor={formatMoney(caja.monto_ventas_tarjeta)} />
-      <Dato titulo="Gastos" valor={formatMoney(caja.monto_gastos)} />
+      <Dato titulo="Gastos y compras" valor={formatMoney(caja.monto_gastos)} />
       <Dato titulo="Esperado" valor={caja.saldo_esperado != null ? formatMoney(caja.saldo_esperado) : '—'} />
       <Dato titulo="Contado" valor={caja.monto_cierre != null ? formatMoney(caja.monto_cierre) : '—'} />
     </div>

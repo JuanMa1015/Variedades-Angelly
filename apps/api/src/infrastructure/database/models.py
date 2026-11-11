@@ -234,7 +234,7 @@ class PedidoProveedorModel(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     proveedor_id: Mapped[int] = mapped_column(ForeignKey("proveedores.id"), nullable=False)
-    descripcion: Mapped[str] = mapped_column(String(255), nullable=False)
+    descripcion: Mapped[str] = mapped_column(String(1000), nullable=False)
     monto_estimado: Mapped[float] = mapped_column(_dinero(), nullable=False)
     estado: Mapped[str] = mapped_column(String(20), nullable=False, default="enviado")
     creado_por: Mapped[str] = mapped_column(String(50), nullable=False)
@@ -248,6 +248,10 @@ class PedidoProveedorModel(Base):
         DateTime(timezone=False),
         nullable=True,
     )
+    # Ciclo de vida: enviado -> recibido (con o sin factura) | cancelado. `aprobado_por` ya no se usa.
+    resuelto_por: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    nota: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    factura_id: Mapped[int | None] = mapped_column(ForeignKey("facturas_compra.id"), nullable=True)
 
     def __repr__(self) -> str:
         return f"PedidoProveedorModel(id={self.id!r}, descripcion={self.descripcion!r})"
@@ -267,6 +271,19 @@ class FacturaCompraModel(Base):
     numero_factura: Mapped[str | None] = mapped_column(String(20), nullable=True)
     encomienda: Mapped[float | None] = mapped_column(_dinero(), nullable=True, default=0.0)
     porcentaje_ganancia: Mapped[float | None] = mapped_column(Float, nullable=True, default=0.70)
+    # Como se pago la compra. NULL = sin dato (facturas viejas): no toca la caja. Solo el efectivo sale del cajon.
+    medio_pago: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    caja_id: Mapped[int | None] = mapped_column(
+        ForeignKey("cierres_caja.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    # Una factura no se borra: se anula con motivo y autorizacion de un administrador (devuelve el stock).
+    anulada: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=expression.false())
+    anulada_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), nullable=True)
+    anulada_por: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    autorizada_por: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    motivo_anulacion: Mapped[str | None] = mapped_column(String(200), nullable=True)
     proveedor: Mapped["ProveedorModel"] = relationship(
         "ProveedorModel",
         back_populates="facturas_compra",
@@ -327,6 +344,8 @@ class GastoModel(Base):
         default=_utcnow_naive,
     )
     registrado_por: Mapped[str] = mapped_column(String(50), nullable=False)
+    # Solo el gasto pagado en efectivo sale del cajon y resta del efectivo esperado de la caja.
+    medio_pago: Mapped[str] = mapped_column(String(20), nullable=False, default="efectivo", server_default="efectivo")
 
     # Turno de caja al que pertenece (se asigna solo al crear si hay una caja abierta).
     caja_id: Mapped[int | None] = mapped_column(
@@ -334,6 +353,13 @@ class GastoModel(Base):
         nullable=True,
         index=True,
     )
+
+    # Un gasto no se borra: se anula con motivo y autorizacion de un administrador.
+    anulado: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=expression.false())
+    anulado_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), nullable=True)
+    anulado_por: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    autorizado_por: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    motivo_anulacion: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     def __repr__(self) -> str:
         return f"GastoModel(id={self.id!r}, categoria={self.categoria!r})"
@@ -511,5 +537,5 @@ def _asignar_turno_abierto(_mapper, connection, target) -> None:
     target.caja_id = abierta.id
 
 
-for _modelo in (VentaModel, AbonoCarteraModel, AbonoTiendaModel, GastoModel):
+for _modelo in (VentaModel, AbonoCarteraModel, AbonoTiendaModel, GastoModel, FacturaCompraModel):
     event.listen(_modelo, "before_insert", _asignar_turno_abierto)
