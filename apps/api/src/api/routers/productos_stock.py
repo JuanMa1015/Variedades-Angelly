@@ -15,7 +15,7 @@ from src.api.routers.productos import ProductoResponse, _to_producto_response_fr
 from src.api.services.auditoria import registrar_auditoria
 from src.api.services.stock import ETIQUETA_MOTIVO, MOTIVOS_POR_MODO, ModoAjuste, MotivoAjuste, mover_stock
 from src.infrastructure.database.connection import get_db
-from src.infrastructure.database.models import MovimientoStockModel, ProductoModel
+from src.infrastructure.database.models import MovimientoStockModel, ProductoModel, ProveedorModel
 
 router = APIRouter(tags=["productos-stock"])
 
@@ -84,6 +84,35 @@ class ResumenInventarioResponse(BaseModel):
     urgentes: list[ProductoUrgente]
 
 
+class ProductoReposicion(BaseModel):
+    id: int
+    nombre: str
+    stock_actual: int
+    stock_minimo: int
+    sugerido: int  # unidades para volver a 2 veces el minimo (al menos 1)
+    costo: float
+
+
+class GrupoReposicion(BaseModel):
+    """Lo que hay que pedir a un proveedor (o los productos sin proveedor asignado)."""
+
+    proveedor_id: int | None
+    proveedor_nombre: str | None
+    telefono: str | None
+    productos: list[ProductoReposicion]
+    monto_estimado: float
+
+
+class ReposicionResponse(BaseModel):
+    grupos: list[GrupoReposicion]
+    total_productos: int
+
+
+def _sugerido(stock_actual: int, stock_minimo: int) -> int:
+    """Pedir hasta tener el doble del minimo: alcanza para volver a vender sin pedir cada semana."""
+    return max(1, int(stock_minimo) * 2 - int(stock_actual))
+
+
 def _to_movimiento(m: MovimientoStockModel) -> MovimientoStockResponse:
     return MovimientoStockResponse(
         id=m.id,
@@ -138,6 +167,48 @@ def resumen_inventario(
             for p in urgentes
         ],
     )
+
+
+@router.get("/api/productos/reposicion", response_model=ReposicionResponse)
+def productos_a_reponer(
+    catalogo: Literal["tienda", "cartera"] = Query(default="tienda"),
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+) -> ReposicionResponse:
+    """Productos agotados o por agotarse, agrupados por proveedor con la cantidad sugerida y el costo estimado."""
+    filas = db.execute(
+        select(ProductoModel, ProveedorModel)
+        .outerjoin(ProveedorModel, ProveedorModel.id == ProductoModel.proveedor_id)
+        .where(
+            ProductoModel.activo.is_(True),
+            ProductoModel.catalogo == catalogo,
+            ProductoModel.stock_actual <= ProductoModel.stock_minimo,
+        )
+        .order_by(ProductoModel.stock_actual.asc(), ProductoModel.nombre.asc()),
+    ).all()
+
+    grupos: dict[int | None, GrupoReposicion] = {}
+    for producto, proveedor in filas:
+        clave = proveedor.id if proveedor is not None else None
+        if clave not in grupos:
+            grupos[clave] = GrupoReposicion(
+                proveedor_id=clave,
+                proveedor_nombre=proveedor.nombre if proveedor is not None else None,
+                telefono=proveedor.telefono if proveedor is not None else None,
+                productos=[],
+                monto_estimado=0.0,
+            )
+        sugerido = _sugerido(producto.stock_actual, producto.stock_minimo)
+        grupo = grupos[clave]
+        grupo.productos.append(ProductoReposicion(
+            id=producto.id, nombre=producto.nombre, stock_actual=producto.stock_actual,
+            stock_minimo=producto.stock_minimo, sugerido=sugerido, costo=float(producto.precio_costo),
+        ))
+        grupo.monto_estimado += float(producto.precio_costo) * sugerido
+
+    # Primero los proveedores por nombre; lo que no tiene proveedor al final (no se puede pedir hasta asignarlo).
+    ordenados = sorted(grupos.values(), key=lambda g: (g.proveedor_id is None, (g.proveedor_nombre or "").casefold()))
+    return ReposicionResponse(grupos=ordenados, total_productos=len(filas))
 
 
 @router.post("/api/productos/{producto_id}/ajustes-stock", response_model=AjusteStockResponse)

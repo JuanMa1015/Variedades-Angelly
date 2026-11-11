@@ -7,6 +7,7 @@ const apiPostMock = vi.hoisted(() => vi.fn());
 const apiPatchMock = vi.hoisted(() => vi.fn());
 const apiDeleteMock = vi.hoisted(() => vi.fn());
 const apiUploadMock = vi.hoisted(() => vi.fn());
+const apiRequestMock = vi.hoisted(() => vi.fn());
 const confirmMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../../auth/AuthContext', () => ({
@@ -19,6 +20,7 @@ vi.mock('../../api/httpClient', () => ({
   apiPatch: apiPatchMock,
   apiPost: apiPostMock,
   apiUpload: apiUploadMock,
+  apiRequest: apiRequestMock,
 }));
 
 vi.mock('../../components/ErrorMessage', () => ({
@@ -84,6 +86,10 @@ const mockProveedores = [
   { id: 1, nombre: 'Distribuidora XYZ', activo: true },
 ];
 
+// La lista se dibuja como tabla (escritorio) y como tarjetas (celular): los nombres salen dos veces.
+const aparece = (nombre) => expect(screen.getAllByText(nombre).length).toBeGreaterThan(0);
+const filaTabla = async (nombre) => (await screen.findAllByText(nombre)).map((el) => el.closest('tr')).find(Boolean);
+
 describe('Inventario', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -103,6 +109,7 @@ describe('Inventario', () => {
     apiPostMock.mockResolvedValue({ id: 3 });
     apiPatchMock.mockResolvedValue({});
     apiDeleteMock.mockResolvedValue(undefined);
+    apiRequestMock.mockResolvedValue({});
   });
 
   it('renderiza y carga productos al montarse', async () => {
@@ -111,8 +118,8 @@ describe('Inventario', () => {
 
     expect(screen.getByText('Inventario')).toBeTruthy();
     await waitFor(() => {
-      expect(screen.getByText('Arroz Diana')).toBeTruthy();
-      expect(screen.getAllByText('Aceite Gourmet').length).toBeGreaterThan(0);
+      aparece('Arroz Diana');
+      aparece('Aceite Gourmet');
     });
   });
 
@@ -121,7 +128,7 @@ describe('Inventario', () => {
     render(<Inventario />);
 
     await waitFor(() => {
-      expect(screen.getByText('Arroz Diana')).toBeTruthy();
+      aparece('Arroz Diana');
     });
 
     fireEvent.click(screen.getByText('Agregar producto'));
@@ -133,7 +140,7 @@ describe('Inventario', () => {
     render(<Inventario />);
 
     await waitFor(() => {
-      expect(screen.getByText('Arroz Diana')).toBeTruthy();
+      aparece('Arroz Diana');
     });
 
     const editButtons = screen.getAllByTitle('Editar producto');
@@ -149,7 +156,7 @@ describe('Inventario', () => {
     render(<Inventario />);
 
     await waitFor(() => {
-      expect(screen.getByText('Arroz Diana')).toBeTruthy();
+      aparece('Arroz Diana');
     });
 
     const deleteButtons = screen.getAllByTitle('Desactivar producto');
@@ -168,7 +175,7 @@ describe('Inventario', () => {
     render(<Inventario />);
 
     await waitFor(() => {
-      expect(screen.getByText('Arroz Diana')).toBeTruthy();
+      aparece('Arroz Diana');
     });
     expect(screen.queryAllByTitle('Desactivar producto')).toHaveLength(0);
   });
@@ -184,14 +191,14 @@ describe('Inventario', () => {
   const crearProductoConImagen = async (direccion) => {
     const Inventario = (await import('../Inventario')).default;
     render(<Inventario />);
-    await waitFor(() => expect(screen.getByText('Arroz Diana')).toBeTruthy());
+    await waitFor(() => aparece('Arroz Diana'));
 
     fireEvent.click(screen.getByText('Agregar producto'));
-    fireEvent.change(screen.getByPlaceholderText('Nombre'), { target: { value: 'Producto Nuevo' } });
-    fireEvent.change(screen.getByPlaceholderText('Precio costo (ej: 3500)'), { target: { value: '1000' } });
-    fireEvent.change(screen.getByPlaceholderText('Precio venta (ej: 5000)'), { target: { value: '1500' } });
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Producto Nuevo' } });
+    fireEvent.change(screen.getAllByLabelText('Precio de costo', { selector: 'input' })[0], { target: { value: '1000' } });
+    fireEvent.change(screen.getAllByLabelText('Precio de venta', { selector: 'input' })[0], { target: { value: '1500' } });
     fireEvent.click(screen.getAllByText('Pegar URL')[0]);
-    fireEvent.change(screen.getByPlaceholderText('Pega la dirección de la imagen: se guarda una copia'), { target: { value: direccion } });
+    fireEvent.change(screen.getByLabelText('Dirección de la imagen'), { target: { value: direccion } });
     fireEvent.click(screen.getAllByRole('button', { name: /Agregar producto/ }).pop());
   };
 
@@ -287,7 +294,7 @@ describe('Inventario', () => {
     });
     const Inventario = (await import('../Inventario')).default;
     render(<Inventario />);
-    await screen.findByText('Arroz Diana');
+    await screen.findAllByText('Arroz Diana');
 
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/ }));
 
@@ -308,11 +315,11 @@ describe('Inventario', () => {
     });
     const Inventario = (await import('../Inventario')).default;
     render(<Inventario />);
-    await screen.findByText('Sin Stock');
+    await screen.findAllByText('Sin Stock');
 
-    expect(within(screen.getByText('Sin Stock').closest('tr')).getByText('Agotado')).toBeTruthy();
-    expect(within(screen.getByText('Poco Stock').closest('tr')).getByText('Bajo')).toBeTruthy();
-    expect(within(screen.getByText('Buen Stock').closest('tr')).queryByText('Agotado')).toBeNull();
+    expect(within(await filaTabla('Sin Stock')).getByText('Agotado')).toBeTruthy();
+    expect(within(await filaTabla('Poco Stock')).getByText('Bajo')).toBeTruthy();
+    expect(within(await filaTabla('Buen Stock')).queryByText('Agotado')).toBeNull();
   });
 
   // -- Edicion segura --
@@ -320,7 +327,7 @@ describe('Inventario', () => {
   const abrirEdicion = async (nombre = 'Arroz Diana') => {
     const Inventario = (await import('../Inventario')).default;
     render(<Inventario />);
-    const fila = (await screen.findByText(nombre)).closest('tr');
+    const fila = await filaTabla(nombre);
     fireEvent.click(within(fila).getByTitle('Editar producto'));
     return screen.findByRole('button', { name: 'Guardar cambios' });
   };
@@ -356,7 +363,7 @@ describe('Inventario', () => {
   it('quitar el proveedor se envia como null', async () => {
     const guardar = await abrirEdicion('Aceite Gourmet');
 
-    fireEvent.change(screen.getByLabelText('Proveedor'), { target: { value: '' } });
+    fireEvent.change(within(screen.getAllByTestId('modal')[0]).getByLabelText('Proveedor'), { target: { value: '' } });
     fireEvent.click(guardar);
 
     await waitFor(() => expect(apiPatchMock).toHaveBeenCalledWith('/api/productos/2', { proveedor_id: null }));
@@ -478,12 +485,13 @@ describe('Inventario', () => {
   const procesarCodigo = async (codigo, extra = {}) => {
     const Inventario = (await import('../Inventario')).default;
     render(<Inventario />);
-    await screen.findByText('Arroz Diana');
+    await screen.findAllByText('Arroz Diana');
     fireEvent.click(screen.getByText('Agregar producto'));
-    fireEvent.click(screen.getByRole('button', { name: /Por código de barras/ }));
-    fireEvent.change(screen.getByPlaceholderText('Escanear código de barras'), { target: { value: codigo } });
-    if (extra.nombre) fireEvent.change(screen.getByPlaceholderText('Nombre (si es nuevo)'), { target: { value: extra.nombre } });
-    fireEvent.change(screen.getByPlaceholderText('Cantidad a ingresar (ej: 6)'), { target: { value: '6' } });
+    fireEvent.click(screen.getByRole('tab', { name: /Por código de barras/ }));
+    fireEvent.change(screen.getByLabelText('Código de barras'), { target: { value: codigo } });
+    if (extra.nombre) fireEvent.change(screen.getByLabelText('Nombre (solo si es nuevo)'), { target: { value: extra.nombre } });
+    fireEvent.change(screen.getByLabelText('Cantidad a ingresar'), { target: { value: '6' } });
+    if (extra.venta) fireEvent.change(screen.getAllByLabelText('Precio de venta', { selector: 'input' })[0], { target: { value: String(extra.venta) } });
     fireEvent.click(screen.getByRole('button', { name: /Procesar código/ }));
   };
 
@@ -512,8 +520,255 @@ describe('Inventario', () => {
       return Promise.resolve([]);
     });
 
-    await procesarCodigo('7709999999999', { nombre: 'Producto Nuevo' });
+    await procesarCodigo('7709999999999', { nombre: 'Producto Nuevo', venta: 4500 });
 
     await waitFor(() => expect(apiPostMock).toHaveBeenCalledWith('/api/productos', expect.objectContaining({ nombre: 'Producto Nuevo', codigo_barras: '7709999999999', stock_actual: 6 })));
+  });
+
+  // -- Paso 2: desactivados, proveedor, historial, reposicion y alta con etiquetas --
+
+  it('el administrador ve los desactivados y puede reactivarlos; el vendedor no tiene ese filtro', async () => {
+    useAuthMock.mockReturnValue({ token: 'test-token', user: { username: 'vendedor1', role: 'vendedor' } });
+    const Inventario = (await import('../Inventario')).default;
+    const { unmount } = render(<Inventario />);
+    await screen.findAllByText('Arroz Diana');
+    expect(screen.queryByRole('button', { name: 'Desactivados' })).toBeNull();
+    unmount();
+
+    useAuthMock.mockReturnValue({ token: 'test-token', user: { username: 'admin', role: 'admin' } });
+    apiGetMock.mockImplementation((endpoint) => {
+      if (endpoint.includes('productos/resumen')) return Promise.resolve(mockResumen);
+      if (endpoint.includes('solo_inactivos=true')) {
+        return Promise.resolve({ data: [{ ...mockProductos[0], id: 7, nombre: 'Producto Viejo', activo: false }], page: { total: 1, total_pages: 1 } });
+      }
+      if (endpoint.includes('productos/paginados')) return Promise.resolve({ data: mockProductos, page: { total: 2, total_pages: 1 } });
+      return Promise.resolve(mockProveedores);
+    });
+    render(<Inventario />);
+    await screen.findAllByText('Arroz Diana');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Desactivados' }));
+    const fila = await filaTabla('Producto Viejo');
+    expect(within(fila).queryByTitle('Editar producto')).toBeNull();
+    fireEvent.click(within(fila).getByRole('button', { name: /Reactivar/ }));
+
+    await waitFor(() => expect(apiRequestMock).toHaveBeenCalledWith('/api/productos/7/reactivar', { method: 'PUT' }));
+  });
+
+  it('el filtro por proveedor se envia al servidor', async () => {
+    const Inventario = (await import('../Inventario')).default;
+    render(<Inventario />);
+    await screen.findAllByText('Arroz Diana');
+
+    fireEvent.change(screen.getByLabelText('Proveedor'), { target: { value: '1' } });
+
+    await waitFor(() => expect(consultas().at(-1)).toContain('proveedor_id=1'));
+  });
+
+  it('el historial muestra por que cambio el stock: ventas, compras y ajustes', async () => {
+    apiGetMock.mockImplementation((endpoint) => {
+      if (endpoint.includes('productos/resumen')) return Promise.resolve(mockResumen);
+      if (endpoint.includes('movimientos-stock')) {
+        return Promise.resolve({
+          data: [
+            { id: 3, producto_id: 1, fecha: '2026-11-10T20:00:00', tipo: 'ajuste', delta: -2, stock_resultante: 48, motivo: 'Merma: se cayeron', usuario: 'vendedor1' },
+            { id: 2, producto_id: 1, fecha: '2026-11-09T20:00:00', tipo: 'venta', delta: -3, stock_resultante: 50, usuario: 'vendedor1', referencia_tipo: 'venta', referencia_id: 14 },
+            { id: 1, producto_id: 1, fecha: '2026-11-08T20:00:00', tipo: 'factura_compra', delta: 20, stock_resultante: 53, usuario: 'admin', referencia_tipo: 'factura', referencia_id: 5 },
+          ],
+          page: { total: 3, total_pages: 1, current_page: 1, limit: 8 },
+        });
+      }
+      if (endpoint.includes('productos/paginados')) return Promise.resolve({ data: mockProductos, page: { total: 2, total_pages: 1 } });
+      return Promise.resolve(mockProveedores);
+    });
+    const Inventario = (await import('../Inventario')).default;
+    render(<Inventario />);
+    const fila = await filaTabla('Arroz Diana');
+
+    fireEvent.click(within(fila).getByTitle('Historial de stock'));
+
+    expect(await screen.findByText('Ajuste')).toBeTruthy();
+    expect(screen.getByText('Venta #14')).toBeTruthy();
+    expect(screen.getByText('Factura #5')).toBeTruthy();
+    expect(screen.getByText('-3')).toBeTruthy();
+    expect(screen.getByText('+20')).toBeTruthy();
+    expect(screen.getByText(/Merma: se cayeron/)).toBeTruthy();
+  });
+
+  it('un producto sin movimientos explica que el historial empieza desde ahora', async () => {
+    apiGetMock.mockImplementation((endpoint) => {
+      if (endpoint.includes('productos/resumen')) return Promise.resolve(mockResumen);
+      if (endpoint.includes('movimientos-stock')) return Promise.resolve({ data: [], page: { total: 0, total_pages: 1 } });
+      if (endpoint.includes('productos/paginados')) return Promise.resolve({ data: mockProductos, page: { total: 2, total_pages: 1 } });
+      return Promise.resolve(mockProveedores);
+    });
+    const Inventario = (await import('../Inventario')).default;
+    render(<Inventario />);
+
+    fireEvent.click(within(await filaTabla('Arroz Diana')).getByTitle('Historial de stock'));
+
+    expect(await screen.findByText(/Todavía no hay movimientos registrados/)).toBeTruthy();
+  });
+
+  // -- Reposicion --
+
+  const reposicion = {
+    total_productos: 3,
+    grupos: [
+      {
+        proveedor_id: 1, proveedor_nombre: 'Distribuidora XYZ', telefono: '3001112233', monto_estimado: 24000,
+        productos: [
+          { id: 2, nombre: 'Aceite Gourmet', stock_actual: 3, stock_minimo: 5, sugerido: 7, costo: 2000 },
+          { id: 5, nombre: 'Galleta', stock_actual: 0, stock_minimo: 3, sugerido: 6, costo: 1500 },
+        ],
+      },
+      { proveedor_id: null, proveedor_nombre: null, telefono: null, monto_estimado: 100, productos: [{ id: 9, nombre: 'Suelto', stock_actual: 0, stock_minimo: 0, sugerido: 1, costo: 100 }] },
+    ],
+  };
+
+  const abrirReposicion = async (datos = reposicion) => {
+    apiGetMock.mockImplementation((endpoint) => {
+      if (endpoint.includes('productos/reposicion')) return Promise.resolve(datos);
+      if (endpoint.includes('productos/resumen')) return Promise.resolve(mockResumen);
+      if (endpoint.includes('productos/paginados')) return Promise.resolve({ data: mockProductos, page: { total: 2, total_pages: 1 } });
+      return Promise.resolve(mockProveedores);
+    });
+    const Inventario = (await import('../Inventario')).default;
+    render(<Inventario />);
+    await screen.findAllByText('Arroz Diana');
+    fireEvent.click(screen.getByRole('button', { name: /Reponer stock/ }));
+  };
+
+  it('reponer agrupa por proveedor con lo sugerido y avisa de lo que no tiene proveedor', async () => {
+    await abrirReposicion();
+
+    expect(await screen.findByText('Distribuidora XYZ')).toBeTruthy();
+    expect(screen.getByLabelText('Cantidad de Aceite Gourmet')).toHaveValue(7);
+    expect(screen.getByLabelText('Cantidad de Galleta')).toHaveValue(6);
+    expect(screen.getByText(/23\.000 estimado/)).toBeTruthy();  // 7*2000 + 6*1500 = 23.000
+    expect(screen.getByText('Sin proveedor asignado')).toBeTruthy();
+    expect(screen.getByText(/No se pueden pedir hasta que tengan proveedor/)).toBeTruthy();
+  });
+
+  it('se puede cambiar la cantidad o descartar un producto y el estimado se recalcula', async () => {
+    await abrirReposicion();
+    await screen.findByText('Distribuidora XYZ');
+
+    fireEvent.change(screen.getByLabelText('Cantidad de Aceite Gourmet'), { target: { value: '10' } });
+    expect(screen.getByText(/29\.000 estimado/)).toBeTruthy();   // 10*2000 + 6*1500
+    fireEvent.click(screen.getByLabelText('Incluir Galleta'));
+    expect(screen.getByText(/20\.000 estimado/)).toBeTruthy();   // solo el aceite
+  });
+
+  it('registrar el pedido lo guarda en el servidor y abre WhatsApp con el detalle', async () => {
+    const abrirVentana = vi.spyOn(window, 'open').mockImplementation(() => null);
+    apiPostMock.mockResolvedValue({ id: 31 });
+    await abrirReposicion();
+    await screen.findByText('Distribuidora XYZ');
+
+    fireEvent.click(screen.getByRole('button', { name: /Registrar pedido y enviar por WhatsApp/ }));
+
+    await waitFor(() => expect(apiPostMock).toHaveBeenCalledWith('/api/proveedores/pedidos', {
+      proveedor_id: 1,
+      descripcion: '7× Aceite Gourmet; 6× Galleta',
+      monto_estimado: 23000,
+    }));
+    expect(await screen.findByText(/Pedido #31 registrado/)).toBeTruthy();
+    const enlace = decodeURIComponent(abrirVentana.mock.calls[0][0]);
+    expect(enlace).toContain('https://wa.me/573001112233?text=');
+    expect(enlace).toContain('pedido #31');
+    expect(enlace).toContain('- 7× Aceite Gourmet');
+    expect(enlace).toContain('- 6× Galleta');
+    abrirVentana.mockRestore();
+  });
+
+  it('si el servidor rechaza el pedido muestra el motivo y no abre WhatsApp', async () => {
+    const abrirVentana = vi.spyOn(window, 'open').mockImplementation(() => null);
+    apiPostMock.mockRejectedValue(new Error('Proveedor no encontrado'));
+    await abrirReposicion();
+    await screen.findByText('Distribuidora XYZ');
+
+    fireEvent.click(screen.getByRole('button', { name: /Registrar pedido y enviar por WhatsApp/ }));
+
+    expect(await screen.findByText('Proveedor no encontrado')).toBeTruthy();
+    expect(abrirVentana).not.toHaveBeenCalled();
+    abrirVentana.mockRestore();
+  });
+
+  it('si no falta nada lo dice', async () => {
+    await abrirReposicion({ grupos: [], total_productos: 0 });
+
+    expect(await screen.findByText(/Nada que pedir por ahora/)).toBeTruthy();
+  });
+
+  // -- Alta con etiquetas --
+
+  it('el alta manual tiene etiquetas, calcula el margen y envia los precios como numeros', async () => {
+    apiPostMock.mockResolvedValue({ id: 3 });
+    const Inventario = (await import('../Inventario')).default;
+    render(<Inventario />);
+    await screen.findAllByText('Arroz Diana');
+
+    fireEvent.click(screen.getByText('Agregar producto'));
+    ['Nombre', 'Código de barras', 'Stock inicial', 'Stock mínimo', 'Proveedor'].forEach((etiqueta) => {
+      expect(screen.getAllByLabelText(etiqueta).length).toBeGreaterThan(0);
+    });
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Aceite Nuevo' } });
+    fireEvent.change(screen.getAllByLabelText('Precio de costo', { selector: 'input' })[0], { target: { value: '3500' } });
+    fireEvent.change(screen.getAllByLabelText('Precio de venta', { selector: 'input' })[0], { target: { value: '5000' } });
+    fireEvent.change(screen.getByLabelText('Stock inicial'), { target: { value: '12' } });
+    expect(screen.getByText(/Margen: 30%/)).toBeTruthy();
+    fireEvent.click(screen.getAllByRole('button', { name: /Agregar producto/ }).pop());
+
+    await waitFor(() => expect(apiPostMock).toHaveBeenCalledWith('/api/productos', expect.objectContaining({
+      nombre: 'Aceite Nuevo', precio_costo: 3500, precio_venta: 5000, stock_actual: 12, stock_minimo: 0, catalogo: 'tienda',
+    })));
+    expect(await screen.findByText('Producto agregado correctamente')).toBeTruthy();
+  });
+
+  it('el alta no deja guardar sin nombre ni con precio de venta en cero, y avisa si se vende bajo el costo', async () => {
+    const Inventario = (await import('../Inventario')).default;
+    render(<Inventario />);
+    await screen.findAllByText('Arroz Diana');
+    fireEvent.click(screen.getByText('Agregar producto'));
+    const guardar = () => fireEvent.click(screen.getAllByRole('button', { name: /Agregar producto/ }).pop());
+
+    guardar();
+    expect(await screen.findByText('Escribe el nombre del producto')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Regalo' } });
+    guardar();
+    expect(await screen.findByText('El precio de venta debe ser mayor a 0')).toBeTruthy();
+
+    confirmMock.mockResolvedValue(false);
+    fireEvent.change(screen.getAllByLabelText('Precio de costo', { selector: 'input' })[0], { target: { value: '3000' } });
+    fireEvent.change(screen.getAllByLabelText('Precio de venta', { selector: 'input' })[0], { target: { value: '2000' } });
+    expect(screen.getByText(/por debajo del costo/)).toBeTruthy();
+    guardar();
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: 'Precio por debajo del costo' })));
+    expect(apiPostMock).not.toHaveBeenCalled();
+  });
+
+  it('un codigo nuevo sin nombre no se crea y lo explica', async () => {
+    apiGetMock.mockImplementation((endpoint) => {
+      if (endpoint.includes('productos/resumen')) return Promise.resolve(mockResumen);
+      if (endpoint.includes('q=7700000000001')) return Promise.resolve({ data: [], page: { total: 0, total_pages: 1 } });
+      if (endpoint.includes('productos/paginados')) return Promise.resolve({ data: mockProductos, page: { total: 2, total_pages: 1 } });
+      return Promise.resolve(mockProveedores);
+    });
+
+    await procesarCodigo('7700000000001');
+
+    expect(await screen.findByText('Para un código nuevo, ingresa el nombre del producto')).toBeTruthy();
+    expect(apiPostMock).not.toHaveBeenCalled();
+  });
+
+  it('en celular cada producto tiene su tarjeta con las mismas acciones', async () => {
+    const Inventario = (await import('../Inventario')).default;
+    render(<Inventario />);
+    const tarjeta = (await screen.findAllByText('Arroz Diana')).map((el) => el.closest('li')).find(Boolean);
+
+    expect(within(tarjeta).getByText(/Stock:/)).toBeTruthy();
+    expect(within(tarjeta).getByRole('button', { name: /Editar/ })).toBeTruthy();
+    expect(within(tarjeta).getByRole('button', { name: /Historial/ })).toBeTruthy();
   });
 });

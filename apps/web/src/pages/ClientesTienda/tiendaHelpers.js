@@ -1,6 +1,10 @@
 import { formatDateTime, formatMoney } from '../../utils/format';
 import { paymentLabel } from '../../utils/paymentMethods';
+import { whatsappNumber, buildWhatsappUrl } from '../../utils/whatsapp';
 import { RECEIPT_STYLES, escapeHtml } from '../Ventas/receiptHtml';
+
+// El armado del enlace de WhatsApp es comun a varios modulos: vive en utils/whatsapp.
+export { whatsappNumber, buildWhatsappUrl };
 
 // Estado de la deuda segun cuanto lleva sin pagarse (lo calcula el servidor: 30 y 60 dias).
 export const ESTADOS = {
@@ -47,20 +51,6 @@ export const formatPhone = (valor) => {
   if (!digitos) return '';
   const nacional = digitos.length === 12 && digitos.startsWith('57') ? digitos.slice(2) : digitos;
   return nacional.length === 10 ? `${nacional.slice(0, 3)} ${nacional.slice(3, 6)} ${nacional.slice(6)}` : nacional;
-};
-
-// Numero listo para wa.me, o '' si no sirve.
-export const whatsappNumber = (valor) => {
-  const digitos = soloDigitos(valor);
-  if (digitos.length === 12 && digitos.startsWith('57')) return digitos;
-  if (digitos.length === 10) return `57${digitos}`;
-  if (digitos.length === 7) return `57601${digitos}`;
-  return '';
-};
-
-export const buildWhatsappUrl = (telefono, lineas) => {
-  const numero = whatsappNumber(telefono);
-  return numero ? `https://wa.me/${numero}?text=${encodeURIComponent(lineas.join('\n'))}` : '';
 };
 
 // Recordatorio de cobro: saldo y formas de pago (si estan configuradas en el entorno).

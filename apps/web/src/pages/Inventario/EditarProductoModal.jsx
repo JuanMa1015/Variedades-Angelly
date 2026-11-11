@@ -1,79 +1,24 @@
 import { useState } from 'react';
-import { ImageUp, Link, X } from 'lucide-react';
 import { apiPatch } from '../../api/httpClient';
 import { resolveImageUrl } from '../../api/imagesApi';
 import Modal from '../../components/Modal';
 import { formatMoney } from '../../utils/format';
 import MoneyInput from '../Ventas/MoneyInput';
+import ImagenCampo from './ImagenCampo';
+import { IMAGEN_VACIA, imagenCambio } from './imagenHelpers';
 
 const INPUT = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rosewood focus:outline-none';
 const LABEL = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500';
-const API_URL = import.meta.env.VITE_API_URL ?? '';
-
-const MODOS_IMAGEN = [
-  { id: 'upload', texto: 'Subir archivo', icono: <ImageUp className="h-3.5 w-3.5" aria-hidden="true" /> },
-  { id: 'url', texto: 'Pegar URL', icono: <Link className="h-3.5 w-3.5" aria-hidden="true" /> },
-];
-
-const urlVisible = (url) => (url.startsWith('http') ? url : `${API_URL}${url}`);
 
 // Margen sobre el precio de venta: lo que queda de cada $100 vendidos despues de pagar el producto.
 const margen = (costo, venta) => (venta > 0 ? Math.round(((venta - costo) / venta) * 100) : 0);
 
-const Margen = ({ costo, venta }) => {
+export const Margen = ({ costo, venta }) => {
   if (!(venta > 0)) return null;
   if (venta < costo) {
     return <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">Estás vendiendo por debajo del costo: pierdes {formatMoney(costo - venta)} por unidad.</p>;
   }
   return <p className="text-xs text-gray-500">Margen: {margen(costo, venta)}% · ganas {formatMoney(venta - costo)} por unidad.</p>;
-};
-
-// La imagen puede conservarse, cambiarse (archivo o direccion de internet) o quitarse.
-const ImagenCampo = ({ actual, valor, onChange }) => {
-  const [modo, setModo] = useState('upload');
-  const [preview, setPreview] = useState(null);
-
-  const elegirArchivo = (event) => {
-    const archivo = event.target.files?.[0];
-    if (!archivo) return;
-    setPreview(URL.createObjectURL(archivo));
-    onChange({ archivo, url: '', quitar: false });
-  };
-  const deshacer = () => { setPreview(null); onChange({ archivo: null, url: '', quitar: false }); };
-  const quitar = () => { setPreview(null); onChange({ archivo: null, url: '', quitar: true }); };
-
-  const mostrada = preview ?? (!valor.quitar && !valor.url && actual ? urlVisible(actual) : null);
-
-  return (
-    <div>
-      <span className={LABEL}>Imagen</span>
-      <div className="mb-2 flex gap-1 rounded-lg border border-gray-300 bg-gray-50 p-0.5">
-        {MODOS_IMAGEN.map(({ id, texto, icono }) => (
-          <button key={id} type="button" onClick={() => setModo(id)} className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition ${modo === id ? 'bg-white text-rosewood shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-            {icono} {texto}
-          </button>
-        ))}
-      </div>
-      {modo === 'upload' ? (
-        mostrada ? (
-          <div className="relative inline-block">
-            <img src={mostrada} alt="Imagen del producto" className="h-20 w-20 rounded-lg border border-gray-300 object-cover" />
-            <button type="button" onClick={preview ? deshacer : quitar} title={preview ? 'Descartar la nueva imagen' : 'Quitar imagen'} aria-label={preview ? 'Descartar la nueva imagen' : 'Quitar imagen'} className="absolute -right-2 -top-2 rounded-full border border-gray-300 bg-white p-0.5 text-gray-500 hover:text-red-600">
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        ) : (
-          <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-gray-300 px-3 py-2.5 text-sm text-gray-500 hover:border-rosewood hover:text-rosewood">
-            <ImageUp className="h-4 w-4" aria-hidden="true" />
-            <span>{valor.quitar ? 'Sin imagen: elegir una nueva' : 'Seleccionar archivo'}</span>
-            <input type="file" accept="image/*" onChange={elegirArchivo} className="hidden" />
-          </label>
-        )
-      ) : (
-        <input type="text" value={valor.url} onChange={(e) => { setPreview(null); onChange({ archivo: null, url: e.target.value, quitar: false }); }} placeholder="Pega la dirección de la imagen: se guarda una copia" aria-label="Dirección de la imagen" className={INPUT} />
-      )}
-    </div>
-  );
 };
 
 // Solo se envia lo que el usuario cambio: asi editar un precio nunca pisa el stock ni otros campos.
@@ -100,7 +45,7 @@ const Formulario = ({ producto, proveedores, confirmar, onSaved, onAjustar, onCl
     stock_minimo: String(producto.stock_minimo ?? 0),
     proveedor_id: producto.proveedor_id ? String(producto.proveedor_id) : '',
   });
-  const [imagen, setImagen] = useState({ archivo: null, url: '', quitar: false });
+  const [imagen, setImagen] = useState(IMAGEN_VACIA);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const campo = (nombre) => (valor) => setForm((actual) => ({ ...actual, [nombre]: valor }));
@@ -108,7 +53,7 @@ const Formulario = ({ producto, proveedores, confirmar, onSaved, onAjustar, onCl
   const handleSubmit = async (event) => {
     event.preventDefault();
     const cambios = diferencias(producto, form);
-    const imagenCambia = Boolean(imagen.archivo || imagen.url.trim() || imagen.quitar);
+    const imagenCambia = imagenCambio(imagen);
     if (!form.nombre.trim()) { setError('El nombre del producto es obligatorio'); return; }
     if (!(form.precio_venta > 0)) { setError('El precio de venta debe ser mayor a 0'); return; }
     if (Number(form.stock_minimo) < 0) { setError('El stock mínimo no puede ser negativo'); return; }
