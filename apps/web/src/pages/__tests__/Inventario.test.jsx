@@ -637,13 +637,15 @@ describe('Inventario', () => {
     render(<Inventario />);
     await screen.findAllByText('Arroz Diana');
     fireEvent.click(screen.getByRole('button', { name: /Reponer stock/ }));
+    // "Distribuidora XYZ" tambien sale en la tabla y en el filtro: se espera a que el cuadro termine de cargar.
+    await waitFor(() => expect(screen.queryByText(/Calculando qué falta/)).toBeNull());
   };
 
   it('reponer agrupa por proveedor con lo sugerido y avisa de lo que no tiene proveedor', async () => {
     await abrirReposicion();
 
-    expect(await screen.findByText('Distribuidora XYZ')).toBeTruthy();
-    expect(screen.getByLabelText('Cantidad de Aceite Gourmet')).toHaveValue(7);
+    expect(await screen.findByLabelText('Cantidad de Aceite Gourmet')).toHaveValue(7);
+    expect(screen.getAllByText('Distribuidora XYZ').length).toBeGreaterThan(0);
     expect(screen.getByLabelText('Cantidad de Galleta')).toHaveValue(6);
     expect(screen.getByText(/23\.000 estimado/)).toBeTruthy();  // 7*2000 + 6*1500 = 23.000
     expect(screen.getByText('Sin proveedor asignado')).toBeTruthy();
@@ -652,7 +654,7 @@ describe('Inventario', () => {
 
   it('se puede cambiar la cantidad o descartar un producto y el estimado se recalcula', async () => {
     await abrirReposicion();
-    await screen.findByText('Distribuidora XYZ');
+    await screen.findByLabelText('Cantidad de Aceite Gourmet');
 
     fireEvent.change(screen.getByLabelText('Cantidad de Aceite Gourmet'), { target: { value: '10' } });
     expect(screen.getByText(/29\.000 estimado/)).toBeTruthy();   // 10*2000 + 6*1500
@@ -664,7 +666,7 @@ describe('Inventario', () => {
     const abrirVentana = vi.spyOn(window, 'open').mockImplementation(() => null);
     apiPostMock.mockResolvedValue({ id: 31 });
     await abrirReposicion();
-    await screen.findByText('Distribuidora XYZ');
+    await screen.findByLabelText('Cantidad de Aceite Gourmet');
 
     fireEvent.click(screen.getByRole('button', { name: /Registrar pedido y enviar por WhatsApp/ }));
 
@@ -686,7 +688,7 @@ describe('Inventario', () => {
     const abrirVentana = vi.spyOn(window, 'open').mockImplementation(() => null);
     apiPostMock.mockRejectedValue(new Error('Proveedor no encontrado'));
     await abrirReposicion();
-    await screen.findByText('Distribuidora XYZ');
+    await screen.findByLabelText('Cantidad de Aceite Gourmet');
 
     fireEvent.click(screen.getByRole('button', { name: /Registrar pedido y enviar por WhatsApp/ }));
 
