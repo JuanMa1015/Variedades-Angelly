@@ -100,7 +100,7 @@ def test_admin_puede_crear_factura_compra_y_totales_iva(
 
     productos_response = client.get(
         "/api/productos?catalogo=tienda",
-        headers={"Authorization": f"Bearer {admin_token}"},
+        headers={"Authorization": f"Bearer {_login_token(client, 'angelly_superadmin', 'supersecure123')}"},
     )
     assert productos_response.status_code == 200
     productos = {item["nombre"]: item["id"] for item in productos_response.json()}

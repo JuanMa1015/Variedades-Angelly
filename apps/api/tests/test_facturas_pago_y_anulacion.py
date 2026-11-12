@@ -276,7 +276,7 @@ def test_anular_deja_auditoria_y_el_historial_de_stock(auth_client) -> None:
     _anular(client, _admin(client), factura["id"])
 
     registro = _auditoria(sf, "anular")
-    movimientos = client.get(f"/api/productos/{producto}/movimientos-stock", headers=_h(_admin(client))).json()["data"]
+    movimientos = client.get(f"/api/productos/{producto}/movimientos-stock", headers=_h(_vendedor(client))).json()["data"]
 
     assert len(registro) == 1 and "Autorizo: angelly_admin" in registro[0] and "Error al digitar" in registro[0]
     assert movimientos[0]["delta"] == -5

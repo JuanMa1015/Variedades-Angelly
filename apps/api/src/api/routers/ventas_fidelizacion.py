@@ -234,6 +234,8 @@ def create_venta(
                     )
 
                 exigir_producto_vendible(producto)
+                if producto.catalogo != "tienda":
+                    raise HTTPException(status_code=400, detail=f"'{producto.nombre}' no es un producto de la tienda")
 
                 if producto.stock_actual < item.cantidad:
                     raise HTTPException(

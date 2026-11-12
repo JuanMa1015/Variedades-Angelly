@@ -63,6 +63,7 @@ def test_crear_producto_y_filtrar_por_catalogo(
 ) -> None:
     client, _ = inventario_client
     vendedor_token = _login_token(client, "vendedor1", "ventas123")
+    admin_token = _login_token(client, "angelly_admin", "cambiame123")
 
     create_tienda = client.post(
         "/api/productos",
@@ -81,7 +82,7 @@ def test_crear_producto_y_filtrar_por_catalogo(
 
     create_cartera = client.post(
         "/api/productos",
-        headers={"Authorization": f"Bearer {vendedor_token}"},
+        headers={"Authorization": f"Bearer {admin_token}"},
         json={
             "nombre": "Producto Cartera Catalogo",
             "codigo_barras": "7701002003002",
@@ -103,21 +104,24 @@ def test_crear_producto_y_filtrar_por_catalogo(
 
     list_cartera = client.get(
         "/api/productos?catalogo=cartera",
-        headers={"Authorization": f"Bearer {vendedor_token}"},
+        headers={"Authorization": f"Bearer {admin_token}"},
     )
     assert list_cartera.status_code == 200
-    assert all(item["catalogo"] == "cartera" for item in list_cartera.json())
+    assert list_cartera.json() and all(item["catalogo"] == "cartera" for item in list_cartera.json())
+    # Cada rol solo ve su catalogo: pedir el ajeno es un 403.
+    assert client.get("/api/productos?catalogo=cartera", headers={"Authorization": f"Bearer {vendedor_token}"}).status_code == 403
+    assert client.get("/api/productos?catalogo=tienda", headers={"Authorization": f"Bearer {admin_token}"}).status_code == 403
 
 
 def test_codigo_barras_duplicado_retorna_409(
     inventario_client: tuple[TestClient, sessionmaker[Session]],
 ) -> None:
     client, _ = inventario_client
-    admin_token = _login_token(client, "angelly_admin", "cambiame123")
+    vendedor_token = _login_token(client, "vendedor1", "ventas123")
 
     first_response = client.post(
         "/api/productos",
-        headers={"Authorization": f"Bearer {admin_token}"},
+        headers={"Authorization": f"Bearer {vendedor_token}"},
         json={
             "nombre": "Producto Barcode A",
             "codigo_barras": "7709990001112",
@@ -132,7 +136,7 @@ def test_codigo_barras_duplicado_retorna_409(
 
     duplicate_response = client.post(
         "/api/productos",
-        headers={"Authorization": f"Bearer {admin_token}"},
+        headers={"Authorization": f"Bearer {vendedor_token}"},
         json={
             "nombre": "Producto Barcode B",
             "codigo_barras": "7709990001112",
@@ -198,12 +202,11 @@ def test_vendedor_puede_editar_producto(
     inventario_client: tuple[TestClient, sessionmaker[Session]],
 ) -> None:
     client, _ = inventario_client
-    admin_token = _login_token(client, "angelly_admin", "cambiame123")
     vendedor_token = _login_token(client, "vendedor1", "ventas123")
 
     create_response = client.post(
         "/api/productos",
-        headers={"Authorization": f"Bearer {admin_token}"},
+        headers={"Authorization": f"Bearer {vendedor_token}"},
         json={
             "nombre": "Producto Editable",
             "codigo_barras": "7704445556667",
@@ -231,12 +234,12 @@ def test_soft_delete_producto_con_historial_ventas(
     inventario_client: tuple[TestClient, sessionmaker[Session]],
 ) -> None:
     client, testing_session_local = inventario_client
-    admin_token = _login_token(client, "angelly_admin", "cambiame123")
+    admin_token = _login_token(client, "angelly_superadmin", "supersecure123")
     vendedor_token = _login_token(client, "vendedor1", "ventas123")
 
     create_response = client.post(
         "/api/productos",
-        headers={"Authorization": f"Bearer {admin_token}"},
+        headers={"Authorization": f"Bearer {vendedor_token}"},
         json={
             "nombre": "Producto Con Historial",
             "codigo_barras": "7705556667778",

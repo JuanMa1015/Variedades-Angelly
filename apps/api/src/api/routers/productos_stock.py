@@ -10,6 +10,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from src.api.dependencies import AuthenticatedUser, require_roles
+from src.api.services.catalogos import exigir_catalogo_propio, resolver_catalogo
 from src.api.pagination import PageInfo
 from src.api.routers.productos import ProductoResponse, _to_producto_response_from_model
 from src.api.services.auditoria import registrar_auditoria
@@ -136,11 +137,12 @@ def _texto_motivo(payload: AjusteStockRequest) -> str:
 
 @router.get("/api/productos/resumen", response_model=ResumenInventarioResponse)
 def resumen_inventario(
-    catalogo: Literal["tienda", "cartera"] = Query(default="tienda"),
+    catalogo: Literal["tienda", "cartera"] | None = Query(default=None),
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> ResumenInventarioResponse:
     """Totales de todo el catalogo activo: productos, unidades, agotados y bajo stock, y los mas urgentes."""
+    catalogo = resolver_catalogo(current_user, catalogo, defecto="tienda")
     activos = (ProductoModel.activo.is_(True), ProductoModel.catalogo == catalogo)
     cuenta = lambda condicion: func.coalesce(func.sum(case((condicion, 1), else_=0)), 0)  # noqa: E731
     total, stock_total, agotados, bajo = db.execute(
@@ -171,11 +173,12 @@ def resumen_inventario(
 
 @router.get("/api/productos/reposicion", response_model=ReposicionResponse)
 def productos_a_reponer(
-    catalogo: Literal["tienda", "cartera"] = Query(default="tienda"),
+    catalogo: Literal["tienda", "cartera"] | None = Query(default=None),
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> ReposicionResponse:
     """Productos agotados o por agotarse, agrupados por proveedor con la cantidad sugerida y el costo estimado."""
+    catalogo = resolver_catalogo(current_user, catalogo, defecto="tienda")
     filas = db.execute(
         select(ProductoModel, ProveedorModel)
         .outerjoin(ProveedorModel, ProveedorModel.id == ProductoModel.proveedor_id)
@@ -224,6 +227,7 @@ def ajustar_stock(
     ).scalar_one_or_none()
     if producto is None:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
+    exigir_catalogo_propio(current_user, producto.catalogo)
 
     if payload.modo == "sumar":
         delta = payload.cantidad
@@ -259,11 +263,13 @@ def movimientos_de_stock(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> MovimientoStockPage:
     """Historial de por que cambio el stock del producto, del mas reciente al mas antiguo."""
-    if db.get(ProductoModel, producto_id) is None:
+    producto = db.get(ProductoModel, producto_id)
+    if producto is None:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
+    exigir_catalogo_propio(current_user, producto.catalogo)
     consulta = select(MovimientoStockModel).where(MovimientoStockModel.producto_id == producto_id)
     total = db.execute(select(func.count()).select_from(consulta.subquery())).scalar_one()
     filas = db.execute(

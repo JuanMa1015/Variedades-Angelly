@@ -139,7 +139,7 @@ def test_vendedor_no_puede_desactivar_productos_ni_borrar_facturas(auth_client) 
 def test_desactivar_producto_deja_auditoria_con_el_usuario_del_token(auth_client) -> None:
     client, session_factory = auth_client
     producto_id = _crear_producto(session_factory)
-    token = _login_token(client, "angelly_admin", "cambiame123")
+    token = _login_token(client, "angelly_superadmin", "supersecure123")
 
     assert client.delete(f"/api/productos/{producto_id}", headers=_auth(token)).status_code == 204
 
@@ -147,7 +147,7 @@ def test_desactivar_producto_deja_auditoria_con_el_usuario_del_token(auth_client
         fila = db.execute(
             select(AuditoriaModel).where(AuditoriaModel.entidad == "producto", AuditoriaModel.accion == "desactivar"),
         ).scalar_one()
-        assert fila.usuario == "angelly_admin"
+        assert fila.usuario == "angelly_superadmin"
         assert fila.entidad_id == producto_id
 
 
