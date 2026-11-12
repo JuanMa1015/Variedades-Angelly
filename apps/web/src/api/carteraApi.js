@@ -19,25 +19,18 @@ const buildSearchParams = ({ page, limit, search } = {}) => {
   return query ? `?${query}` : '';
 };
 
-export const fetchCarteraInitialData = async ({ page, limit, search, signal }) => {
-  const query = buildSearchParams({ page, limit, search });
-
-  const [clientes, clientesCatalogo, productosCartera, dashboardVentas, resumenCartera] = await Promise.all([
-    apiGet(`/api/cartera/clientes${query}`, { signal }),
+// Lo que necesitan las pantallas de venta y de detalle: los clientes (con lo que deben) y los productos de cartera.
+export const fetchCarteraInitialData = async ({ signal } = {}) => {
+  const [clientesCatalogo, productosCartera] = await Promise.all([
     apiGet('/api/clientes', { signal }),
     apiGet('/api/productos?catalogo=cartera', { signal }),
-    apiGet('/api/dashboard/resumen', { signal }),
-    apiGet('/api/cartera/resumen', { signal }),
   ]);
 
-  return {
-    clientes,
-    clientesCatalogo,
-    productosCartera,
-    dashboardVentas,
-    resumenCartera,
-  };
+  return { clientesCatalogo, productosCartera };
 };
+
+// Todo el dashboard de cartera en una sola peticion: ventas y cobrado por periodo, por cobrar por antiguedad y rankings.
+export const fetchCarteraDashboard = ({ signal } = {}) => apiGet('/api/cartera/dashboard', { signal, skipCache: true });
 
 export const saveCarteraCliente = ({ clienteId, payload }) => {
   if (clienteId) {

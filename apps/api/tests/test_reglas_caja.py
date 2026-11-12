@@ -229,7 +229,7 @@ def test_el_dashboard_separa_tarjeta_transferencia_y_efectivo(auth_client) -> No
         tienda_id = tienda.id
     client.post(f"/api/clientes/tienda/{tienda_id}/abonos", headers=_h(vendedor), json={"monto": 1500, "metodo_pago": "efectivo"})
 
-    resumen = client.get("/api/dashboard/resumen", headers=_h(admin)).json()
+    resumen = client.get("/api/dashboard/resumen", headers=_h(vendedor)).json()
 
     assert resumen["pagos_efectivo"] == 2500  # venta 1000 + abono de tienda 1500
     assert resumen["pagos_transferencia"] == 2000

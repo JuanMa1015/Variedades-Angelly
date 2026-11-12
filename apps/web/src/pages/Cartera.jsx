@@ -22,11 +22,6 @@ const Cartera = () => {
   const {
     activeSection,
     clientesCatalogo,
-    clientesRanking,
-    clientesMasCompras,
-    clientesAccesoRapido,
-    dashboardVentas,
-    resumenCartera,
     productosCartera,
     error,
     success,
@@ -128,13 +123,11 @@ const Cartera = () => {
 
       {activeSection === 'dashboard' && (
         <CarteraDashboardSection
-          resumenCartera={resumenCartera}
-          dashboardVentas={dashboardVentas}
-          clientesRanking={clientesRanking}
-          clientesMasCompras={clientesMasCompras}
-          clientesAccesoRapido={clientesAccesoRapido}
           navigate={navigate}
           formatMoney={formatMoney}
+          recargar={reloadTick}
+          onCobrar={handleRegistrarAbono}
+          onVender={(cliente) => { setVentaClienteId(String(cliente.id)); navigate('/cartera/venta'); }}
         />
       )}
 

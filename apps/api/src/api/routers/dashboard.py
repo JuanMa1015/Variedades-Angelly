@@ -28,7 +28,7 @@ class DashboardResumenResponse(BaseModel):
 @router.get("/api/dashboard/resumen", response_model=DashboardResumenResponse)
 def dashboard_resumen(
     service: DashboardService = Depends(get_dashboard_service),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor")),
+    _: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> DashboardResumenResponse:
     resumen = service.build_resumen()
 
