@@ -1,17 +1,5 @@
 import { CalendarDays, CircleDollarSign, Wallet } from 'lucide-react';
-
-const NIVEL_DEUDA = {
-  verde: { max: 200000, label: 'Al día', dot: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700', bar: 'bg-emerald-500' },
-  amarillo: { max: 400000, label: 'Alerta', dot: 'bg-amber-500', bg: 'bg-amber-50', text: 'text-amber-700', bar: 'bg-amber-500' },
-  rojo: { max: Infinity, label: 'Moroso', dot: 'bg-red-500', bg: 'bg-red-50', text: 'text-red-700', bar: 'bg-red-500' },
-};
-
-const nivelDeuda = (deuda) => {
-  const monto = Number(deuda || 0);
-  if (monto <= NIVEL_DEUDA.verde.max) return NIVEL_DEUDA.verde;
-  if (monto <= NIVEL_DEUDA.amarillo.max) return NIVEL_DEUDA.amarillo;
-  return NIVEL_DEUDA.rojo;
-};
+import { nivelDeudaCartera } from './nivelDeudaCartera';
 
 const DEUDA_MAX_REF = 400000;
 
@@ -121,7 +109,7 @@ const CarteraDashboardSection = ({
           <div className="mt-4 space-y-3">
             {clientesRanking.map((cliente) => {
               const deuda = Number(cliente.deuda_total || 0);
-              const nivel = nivelDeuda(deuda);
+              const nivel = nivelDeudaCartera(cliente);
               const porcentaje = Math.min(100, (deuda / DEUDA_MAX_REF) * 100);
 
               return (

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from src.infrastructure.database.models import ClienteFiadoTiendaModel, ClienteModel, VentaModel
 
 FIADO_TIENDA = "tienda"
+FIADO_CARTERA = "cartera"
 
 DeudaTienda = tuple[int | None, float]
 SIN_DEUDA: DeudaTienda = (None, 0.0)

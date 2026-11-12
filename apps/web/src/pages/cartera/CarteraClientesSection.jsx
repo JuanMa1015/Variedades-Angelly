@@ -1,15 +1,5 @@
-const NIVEL_DEUDA = {
-  verde: { max: 200000, label: 'Al día', dot: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-l-emerald-500' },
-  amarillo: { max: 400000, label: 'Alerta', dot: 'bg-amber-500', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-l-amber-500' },
-  rojo: { max: Infinity, label: 'Moroso', dot: 'bg-red-500', bg: 'bg-red-50', text: 'text-red-700', border: 'border-l-red-500' },
-};
-
-const nivelDeuda = (deuda) => {
-  const monto = Number(deuda || 0);
-  if (monto <= NIVEL_DEUDA.verde.max) return NIVEL_DEUDA.verde;
-  if (monto <= NIVEL_DEUDA.amarillo.max) return NIVEL_DEUDA.amarillo;
-  return NIVEL_DEUDA.rojo;
-};
+import { telefonoLegible } from '../../utils/whatsapp';
+import { nivelDeudaCartera, textoAntiguedad } from './nivelDeudaCartera';
 
 const CarteraClientesSection = ({
   clientesCarteraFiltrados,
@@ -61,18 +51,19 @@ const CarteraClientesSection = ({
             </thead>
             <tbody>
               {clientesCarteraFiltrados.map((cliente, index) => {
-                const nivel = nivelDeuda(cliente.deuda_total);
+                const nivel = nivelDeudaCartera(cliente);
                 return (
                   <tr key={cliente.id} className={`border-b border-gray-100 align-middle transition hover:bg-rose-50/40 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
                     <td className="px-4 py-3 font-semibold text-gray-900">{cliente.nombre}</td>
                     <td className="px-4 py-3 text-gray-700">{cliente.documento || '-'}</td>
-                    <td className="px-4 py-3 text-gray-700">{cliente.telefono_whatsapp || '-'}</td>
+                    <td className="px-4 py-3 text-gray-700">{telefonoLegible(cliente.telefono_whatsapp) || '-'}</td>
                     <td className={`px-4 py-3 text-right font-semibold ${nivel.text}`}>{formatMoney(cliente.deuda_total)}</td>
                     <td className="px-4 py-3 text-center">
                       <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${nivel.bg} ${nivel.text}`}>
                         <span className={`h-2 w-2 rounded-full ${nivel.dot}`} />
                         {nivel.label}
                       </span>
+                      {textoAntiguedad(cliente) && <p className="mt-1 text-xs text-gray-500">{textoAntiguedad(cliente)}</p>}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-2">
@@ -97,14 +88,14 @@ const CarteraClientesSection = ({
 
         <div className="space-y-3 p-4 md:hidden">
           {clientesCarteraFiltrados.map((cliente) => {
-            const nivel = nivelDeuda(cliente.deuda_total);
+            const nivel = nivelDeudaCartera(cliente);
             return (
               <div key={`card-${cliente.id}`} className={`rounded-2xl border border-gray-200 bg-white p-4 shadow-sm border-l-4 ${nivel.border}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-base font-semibold text-gray-900">{cliente.nombre}</p>
                     <p className="mt-1 text-xs text-gray-500">Documento: {cliente.documento || '-'}</p>
-                    <p className="text-xs text-gray-500">WhatsApp: {cliente.telefono_whatsapp || '-'}</p>
+                    <p className="text-xs text-gray-500">WhatsApp: {telefonoLegible(cliente.telefono_whatsapp) || '-'}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-gray-500">Deuda</p>
@@ -113,6 +104,7 @@ const CarteraClientesSection = ({
                       <span className={`h-1.5 w-1.5 rounded-full ${nivel.dot}`} />
                       {nivel.label}
                     </span>
+                    {textoAntiguedad(cliente) && <p className="mt-1 text-xs text-gray-500">{textoAntiguedad(cliente)}</p>}
                   </div>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">

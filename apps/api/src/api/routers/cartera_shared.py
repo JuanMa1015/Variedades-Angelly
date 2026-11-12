@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from src.api.schemas.cartera import AbonoCarteraResponse, ClienteCarteraPageResponse, ClienteCobroResponse, ClienteResponse
+from src.api.services.antiguedad_deuda import estado_deuda
 from src.domain.cliente import Cliente
 from src.infrastructure.database.models import AbonoCarteraModel, ClienteModel
 
@@ -32,6 +33,7 @@ def to_cliente_model_response(
     cliente: ClienteModel,
     compras_total: float = 0,
     compras_cantidad: int = 0,
+    dias_deuda: int | None = None,
 ) -> ClienteResponse:
     return ClienteResponse(
         id=cliente.id,
@@ -41,6 +43,9 @@ def to_cliente_model_response(
         deuda_total=cliente.deuda_total,
         compras_total=compras_total,
         compras_cantidad=compras_cantidad,
+        activo=cliente.activo,
+        estado_deuda=estado_deuda(float(cliente.deuda_total or 0), dias_deuda),
+        dias_deuda=dias_deuda,
     )
 
 
