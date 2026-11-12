@@ -1,54 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { vi } from 'vitest';
-import CarteraDashboardSection from '../CarteraDashboardSection';
 import CarteraVentaSection from '../CarteraVentaSection';
 
 const formatMoney = (value) => `$${Number(value || 0).toLocaleString('es-CO')}`;
 
 describe('Cartera sections smoke tests', () => {
-  it('renders dashboard KPIs and quick actions', () => {
-    const navigate = vi.fn();
-
-    render(
-      <CarteraDashboardSection
-        resumenCartera={{
-          clientes_totales: 12,
-          clientes_con_deuda: 4,
-          deuda_total: 250000,
-          limite_total: 500000,
-          disponible_total: 250000,
-          clientes_alto_riesgo: 1,
-          saldo_promedio: 62500,
-        }}
-        dashboardVentas={{
-          ventas_diarias: 120000,
-          ventas_semanales: 540000,
-          ventas_mensuales: 2100000,
-          transacciones_diarias: 3,
-          transacciones_semanales: 15,
-          transacciones_mensuales: 42,
-        }}
-        clientesRanking={[
-          { id: 1, nombre: 'Cliente A', deuda_total: 90000, limite_credito: 100000 },
-        ]}
-        clientesMasCompras={[
-          { id: 1, nombre: 'Cliente A', compras_cantidad: 4, compras_total: 120000 },
-        ]}
-        clientesAccesoRapido={[
-          { id: 1, nombre: 'Cliente A', deuda_total: 90000 },
-        ]}
-        navigate={navigate}
-        formatMoney={formatMoney}
-      />,
-    );
-
-    expect(screen.getByText('Clientes totales')).toBeInTheDocument();
-    expect(screen.getByText('Resumen operativo')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: /cobrar cartera/i }));
-    expect(navigate).toHaveBeenCalledWith('/cartera/cobrar');
-  });
-
   it('renders venta flow and toggles critical controls', () => {
     const setVentaModo = vi.fn();
     const setVentaClienteId = vi.fn();

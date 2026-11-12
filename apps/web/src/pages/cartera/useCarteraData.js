@@ -12,30 +12,11 @@ import {
   saveCarteraVenta,
 } from '../../api/carteraApi';
 
-const CLIENTES_PAGE_SIZE = 20;
 const MONEY_FORMATTER = new Intl.NumberFormat('es-CO', {
   style: 'currency',
   currency: 'COP',
   maximumFractionDigits: 0,
 });
-
-const emptyDashboardResumen = {
-  ventas_diarias: 0,
-  ventas_semanales: 0,
-  ventas_mensuales: 0,
-  transacciones_diarias: 0,
-  transacciones_semanales: 0,
-  transacciones_mensuales: 0,
-};
-
-const emptyCarteraResumen = {
-  clientes_totales: 0,
-  clientes_con_deuda: 0,
-  deuda_total: 0,
-  clientes_alto_riesgo: 0,
-  clientes_riesgo_medio: 0,
-  saldo_promedio: 0,
-};
 
 const EMPTY_CLIENT_FORM = {
   nombre: '',
@@ -90,19 +71,12 @@ export const useCarteraData = () => {
 
   const { confirm, ConfirmModal } = useConfirm();
 
-  const [clientes, setClientes] = useState([]);
   const [clientesCatalogo, setClientesCatalogo] = useState([]);
   const [productosCartera, setProductosCartera] = useState([]);
-  const [dashboardVentas, setDashboardVentas] = useState(emptyDashboardResumen);
-  const [resumenCartera, setResumenCartera] = useState(emptyCarteraResumen);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [reloadTick, setReloadTick] = useState(0);
 
   const [clienteForm, setClienteForm] = useState(EMPTY_CLIENT_FORM);
@@ -133,28 +107,13 @@ export const useCarteraData = () => {
   }, [location.pathname]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchTerm.trim());
-    }, 350);
-
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [debouncedSearch]);
-
-  useEffect(() => {
     if (!bootstrapped) {
       return undefined;
     }
 
     if (!isAuthenticated) {
-      setClientes([]);
       setClientesCatalogo([]);
       setProductosCartera([]);
-      setDashboardVentas(emptyDashboardResumen);
-      setResumenCartera(emptyCarteraResumen);
       setLoading(false);
       return undefined;
     }
@@ -166,30 +125,17 @@ export const useCarteraData = () => {
         setLoading(true);
         setError('');
 
-        const payload = await fetchCarteraInitialData({
-          page: currentPage,
-          limit: CLIENTES_PAGE_SIZE,
-          search: debouncedSearch,
-          signal: controller.signal,
-        });
+        const payload = await fetchCarteraInitialData({ signal: controller.signal });
 
         if (controller.signal.aborted) return;
 
-        setClientes(Array.isArray(payload.clientes?.data) ? payload.clientes.data : []);
-        setTotalPages(Math.max(1, Number(payload.clientes?.total_pages ?? 1)));
         setClientesCatalogo(Array.isArray(payload.clientesCatalogo) ? payload.clientesCatalogo : []);
         setProductosCartera(Array.isArray(payload.productosCartera) ? payload.productosCartera : []);
-        setDashboardVentas(typeof payload.dashboardVentas === 'object' && payload.dashboardVentas ? payload.dashboardVentas : emptyDashboardResumen);
-        setResumenCartera(typeof payload.resumenCartera === 'object' && payload.resumenCartera ? payload.resumenCartera : emptyCarteraResumen);
       } catch {
         if (controller.signal.aborted) return;
-        setError('No fue posible cargar los clientes');
-        setClientes([]);
+        setError('No fue posible cargar los clientes y productos');
         setClientesCatalogo([]);
         setProductosCartera([]);
-        setDashboardVentas(emptyDashboardResumen);
-        setResumenCartera(emptyCarteraResumen);
-        setTotalPages(1);
       } finally {
         if (!controller.signal.aborted) {
           setLoading(false);
@@ -202,7 +148,7 @@ export const useCarteraData = () => {
     return () => {
       controller.abort();
     };
-  }, [bootstrapped, currentPage, debouncedSearch, isAuthenticated, reloadTick]);
+  }, [bootstrapped, isAuthenticated, reloadTick]);
 
   const productosById = useMemo(
     () => new Map(productosCartera.map((producto) => [Number(producto.id), producto])),
@@ -472,47 +418,6 @@ export const useCarteraData = () => {
     }
   };
 
-  const clientesConDeuda = useMemo(
-    () => clientesCatalogo.filter((cliente) => Number(cliente.deuda_total || 0) > 0),
-    [clientesCatalogo],
-  );
-
-  const clientesRanking = useMemo(
-    () => [...clientesConDeuda]
-      .sort((a, b) => Number(b.deuda_total || 0) - Number(a.deuda_total || 0))
-      .slice(0, 8),
-    [clientesConDeuda],
-  );
-
-  const clientesMasCompras = useMemo(
-    () => [...clientesCatalogo]
-      .sort((a, b) => {
-        const comprasB = Number(b.compras_cantidad || 0);
-        const comprasA = Number(a.compras_cantidad || 0);
-        if (comprasB !== comprasA) return comprasB - comprasA;
-        return Number(b.compras_total || 0) - Number(a.compras_total || 0);
-      })
-      .filter((cliente) => Number(cliente.compras_cantidad || 0) > 0)
-      .slice(0, 6),
-    [clientesCatalogo],
-  );
-
-  const clientesAccesoRapido = useMemo(
-    () => [...clientesConDeuda]
-      .sort((a, b) => Number(b.deuda_total || 0) - Number(a.deuda_total || 0)),
-    [clientesConDeuda],
-  );
-
-  const clientesCarteraFiltrados = useMemo(() => {
-    const query = searchTerm.trim().toLowerCase();
-    if (!query) return clientesCatalogo;
-
-    return clientesCatalogo.filter((cliente) => (
-      [cliente.nombre, cliente.documento, cliente.telefono_whatsapp]
-        .some((value) => String(value || '').toLowerCase().includes(query))
-    ));
-  }, [clientesCatalogo, searchTerm]);
-
   const handleVerDetalle = (cliente) => {
     cleanMessages();
     setSelectedClienteDetalle(cliente);
@@ -524,20 +429,11 @@ export const useCarteraData = () => {
   };
 
   return {
-    clientes,
     clientesCatalogo,
     productosCartera,
-    dashboardVentas,
-    resumenCartera,
     loading,
     error,
     success,
-    searchTerm,
-    setSearchTerm,
-    debouncedSearch,
-    currentPage,
-    setCurrentPage,
-    totalPages,
     clienteForm,
     setClienteForm,
     savingCliente,
@@ -572,11 +468,6 @@ export const useCarteraData = () => {
     totalVentaEstimado,
     totalAPagar,
     cambioContado,
-    clientesConDeuda,
-    clientesRanking,
-    clientesMasCompras,
-    clientesAccesoRapido,
-    clientesCarteraFiltrados,
     cleanMessages,
     setSuccess,
     refreshPage,
@@ -613,6 +504,4 @@ export {
   normalizeWhatsappNumber,
   EMPTY_CLIENT_FORM,
   EMPTY_ITEM,
-  emptyDashboardResumen,
-  emptyCarteraResumen,
 };

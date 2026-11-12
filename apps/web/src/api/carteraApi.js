@@ -19,32 +19,18 @@ const buildSearchParams = ({ page, limit, search } = {}) => {
   return query ? `?${query}` : '';
 };
 
-// Las ventas del dashboard son las del modulo de cartera (no las de la tienda): salen de /api/cartera/dashboard
-// con la forma que ya usa la pantalla.
-const ventasDelDashboard = (dashboard) => ({
-  ventas_diarias: dashboard?.ventas?.hoy?.total ?? 0,
-  ventas_semanales: dashboard?.ventas?.semana?.total ?? 0,
-  ventas_mensuales: dashboard?.ventas?.mes?.total ?? 0,
-  transacciones_diarias: dashboard?.ventas?.hoy?.transacciones ?? 0,
-  transacciones_semanales: dashboard?.ventas?.semana?.transacciones ?? 0,
-  transacciones_mensuales: dashboard?.ventas?.mes?.transacciones ?? 0,
-});
-
+// Lo que necesitan las pantallas de venta y de detalle: los clientes (con lo que deben) y los productos de cartera.
 export const fetchCarteraInitialData = async ({ signal } = {}) => {
-  const [clientesCatalogo, productosCartera, dashboard, resumenCartera] = await Promise.all([
+  const [clientesCatalogo, productosCartera] = await Promise.all([
     apiGet('/api/clientes', { signal }),
     apiGet('/api/productos?catalogo=cartera', { signal }),
-    apiGet('/api/cartera/dashboard', { signal }),
-    apiGet('/api/cartera/resumen', { signal }),
   ]);
 
-  return {
-    clientesCatalogo,
-    productosCartera,
-    dashboardVentas: ventasDelDashboard(dashboard),
-    resumenCartera,
-  };
+  return { clientesCatalogo, productosCartera };
 };
+
+// Todo el dashboard de cartera en una sola peticion: ventas y cobrado por periodo, por cobrar por antiguedad y rankings.
+export const fetchCarteraDashboard = ({ signal } = {}) => apiGet('/api/cartera/dashboard', { signal, skipCache: true });
 
 export const saveCarteraCliente = ({ clienteId, payload }) => {
   if (clienteId) {
