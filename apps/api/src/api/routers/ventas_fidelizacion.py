@@ -356,14 +356,24 @@ def create_venta(
     return _respuesta_venta(venta, detalle_payload, cliente_nombre)
 
 
+def _solo_las_del_rol(query, usuario: AuthenticatedUser):
+    """El vendedor ve las ventas de la tienda; el admin, las del modulo de cartera; el superadmin, todas."""
+    rol = str(usuario.role).lower().strip()
+    if rol == "vendedor":
+        return query.where(VentaModel.fuera_de_caja.is_(False))
+    if rol == "admin":
+        return query.where(VentaModel.fuera_de_caja.is_(True))
+    return query
+
+
 @router.get("/api/ventas", response_model=list[VentaResponse])
 def list_ventas(
     db: Session = Depends(get_db),
     fecha_desde: datetime | None = Query(default=None),
     fecha_hasta: datetime | None = Query(default=None),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> list[VentaResponse]:
-    query = select(VentaModel)
+    query = _solo_las_del_rol(select(VentaModel), current_user)
     if fecha_desde:
         query = query.where(VentaModel.fecha >= fecha_desde)
     if fecha_hasta:
@@ -382,10 +392,10 @@ def list_ventas_paginadas(
     fecha_desde: datetime | None = Query(default=None),
     fecha_hasta: datetime | None = Query(default=None),
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> VentaPageResponse:
-    """Lista paginada de ventas."""
-    query = select(VentaModel)
+    """Lista paginada de ventas del rol: el vendedor ve las de la tienda y el admin las del modulo de cartera."""
+    query = _solo_las_del_rol(select(VentaModel), current_user)
     if fecha_desde:
         query = query.where(VentaModel.fecha >= fecha_desde)
     if fecha_hasta:

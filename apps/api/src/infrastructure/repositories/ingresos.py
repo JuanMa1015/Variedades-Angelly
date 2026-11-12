@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from datetime import datetime
 
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
@@ -27,10 +28,11 @@ def cobrado_en_venta():
     )
 
 
-def cobros_por_metodo(db: Session, caja_id: int | None = None) -> dict[str, float]:
+def cobros_por_metodo(db: Session, caja_id: int | None = None, desde: datetime | None = None) -> dict[str, float]:
     """Suma lo cobrado por medio de pago (ventas + abonos de cartera + abonos de tienda), sin lo del modulo de cartera.
 
-    Con ``caja_id`` solo cuenta lo asociado a ese turno; sin el, es el historico completo.
+    Con ``caja_id`` solo cuenta lo asociado a ese turno; con ``desde``, lo cobrado desde esa fecha (UTC sin zona);
+    sin ninguno, es el historico completo.
     """
     totales: dict[str, float] = defaultdict(float)
     fuentes = (
@@ -50,6 +52,8 @@ def cobros_por_metodo(db: Session, caja_id: int | None = None) -> dict[str, floa
             consulta = consulta.where(AbonoCarteraModel.anulado.is_(False))
         if caja_id is not None:
             consulta = consulta.where(modelo.caja_id == caja_id)
+        if desde is not None:
+            consulta = consulta.where(modelo.fecha >= desde)
         for metodo, total in db.execute(consulta.group_by(modelo.metodo_pago)).all():
             totales[metodo] += float(total or 0.0)
     return dict(totales)
