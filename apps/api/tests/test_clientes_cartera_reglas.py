@@ -352,6 +352,6 @@ def test_la_deuda_queda_igual_a_ventas_menos_abonos_y_vuelve_si_se_borra_un_abon
             return float(db.get(ClienteModel, cliente).deuda_total)
 
     assert deuda() == 4500.0
-    borrado = client.delete(f"/api/cartera/abonos/{abono.json()['id']}", headers=admin)
+    borrado = client.delete(f"/api/cartera/abonos/{abono.json()['id']}", headers=admin, params={"motivo": "Correccion de prueba"})
     assert borrado.status_code == 204, borrado.text
     assert deuda() == 7000.0  # 4.000 + 3.000: al borrar el abono la deuda vuelve

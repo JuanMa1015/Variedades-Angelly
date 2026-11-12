@@ -46,6 +46,8 @@ def cobros_por_metodo(db: Session, caja_id: int | None = None) -> dict[str, floa
             consulta = consulta.where(AbonoTiendaModel.anulado.is_(False))
         else:
             consulta = consulta.where(modelo.fuera_de_caja.is_(False))  # cartera (admin) lleva su propia cuenta
+        if modelo is AbonoCarteraModel:
+            consulta = consulta.where(AbonoCarteraModel.anulado.is_(False))
         if caja_id is not None:
             consulta = consulta.where(modelo.caja_id == caja_id)
         for metodo, total in db.execute(consulta.group_by(modelo.metodo_pago)).all():

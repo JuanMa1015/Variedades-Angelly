@@ -413,6 +413,11 @@ class AbonoCarteraModel(Base):
     fuera_de_caja: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=expression.false())
     # Venta de la que sale este abono (el abono inicial); permite devolverlo si la venta se anula.
     venta_id: Mapped[int | None] = mapped_column(ForeignKey("ventas.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Un abono no se borra: se anula con motivo y la deuda del cliente vuelve a subir.
+    anulado: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=expression.false())
+    anulado_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), nullable=True)
+    anulado_por: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    motivo_anulacion: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     def __repr__(self) -> str:
         return f"AbonoCarteraModel(id={self.id!r}, monto={self.monto!r})"

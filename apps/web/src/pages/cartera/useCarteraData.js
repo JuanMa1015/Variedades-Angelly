@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
+import { construirMensajeCobro } from './mensajeCobro';
 import { reactivarClienteCartera } from '../../api/carteraClientesApi';
 import useConfirm from '../../components/useConfirm';
 import {
   deleteCarteraCliente,
   deleteCarteraProducto,
   fetchCarteraInitialData,
-  fetchCarteraMovimientos,
+  fetchEstadoCuenta,
   saveCarteraAbono,
   saveCarteraCliente,
   saveCarteraProducto,
@@ -434,57 +435,24 @@ export const useCarteraData = () => {
       return;
     }
 
-    const deuda = Number(cliente?.deuda_total || 0);
-    const nombre = String(cliente?.nombre || '').trim();
-
-    let productosRegistrados = '';
-    let totalOriginal = 0;
+    let estado;
     try {
-      const movimientos = await fetchCarteraMovimientos({ clienteId: cliente.id, page: 1, limit: 20 });
-      const ventas = (movimientos?.data || []).filter((m) => m.tipo === 'Venta');
-      if (ventas.length > 0) {
-        totalOriginal = ventas.reduce((sum, v) => sum + Number(v.monto || 0), 0);
-        productosRegistrados = ventas
-          .filter((v) => v.articulo)
-          .slice(0, 5)
-          .map((v) => `- ${v.articulo} (${formatMoneyWhatsapp(v.monto)})`)
-          .join('\n');
-      }
-    } catch {
-      // si falla la consulta, solo omitimos el detalle
+      estado = await fetchEstadoCuenta({ clienteId: cliente.id });
+    } catch (err) {
+      // Sin cifras reales no se envia nada: un monto equivocado le llegaria al cliente.
+      setError(err.message || 'No fue posible preparar el mensaje de cobro');
+      return;
     }
 
-    const totalAbonado = Math.max(0, totalOriginal - deuda);
-
-    const lineas = [];
-    lineas.push(`Hola ${nombre}, un saludo de Tienda Angelly.`);
-    lineas.push('');
-
-    if (productosRegistrados) {
-      lineas.push('Productos registrados:');
-      lineas.push(productosRegistrados);
-      lineas.push('');
-      lineas.push(`Total original: ${formatMoneyWhatsapp(totalOriginal)}`);
-      if (totalAbonado > 0) {
-        lineas.push(`Abonado: ${formatMoneyWhatsapp(totalAbonado)}`);
-      }
-      lineas.push(`Pendiente: ${formatMoneyWhatsapp(deuda)}`);
-    } else {
-      lineas.push(`Tu saldo pendiente es de ${formatMoneyWhatsapp(deuda)}.`);
-    }
-
-    lineas.push('');
-    lineas.push('Formas de pago:');
+    const formasDePago = [];
     if (import.meta.env.VITE_COBRO_NUMERO_CUENTA) {
-      lineas.push(`- Transferencia: ${import.meta.env.VITE_COBRO_BANCO} ${import.meta.env.VITE_COBRO_TIPO_CUENTA} ${import.meta.env.VITE_COBRO_NUMERO_CUENTA}`);
+      formasDePago.push(`Transferencia: ${import.meta.env.VITE_COBRO_BANCO} ${import.meta.env.VITE_COBRO_TIPO_CUENTA} ${import.meta.env.VITE_COBRO_NUMERO_CUENTA}`);
     }
     if (import.meta.env.VITE_COBRO_NEQUI_NUMERO) {
-      lineas.push(`- Nequi: ${import.meta.env.VITE_COBRO_NEQUI_NUMERO}`);
+      formasDePago.push(`Nequi: ${import.meta.env.VITE_COBRO_NEQUI_NUMERO}`);
     }
-    lineas.push('');
-    lineas.push('Comparte el comprobante para aplicar el abono. Gracias!');
 
-    const mensaje = encodeURIComponent(lineas.join('\n'));
+    const mensaje = encodeURIComponent(construirMensajeCobro(estado, formasDePago));
     window.open(`https://wa.me/${telefono}?text=${mensaje}`, '_blank', 'noopener,noreferrer');
   };
 

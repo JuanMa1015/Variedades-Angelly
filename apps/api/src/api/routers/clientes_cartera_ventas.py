@@ -219,7 +219,7 @@ def create_cartera_venta(
 
 def _abonos_iniciales(db: Session, venta: VentaModel) -> list[AbonoCarteraModel]:
     """Abono(s) que salieron de esta venta. Las ventas viejas no tienen enlace: se reconocen por cliente y fecha exacta."""
-    enlazados = db.execute(select(AbonoCarteraModel).where(AbonoCarteraModel.venta_id == venta.id)).scalars().all()
+    enlazados = db.execute(select(AbonoCarteraModel).where(AbonoCarteraModel.venta_id == venta.id, AbonoCarteraModel.anulado.is_(False))).scalars().all()
     if enlazados:
         return list(enlazados)
     return list(
@@ -227,6 +227,7 @@ def _abonos_iniciales(db: Session, venta: VentaModel) -> list[AbonoCarteraModel]
             select(AbonoCarteraModel).where(
                 AbonoCarteraModel.cliente_id == venta.cliente_id,
                 AbonoCarteraModel.venta_id.is_(None),
+                AbonoCarteraModel.anulado.is_(False),
                 AbonoCarteraModel.fecha == venta.fecha,
             ),
         ).scalars(),

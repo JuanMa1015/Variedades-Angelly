@@ -70,7 +70,7 @@ def _abonos(db: Session, caja: CierreCajaModel, hasta: datetime) -> list[Movimie
     ):
         consulta = select(modelo).where(_del_turno(modelo, caja, hasta))
         if modelo is AbonoCarteraModel:
-            consulta = consulta.where(AbonoCarteraModel.fuera_de_caja.is_(False))  # los cobros del modulo de cartera no pasan por la caja
+            consulta = consulta.where(AbonoCarteraModel.fuera_de_caja.is_(False), AbonoCarteraModel.anulado.is_(False))  # los cobros del modulo de cartera no pasan por la caja
         abonos = db.execute(consulta).scalars().all()
         nombres = _nombres(db, modelo_cliente, {a.cliente_id for a in abonos})
         movimientos.extend(
