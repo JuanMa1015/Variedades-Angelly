@@ -28,7 +28,7 @@ const MODULE_LABELS = [
   { path: '/gastos', label: 'Gastos' },
   { path: '/fidelizacion', label: 'Fidelización' },
   { path: '/clientes', label: 'Clientes' },
-  { path: '/dashboard', label: 'Gerencia' },
+  { path: '/dashboard', label: 'Dashboard' },
 ];
 
 const MainLayout = () => {

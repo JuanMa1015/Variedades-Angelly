@@ -307,7 +307,7 @@ def test_el_listado_muestra_las_anuladas_y_el_dashboard_no_las_suma(auth_client)
     anulada = _vender(client, _admin(client), producto, cantidad=4)
     _anular(client, _admin(client), anulada)
 
-    listado = client.get("/api/ventas/paginadas", headers=_h(_admin(client))).json()["data"]
+    listado = client.get("/api/ventas/paginadas", headers=_h(_login_token(client, "vendedor1", "ventas123"))).json()["data"]
     por_id = {v["venta_id"]: v for v in listado}
     assert por_id[anulada]["anulada"] is True
     assert sum(1 for v in listado if v["anulada"]) == 1
