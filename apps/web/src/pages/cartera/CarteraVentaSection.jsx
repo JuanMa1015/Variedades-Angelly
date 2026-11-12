@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef } from 'react';
+import SelectBuscable from '../../components/SelectBuscable';
 import { BookOpen, CircleDollarSign, Package, Plus, Search, Minus, Trash2, ShoppingCart, UserPlus } from 'lucide-react';
 
 const getProductIcon = (nombre = '') => {
@@ -57,13 +58,23 @@ const CarteraVentaSection = ({
   const [searchTerm, setSearchTerm] = useState('');
   const searchRef = useRef(null);
 
+  const opcionesCliente = useMemo(
+    () => clientesCatalogo.map((cliente) => ({
+      valor: String(cliente.id),
+      etiqueta: `${cliente.nombre} · debe ${formatMoney(cliente.deuda_total || 0)}`,
+    })),
+    [clientesCatalogo, formatMoney],
+  );
+
+  const productosVendibles = useMemo(() => todosLosProductos.filter((p) => p.activo !== false), [todosLosProductos]);
+
   const filteredProducts = useMemo(() => {
-    if (!searchTerm.trim()) return todosLosProductos;
+    if (!searchTerm.trim()) return productosVendibles;
     const term = searchTerm.toLowerCase();
-    return todosLosProductos.filter(
+    return productosVendibles.filter(
       (p) => p.nombre.toLowerCase().includes(term) || (p.codigo_barras && p.codigo_barras.toLowerCase().includes(term)),
     );
-  }, [todosLosProductos, searchTerm]);
+  }, [productosVendibles, searchTerm]);
 
   const totalItems = useMemo(
     () => ventaItems.reduce((acc, item) => acc + (Number(item.producto_id) > 0 ? Number(item.cantidad || 0) : 0), 0),
@@ -113,19 +124,16 @@ const CarteraVentaSection = ({
           <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
             <div className="flex flex-wrap gap-2">
               <div className="flex-1 min-w-[200px]">
-                <label className="mb-1.5 block text-xs font-semibold text-gray-600">Cliente</label>
-                <select
+                <label htmlFor="venta-cliente" className="mb-1.5 block text-xs font-semibold text-gray-600">Cliente</label>
+                <SelectBuscable
+                  id="venta-cliente"
                   value={ventaClienteId}
-                  onChange={(event) => setVentaClienteId(event.target.value)}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm focus:border-rosewood focus:outline-none"
-                >
-                  <option value="">Selecciona cliente</option>
-                  {clientesCatalogo.map((cliente) => (
-                    <option key={cliente.id} value={cliente.id}>
-                      {cliente.nombre} - {formatMoney(cliente.deuda_total || 0)}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setVentaClienteId}
+                  opciones={opcionesCliente}
+                  placeholder="Selecciona cliente"
+                  ariaLabel="Cliente"
+                  vacio="Ningún cliente coincide"
+                />
               </div>
               <div className="min-w-[160px]">
                 <label className="mb-1.5 block text-xs font-semibold text-gray-600">Fecha</label>
@@ -182,12 +190,16 @@ const CarteraVentaSection = ({
                     (item) => Number(item.producto_id) === Number(producto.id) && Number(item.cantidad) > 0,
                   );
                   const qtyInCart = existingItem ? Number(existingItem.cantidad) : 0;
+                  const conStock = producto.stock_actual !== undefined && producto.stock_actual !== null;
+                  const stock = Number(producto.stock_actual);
+                  const sinStock = conStock && stock <= 0;
 
                   return (
                     <div
                       key={producto.id}
                       role="button"
                       tabIndex={0}
+                      aria-disabled={sinStock}
                       onClick={() => handleAddProductoVenta(producto)}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter' || event.key === ' ') {
@@ -196,9 +208,11 @@ const CarteraVentaSection = ({
                         }
                       }}
                       className={`relative rounded-xl border p-3 text-left shadow-sm transition active:scale-[0.98] ${
-                        qtyInCart > 0
-                          ? 'border-rosewood bg-blush-50'
-                          : 'cursor-pointer border-gray-200 bg-white hover:border-rosewood hover:bg-blush-100'
+                        sinStock
+                          ? 'cursor-not-allowed border-gray-200 bg-gray-50 opacity-60'
+                          : qtyInCart > 0
+                            ? 'border-rosewood bg-blush-50'
+                            : 'cursor-pointer border-gray-200 bg-white hover:border-rosewood hover:bg-blush-100'
                       }`}
                     >
                       {qtyInCart > 0 && (
@@ -215,6 +229,11 @@ const CarteraVentaSection = ({
                       </div>
                       <p className="truncate text-xs font-bold text-gray-900">{producto.nombre}</p>
                       <p className="mt-0.5 text-xs font-semibold text-gray-600">{formatMoney(producto.precio_venta)}</p>
+                      {conStock && (
+                        <p className={`mt-0.5 text-[11px] ${sinStock ? 'font-semibold text-red-600' : stock <= Number(producto.stock_minimo ?? 0) ? 'font-semibold text-amber-600' : 'text-gray-500'}`}>
+                          {sinStock ? 'Sin stock' : `Stock ${stock}`}
+                        </p>
+                      )}
                     </div>
                   );
                 })}
@@ -272,8 +291,10 @@ const CarteraVentaSection = ({
                       </span>
                       <button
                         type="button"
-                        onClick={() => handleChangeVentaItem(index, 'cantidad', String(Number(item.cantidad) + 1))}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 hover:bg-gray-100"
+                        onClick={() => handleAddProductoVenta(producto)}
+                        disabled={Number(item.cantidad) >= Number(producto.stock_actual ?? Infinity)}
+                        aria-label={`Una más de ${producto.nombre}`}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         <Plus className="h-3.5 w-3.5" />
                       </button>

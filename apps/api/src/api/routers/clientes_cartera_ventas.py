@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from pydantic import BaseModel
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.api.dependencies import AuthenticatedUser, require_roles
+from src.api.pagination import PageInfo
 from src.api.routers.cartera_shared import normalize_naive_datetime
 from src.api.schemas.cartera import (
     AnularVentaCarteraRequest,
@@ -291,6 +294,121 @@ def anular_venta_cartera(
     )
     db.commit()
     return {"message": "Venta anulada", "venta_id": venta.id, "deuda_cliente": float(cliente.deuda_total)}
+
+
+class LineaVentaCartera(BaseModel):
+    nombre_producto: str
+    cantidad: int
+    precio_unitario: float
+    subtotal: float
+
+
+class VentaCarteraItem(BaseModel):
+    venta_id: int
+    cliente_id: int
+    cliente_nombre: str
+    fecha: datetime
+    total: float
+    es_fiado: bool
+    metodo_pago: str | None = None
+    abono_inicial: float | None = None  # None en ventas viejas que no se pueden enlazar con su abono
+    saldo_cliente: float  # deuda total del cliente justo despues de esta venta
+    anulada: bool = False
+    motivo_anulacion: str | None = None
+    anulada_por: str | None = None
+    creado_por: str | None = None
+    anulable: bool = False
+    lineas: list[LineaVentaCartera]
+
+
+class VentasCarteraPageResponse(BaseModel):
+    data: list[VentaCarteraItem]
+    page: PageInfo
+
+
+FiltroVentas = Literal["todas", "fiado", "contado", "anuladas"]
+
+
+@router.get("/api/cartera/ventas/paginadas", response_model=VentasCarteraPageResponse)
+def list_cartera_ventas_paginadas(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=10, ge=1, le=100),
+    q: str | None = Query(default=None, max_length=100, description="Nombre del cliente o numero de venta (#12)"),
+    estado: FiltroVentas = Query(default="todas"),
+    desde: date | None = Query(default=None),
+    hasta: date | None = Query(default=None),
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+) -> VentasCarteraPageResponse:
+    """Historial de ventas de cartera con busqueda, filtros, fechas y lineas de cada venta."""
+    query = (
+        select(VentaModel, ClienteModel.nombre)
+        .join(ClienteModel, ClienteModel.id == VentaModel.cliente_id)
+        .where(VentaModel.cliente_id.is_not(None))
+    )
+    if estado == "anuladas":
+        query = query.where(VentaModel.anulada.is_(True))
+    elif estado == "fiado":
+        query = query.where(VentaModel.anulada.is_(False), VentaModel.es_fiado.is_(True))
+    elif estado == "contado":
+        query = query.where(VentaModel.anulada.is_(False), VentaModel.es_fiado.is_(False))
+    if desde is not None:
+        query = query.where(VentaModel.fecha >= datetime.combine(desde, time.min))
+    if hasta is not None:
+        query = query.where(VentaModel.fecha < datetime.combine(hasta + timedelta(days=1), time.min))
+    termino = " ".join((q or "").split())
+    if termino:
+        numero = termino.lstrip("#")
+        condicion = ClienteModel.nombre.ilike(f"%{termino}%")
+        if numero.isdigit():
+            condicion = condicion | (VentaModel.id == int(numero))
+        query = query.where(condicion)
+
+    total = db.execute(select(func.count()).select_from(query.subquery())).scalar_one()
+    filas = db.execute(query.order_by(VentaModel.fecha.desc(), VentaModel.id.desc()).offset((page - 1) * limit).limit(limit)).all()
+    ids = [venta.id for venta, _ in filas]
+
+    lineas: dict[int, list[LineaVentaCartera]] = {}
+    abonos: dict[int, float] = {}
+    if ids:
+        for d in db.execute(select(DetalleVentaModel).where(DetalleVentaModel.venta_id.in_(ids)).order_by(DetalleVentaModel.id)).scalars():
+            lineas.setdefault(d.venta_id, []).append(
+                LineaVentaCartera(nombre_producto=d.nombre_producto, cantidad=d.cantidad, precio_unitario=float(d.precio_unitario), subtotal=float(d.subtotal)),
+            )
+        for venta_id, monto in db.execute(
+            select(AbonoCarteraModel.venta_id, func.sum(AbonoCarteraModel.monto)).where(AbonoCarteraModel.venta_id.in_(ids)).group_by(AbonoCarteraModel.venta_id),
+        ).all():
+            abonos[int(venta_id)] = float(monto or 0)
+
+    def _abono(venta: VentaModel) -> float | None:
+        if venta.id in abonos:
+            return abonos[venta.id]
+        # Con enlace o sin abono: una venta nueva a credito sin abono inicial es 0; las viejas no se pueden saber.
+        return 0.0 if venta.creado_por is not None and venta.fuera_de_caja else None
+
+    return VentasCarteraPageResponse(
+        data=[
+            VentaCarteraItem(
+                venta_id=v.id,
+                cliente_id=v.cliente_id,
+                cliente_nombre=nombre,
+                fecha=v.fecha,
+                total=float(v.total),
+                es_fiado=bool(v.es_fiado),
+                metodo_pago=v.metodo_pago,
+                abono_inicial=_abono(v),
+                saldo_cliente=float(v.saldo_pendiente),
+                anulada=bool(v.anulada),
+                motivo_anulacion=v.motivo_anulacion,
+                anulada_por=v.anulada_por,
+                creado_por=v.creado_por,
+                anulable=bool(v.fuera_de_caja and not v.anulada),
+                lineas=lineas.get(v.id, []),
+            )
+            for v, nombre in filas
+        ],
+        page=PageInfo(total=total, total_pages=max(1, (total + limit - 1) // limit), current_page=page, limit=limit),
+    )
 
 
 @router.get(
