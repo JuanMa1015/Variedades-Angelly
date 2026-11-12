@@ -98,7 +98,12 @@ describe('ProductosCarteraSection', () => {
       return Promise.resolve(pagina([{ ...PRODUCTOS[0], activo: false }]));
     });
     fireEvent.click(screen.getByRole('button', { name: 'Recargar' }));
-    const fila = (await screen.findAllByText('Bolso de mano')).map((el) => el.closest('tr')).find(Boolean);
+    const filas = await waitFor(() => {
+      const encontradas = screen.getAllByText('Bolso de mano').map((el) => el.closest('tr')).filter(Boolean);
+      expect(encontradas.some((f) => within(f).queryByRole('button', { name: /Reactivar/ }))).toBe(true);
+      return encontradas;
+    });
+    const fila = filas.find((f) => within(f).queryByRole('button', { name: /Reactivar/ }));
     fireEvent.click(within(fila).getByRole('button', { name: /Reactivar/ }));
 
     await waitFor(() => expect(http.apiRequest).toHaveBeenCalledWith('/api/productos/1/reactivar', { method: 'PUT' }));
