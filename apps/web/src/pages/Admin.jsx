@@ -556,14 +556,17 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
   const handleEditAbonoCartera = useCallback((item) => {
     openEditModal(
       'Editar abono cartera',
-      [{ name: 'monto', label: 'Monto', type: 'number', required: true }],
-      { monto: String(item.monto ?? '') },
+      [
+        { name: 'monto', label: 'Monto', type: 'number', required: true },
+        { name: 'motivo', label: 'Motivo del cambio (obligatorio si cambia el monto)', type: 'text' },
+      ],
+      { monto: String(item.monto ?? ''), motivo: '' },
       async (values) => {
         if (Number(values.monto) <= 0) { notifyError('El monto del abono debe ser mayor a cero'); return; }
         await request({
           endpoint: `/api/cartera/abonos/${item.id}`,
           method: 'PATCH',
-          body: { monto: Number(values.monto) },
+          body: { monto: Number(values.monto), motivo: String(values.motivo || '').trim() || null },
         });
         await loadAll();
         notifySuccess('Abono actualizado');
@@ -571,17 +574,21 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     );
   }, [openEditModal, notifyError, request, loadAll, notifySuccess]);
 
-  const handleDeleteAbonoCartera = useCallback(async (item) => {
-    const confirmed = await confirm({ title: 'Eliminar abono', message: `Eliminar abono ${item.id}?` }); if (!confirmed) return;
-    try {
-      await runDelete({
-        endpoint: `/api/cartera/abonos/${item.id}`,
-        successMessage: 'Abono eliminado',
-      });
-    } catch (err) {
-      notifyError(err.message || 'No se pudo eliminar abono');
-    }
-  }, [confirm, runDelete, notifyError]);
+  // Un abono no se borra: se anula con motivo y la deuda del cliente vuelve a subir.
+  const handleDeleteAbonoCartera = useCallback((item) => {
+    openEditModal(
+      'Anular abono de cartera',
+      [{ name: 'motivo', label: 'Motivo de la anulación', type: 'text', required: true }],
+      { motivo: '' },
+      async (values) => {
+        const motivo = String(values.motivo || '').trim();
+        if (motivo.length < 3) { notifyError('Explica el motivo (mínimo 3 letras)'); return; }
+        await apiDelete(`/api/cartera/abonos/${item.id}?motivo=${encodeURIComponent(motivo)}`);
+        await loadAll();
+        notifySuccess('Abono anulado: la deuda del cliente volvió a subir');
+      },
+    );
+  }, [openEditModal, notifyError, loadAll, notifySuccess]);
 
   const handleEditAdmin = useCallback((item) => {
     openEditModal(

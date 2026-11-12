@@ -165,13 +165,13 @@ def _abono(sf, cliente_id: int, monto: float) -> int:
         return abono.id
 
 
-def test_eliminar_un_abono_restituye_la_deuda(auth_client) -> None:
+def test_anular_un_abono_restituye_la_deuda(auth_client) -> None:
     client, sf = auth_client
     cliente = _cliente_cartera(sf, deuda=4000)
     abono = _abono(sf, cliente, 1500)
     admin = _login_token(client, "angelly_admin", "cambiame123")
 
-    assert client.delete(f"/api/cartera/abonos/{abono}", headers=_h(admin)).status_code == 204
+    assert client.delete(f"/api/cartera/abonos/{abono}", headers=_h(admin), params={"motivo": "Se anoto mal"}).status_code == 204
 
     assert _deuda_cartera(sf, cliente) == 5500
 
@@ -183,7 +183,7 @@ def test_editar_el_monto_de_un_abono_reajusta_la_deuda(auth_client) -> None:
     admin = _login_token(client, "angelly_admin", "cambiame123")
 
     # Abono baja de 1500 a 1000: el cliente debe 500 mas.
-    respuesta = client.patch(f"/api/cartera/abonos/{abono}", headers=_h(admin), json={"monto": 1000})
+    respuesta = client.patch(f"/api/cartera/abonos/{abono}", headers=_h(admin), json={"monto": 1000, "motivo": "Se digito mal"})
 
     assert respuesta.status_code == 200
     assert _deuda_cartera(sf, cliente) == 4500
@@ -195,7 +195,7 @@ def test_no_se_puede_subir_un_abono_por_encima_de_la_deuda(auth_client) -> None:
     abono = _abono(sf, cliente, 500)
     admin = _login_token(client, "angelly_admin", "cambiame123")
 
-    respuesta = client.patch(f"/api/cartera/abonos/{abono}", headers=_h(admin), json={"monto": 900})
+    respuesta = client.patch(f"/api/cartera/abonos/{abono}", headers=_h(admin), json={"monto": 900, "motivo": "Se digito mal"})
 
     assert respuesta.status_code == 400
     assert _deuda_cartera(sf, cliente) == 100

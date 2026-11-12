@@ -196,6 +196,8 @@ class AbonoCarteraUpdateRequest(BaseModel):
     monto: Annotated[float | None, Field(gt=0)] = None
     metodo_pago: MetodoPago | None = None
     referencia: Annotated[str | None, Field(max_length=255)] = None
+    # Cambiar el monto mueve la deuda del cliente: se explica y queda en la auditoria.
+    motivo: Annotated[str | None, Field(max_length=200)] = None
 
 
 class AbonoCarteraResponse(BaseModel):
@@ -208,3 +210,27 @@ class AbonoCarteraResponse(BaseModel):
     saldo_cliente: float
     referencia: str | None
     fecha: datetime
+
+
+class UltimaCompraFiada(BaseModel):
+    venta_id: int
+    fecha: datetime
+    total: float
+    articulos: str
+
+
+class UltimoAbonoResponse(BaseModel):
+    fecha: datetime
+    monto: float
+
+
+class EstadoCuentaResponse(BaseModel):
+    """Lo que se le dice al cliente al cobrarle: cifras reales, sin sumar movimientos sueltos."""
+
+    cliente_id: int
+    nombre: str
+    deuda_total: float
+    dias_deuda: int | None = None
+    estado_deuda: str
+    ultimas_compras: list[UltimaCompraFiada]
+    ultimo_abono: UltimoAbonoResponse | None = None

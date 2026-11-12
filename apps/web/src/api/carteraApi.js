@@ -78,3 +78,6 @@ export const fetchCarteraVentasHistorial = ({ limit, signal }) => {
 export const fetchCarteraMovimientos = ({ clienteId, page, limit, signal }) => {
   return apiGet(`/api/cartera/clientes/${clienteId}/movimientos${buildSearchParams({ page, limit })}`, { signal });
 };
+
+// Cifras reales para el mensaje de cobro: deuda, desde cuando, ultimas compras fiadas y ultimo abono.
+export const fetchEstadoCuenta = ({ clienteId, signal } = {}) => apiGet(`/api/cartera/clientes/${clienteId}/estado-cuenta`, { signal, skipCache: true });
