@@ -33,6 +33,7 @@ const Sidebar = ({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMobile })
 
   const sections = (() => {
     const vendedorItems = [
+      { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, description: 'Resumen de la tienda' },
       { label: 'Caja', path: '/caja', icon: Wallet, description: 'Apertura y cierre de caja' },
       { label: 'Ventas', path: '/ventas', icon: ShoppingCart, description: 'Punto de Venta' },
       { label: 'Gastos', path: '/gastos', icon: Receipt, description: 'Gastos operativos' },
