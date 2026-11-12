@@ -11,12 +11,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.api.dependencies import AuthenticatedUser, require_roles
-from src.api.services.vendedor import (
-    create_vendedor as _create_vendedor,
-    delete_vendedor as _delete_vendedor,
-    list_vendedores as _list_vendedores,
-    update_vendedor as _update_vendedor,
-)
 from src.auth.security import (
     create_access_token,
     create_refresh_token,
@@ -24,6 +18,7 @@ from src.auth.security import (
     hash_password,
     verify_password,
 )
+from src.auth.sesiones import sesion_revocada
 from src.auth.token_blacklist import blacklist_jti, claim_jti, is_jti_blacklisted
 from src.infrastructure.database.connection import get_db
 from src.infrastructure.database.models import UsuarioModel
@@ -85,29 +80,6 @@ class RefreshResponse(BaseModel):
     expires_in: int
     role: str
     username: str
-
-
-class VendedorUsuarioResponse(BaseModel):
-    """Salida administrativa para cuentas de vendedores."""
-
-    id: int
-    username: str
-    rol: str
-
-
-class VendedorUsuarioCreateRequest(BaseModel):
-    """Entrada para crear trabajador/vendedor con credenciales."""
-
-    username: Annotated[str, Field(min_length=3, max_length=50)]
-    password: Annotated[str, Field(min_length=8, max_length=128)]
-    rol: Literal["vendedor"] = "vendedor"
-
-
-class VendedorUsuarioUpdateRequest(BaseModel):
-    """Entrada para actualizar credenciales de vendedor."""
-
-    username: Annotated[str | None, Field(min_length=3, max_length=50)] = None
-    password: Annotated[str | None, Field(min_length=8, max_length=128)] = None
 
 
 @router.post("/api/auth/login", response_model=LoginResponse)
@@ -215,6 +187,11 @@ def auth_refresh(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuario inactivo o inexistente",
         )
+    if sesion_revocada(usuario.sesiones_desde, decoded.get("iat")):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sesion cerrada: vuelve a iniciar sesion",
+        )
 
     # Consumo atomico del JTI: si dos requests llegan a la vez solo uno continua.
     if not claim_jti(db, jti, expires_at):
@@ -262,39 +239,3 @@ def auth_logout(
     response.delete_cookie("access_token", path="/")
     response.delete_cookie("refresh_token", path="/api/auth")
     return {"detail": "Sesion cerrada"}
-
-
-@router.get("/api/usuarios/vendedores", response_model=list[VendedorUsuarioResponse])
-def list_vendedores(
-    db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("superadmin")),
-) -> list[VendedorUsuarioResponse]:
-    return [VendedorUsuarioResponse(**u) for u in _list_vendedores(db)]
-
-
-@router.post("/api/usuarios/vendedores", response_model=VendedorUsuarioResponse, status_code=201)
-def create_vendedor(
-    payload: VendedorUsuarioCreateRequest,
-    db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
-) -> VendedorUsuarioResponse:
-    return VendedorUsuarioResponse(**_create_vendedor(payload.username, payload.password, db, current_user.username))
-
-
-@router.patch("/api/usuarios/vendedores/{usuario_id}", response_model=VendedorUsuarioResponse)
-def update_vendedor(
-    usuario_id: int,
-    payload: VendedorUsuarioUpdateRequest,
-    db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
-) -> VendedorUsuarioResponse:
-    return VendedorUsuarioResponse(**_update_vendedor(usuario_id, payload.username, payload.password, db, current_user.username))
-
-
-@router.delete("/api/usuarios/vendedores/{usuario_id}", status_code=204)
-def delete_vendedor(
-    usuario_id: int,
-    db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
-) -> None:
-    _delete_vendedor(usuario_id, db, current_user.username)

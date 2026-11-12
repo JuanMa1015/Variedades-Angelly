@@ -1,20 +1,23 @@
-"""Router de auditoria administrativa."""
+"""Router de auditoria: solo se consulta. Los registros los crea el sistema y nadie los edita ni los borra."""
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Annotated
+from datetime import date, datetime, time, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from pydantic import BaseModel, Field
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from src.api.dependencies import AuthenticatedUser, require_roles
+from src.api.pagination import PageInfo
 from src.infrastructure.database.connection import get_db
 from src.infrastructure.database.models import AuditoriaModel
 
 router = APIRouter(tags=["auditorias"])
+
+# El admin (cartera) solo ve lo que pasa en cartera; el superadmin lo ve todo.
+MODULOS_DEL_ADMIN = ("cartera", "clientes_cartera")
 
 
 class AuditoriaResponse(BaseModel):
@@ -30,24 +33,9 @@ class AuditoriaResponse(BaseModel):
     fecha: datetime
 
 
-class AuditoriaCreateRequest(BaseModel):
-    """Entrada para registrar evento en tabla de auditorias."""
-
-    modulo: Annotated[str, Field(min_length=2, max_length=50)]
-    entidad: Annotated[str, Field(min_length=2, max_length=80)]
-    entidad_id: Annotated[int | None, Field(gt=0)] = None
-    accion: Annotated[str, Field(min_length=2, max_length=30)]
-    detalle: Annotated[str | None, Field(max_length=500)] = None
-
-
-class AuditoriaUpdateRequest(BaseModel):
-    """Entrada para editar auditoria existente."""
-
-    modulo: Annotated[str | None, Field(min_length=2, max_length=50)] = None
-    entidad: Annotated[str | None, Field(min_length=2, max_length=80)] = None
-    entidad_id: Annotated[int | None, Field(gt=0)] = None
-    accion: Annotated[str | None, Field(min_length=2, max_length=30)] = None
-    detalle: Annotated[str | None, Field(max_length=500)] = None
+class AuditoriaPageResponse(BaseModel):
+    data: list[AuditoriaResponse]
+    page: PageInfo
 
 
 def _to_auditoria_response(auditoria: AuditoriaModel) -> AuditoriaResponse:
@@ -63,96 +51,75 @@ def _to_auditoria_response(auditoria: AuditoriaModel) -> AuditoriaResponse:
     )
 
 
+def _consulta(
+    usuario_actual: AuthenticatedUser,
+    modulo: str | None,
+    accion: str | None,
+    usuario: str | None,
+    q: str | None,
+    desde: date | None,
+    hasta: date | None,
+):
+    query = select(AuditoriaModel)
+    if usuario_actual.role != "superadmin":
+        query = query.where(AuditoriaModel.modulo.in_(MODULOS_DEL_ADMIN))
+    if modulo:
+        query = query.where(AuditoriaModel.modulo == modulo.strip())
+    if accion:
+        query = query.where(AuditoriaModel.accion == accion.strip())
+    if usuario:
+        query = query.where(AuditoriaModel.usuario == usuario.strip())
+    if desde is not None:
+        query = query.where(AuditoriaModel.fecha >= datetime.combine(desde, time.min))
+    if hasta is not None:
+        query = query.where(AuditoriaModel.fecha < datetime.combine(hasta + timedelta(days=1), time.min))
+    texto = " ".join((q or "").split())
+    if texto:
+        patron = f"%{texto}%"
+        query = query.where(or_(AuditoriaModel.detalle.ilike(patron), AuditoriaModel.entidad.ilike(patron), AuditoriaModel.usuario.ilike(patron)))
+    return query
+
+
 @router.get("/api/auditorias", response_model=list[AuditoriaResponse])
 def list_auditorias(
     modulo: str | None = Query(default=None),
+    accion: str | None = Query(default=None),
+    usuario: str | None = Query(default=None),
+    q: str | None = Query(default=None, max_length=100),
+    desde: date | None = Query(default=None),
+    hasta: date | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=200, ge=1, le=500),
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> list[AuditoriaResponse]:
-    query = select(AuditoriaModel)
-    if modulo:
-        query = query.where(AuditoriaModel.modulo == modulo.strip())
-
-    offset = (page - 1) * limit
+    query = _consulta(current_user, modulo, accion, usuario, q, desde, hasta)
     auditorias = db.execute(
-        query.order_by(AuditoriaModel.fecha.desc(), AuditoriaModel.id.desc()).offset(offset).limit(limit),
+        query.order_by(AuditoriaModel.fecha.desc(), AuditoriaModel.id.desc()).offset((page - 1) * limit).limit(limit),
     ).scalars().all()
     return [_to_auditoria_response(auditoria) for auditoria in auditorias]
 
 
-@router.post("/api/auditorias", response_model=AuditoriaResponse, status_code=201)
-def create_auditoria(
-    payload: AuditoriaCreateRequest,
+@router.get("/api/auditorias/paginadas", response_model=AuditoriaPageResponse)
+def list_auditorias_paginadas(
+    modulo: str | None = Query(default=None),
+    accion: str | None = Query(default=None),
+    usuario: str | None = Query(default=None),
+    q: str | None = Query(default=None, max_length=100),
+    desde: date | None = Query(default=None),
+    hasta: date | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
     current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
-) -> AuditoriaResponse:
-    auditoria = AuditoriaModel(
-        modulo=payload.modulo.strip(),
-        entidad=payload.entidad.strip(),
-        entidad_id=payload.entidad_id,
-        accion=payload.accion.strip(),
-        detalle=payload.detalle.strip() if payload.detalle else None,
-        usuario=current_user.username,
+) -> AuditoriaPageResponse:
+    """Historial con busqueda, filtros por modulo, accion, usuario y fechas, y paginas."""
+    query = _consulta(current_user, modulo, accion, usuario, q, desde, hasta)
+    total = db.execute(select(func.count()).select_from(query.subquery())).scalar_one()
+    filas = db.execute(
+        query.order_by(AuditoriaModel.fecha.desc(), AuditoriaModel.id.desc()).offset((page - 1) * limit).limit(limit),
+    ).scalars().all()
+    return AuditoriaPageResponse(
+        data=[_to_auditoria_response(a) for a in filas],
+        page=PageInfo(total=total, total_pages=max(1, (total + limit - 1) // limit), current_page=page, limit=limit),
     )
-    db.add(auditoria)
-    db.commit()
-    db.refresh(auditoria)
-    return _to_auditoria_response(auditoria)
-
-
-@router.patch("/api/auditorias/{auditoria_id}", response_model=AuditoriaResponse)
-def update_auditoria(
-    auditoria_id: int,
-    payload: AuditoriaUpdateRequest,
-    db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
-) -> AuditoriaResponse:
-    auditoria = db.execute(
-        select(AuditoriaModel).where(AuditoriaModel.id == auditoria_id),
-    ).scalar_one_or_none()
-    if auditoria is None:
-        raise HTTPException(status_code=404, detail="Auditoria no encontrada")
-
-    campos = payload.model_fields_set
-    if not campos:
-        raise HTTPException(status_code=400, detail="No se enviaron campos para actualizar")
-
-    if payload.modulo is not None:
-        auditoria.modulo = payload.modulo.strip()
-    if payload.entidad is not None:
-        auditoria.entidad = payload.entidad.strip()
-    if payload.entidad_id is not None:
-        auditoria.entidad_id = payload.entidad_id
-    if payload.accion is not None:
-        auditoria.accion = payload.accion.strip()
-    if payload.detalle is not None:
-        auditoria.detalle = payload.detalle.strip() or None
-
-    auditoria.usuario = current_user.username
-    db.commit()
-    db.refresh(auditoria)
-    return _to_auditoria_response(auditoria)
-
-
-@router.delete(
-    "/api/auditorias/{auditoria_id}",
-    status_code=204,
-    response_class=Response,
-    response_model=None,
-)
-def delete_auditoria(
-    auditoria_id: int,
-    db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("superadmin")),
-) -> Response:
-    auditoria = db.execute(
-        select(AuditoriaModel).where(AuditoriaModel.id == auditoria_id),
-    ).scalar_one_or_none()
-    if auditoria is None:
-        raise HTTPException(status_code=404, detail="Auditoria no encontrada")
-
-    db.delete(auditoria)
-    db.commit()
-    return Response(status_code=status.HTTP_204_NO_CONTENT)

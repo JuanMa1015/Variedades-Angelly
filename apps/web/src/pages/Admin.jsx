@@ -16,7 +16,6 @@ import CreateVendedorDialog from './admin/components/CreateDialogs/CreateVendedo
 import CreateAdminDialog from './admin/components/CreateDialogs/CreateAdminDialog';
 import CreateProductoDialog from './admin/components/CreateDialogs/CreateProductoDialog';
 import CreateProveedorDialog from './admin/components/CreateDialogs/CreateProveedorDialog';
-import CreateAuditoriaDialog from './admin/components/CreateDialogs/CreateAuditoriaDialog';
 import CreateClienteCarteraDialog from './admin/components/CreateDialogs/CreateClienteCarteraDialog';
 import CreateClienteTiendaDialog from './admin/components/CreateDialogs/CreateClienteTiendaDialog';
 import CreateClienteFidelizacionDialog from './admin/components/CreateDialogs/CreateClienteFidelizacionDialog';
@@ -88,7 +87,6 @@ const CREATE_DIALOGS = {
   facturas_compra: 'facturas_compra',
   gastos: 'gastos',
   abonos_cartera: 'abonos_cartera',
-  auditorias: 'auditorias',
 };
 
 const Admin = ({ moduleKey: moduleKeyProp }) => {
@@ -210,7 +208,7 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         request({ endpoint: '/api/facturas-compra', signal }),
         request({ endpoint: '/api/gastos', signal }),
         request({ endpoint: '/api/cartera/abonos', signal }),
-        request({ endpoint: '/api/superadmin/auditorias', signal }),
+        request({ endpoint: '/api/auditorias?limit=200', signal }),
         request({ endpoint: '/api/superadmin/informes', signal }),
       ]);
 
@@ -612,18 +610,6 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     );
   }, [openEditModal, request, loadAll, notifySuccess]);
 
-  const handleDeleteAdmin = useCallback(async (item) => {
-    const confirmed = await confirm({ title: 'Eliminar admin', message: `Eliminar admin ${item.username}?` }); if (!confirmed) return;
-    try {
-      await runDelete({
-        endpoint: `/api/superadmin/usuarios/admins/${item.id}`,
-        successMessage: 'Admin eliminado',
-      });
-    } catch (err) {
-      notifyError(err.message || 'No se pudo eliminar admin');
-    }
-  }, [confirm, runDelete, notifyError]);
-
   const handleEditVendedor = useCallback((item) => {
     openEditModal(
       'Editar vendedor',
@@ -646,17 +632,30 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     );
   }, [openEditModal, request, loadAll, notifySuccess]);
 
-  const handleDeleteVendedor = useCallback(async (item) => {
-    const confirmed = await confirm({ title: 'Eliminar vendedor', message: `Eliminar vendedor ${item.username}?` }); if (!confirmed) return;
+  const alternarUsuario = useCallback(async (ruta, etiqueta, item) => {
+    const desactivar = item.activo !== false;
+    const confirmed = await confirm({
+      title: desactivar ? `Desactivar ${etiqueta}` : `Activar ${etiqueta}`,
+      message: desactivar
+        ? `${item.username} ya no podrá entrar y se le cerrarán las sesiones abiertas. Su historial se conserva.`
+        : `${item.username} podrá volver a entrar con su usuario y clave.`,
+      confirmLabel: desactivar ? 'Desactivar' : 'Activar',
+    });
+    if (!confirmed) return;
     try {
-      await runDelete({
-        endpoint: `/api/superadmin/usuarios/vendedores/${item.id}`,
-        successMessage: 'Vendedor eliminado',
+      await request({
+        endpoint: desactivar ? `/api/superadmin/usuarios/${ruta}/${item.id}` : `/api/superadmin/usuarios/${ruta}/${item.id}/reactivar`,
+        method: desactivar ? 'DELETE' : 'PUT',
       });
+      await loadAll();
+      notifySuccess(desactivar ? 'Usuario desactivado' : 'Usuario activado');
     } catch (err) {
-      notifyError(err.message || 'No se pudo eliminar vendedor');
+      notifyError(err.message || 'No se pudo cambiar el estado del usuario');
     }
-  }, [confirm, runDelete, notifyError]);
+  }, [confirm, request, loadAll, notifySuccess, notifyError]);
+
+  const handleToggleAdmin = useCallback((item) => alternarUsuario('admins', 'admin', item), [alternarUsuario]);
+  const handleToggleVendedor = useCallback((item) => alternarUsuario('vendedores', 'vendedor', item), [alternarUsuario]);
 
   const handleEditProducto = useCallback((item) => {
     openEditModal(
@@ -721,46 +720,17 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     }
   }, [confirm, loadAll, notifySuccess, notifyError]);
 
-  const handleEditAuditoria = useCallback((item) => {
-    openEditModal(
-      'Editar auditoría',
-      [
-        { name: 'modulo', label: 'Módulo', type: 'text', required: true },
-        { name: 'accion', label: 'Acción', type: 'text', required: true },
-      ],
-      { modulo: item.modulo, accion: item.accion },
-      async (values) => {
-        await request({
-          endpoint: `/api/auditorias/${item.id}`,
-          method: 'PATCH',
-          body: { modulo: values.modulo.trim(), accion: values.accion.trim() },
-        });
-        await loadAll();
-        notifySuccess('Auditoria actualizada');
-      },
-    );
-  }, [openEditModal, request, loadAll, notifySuccess]);
-
-  const handleDeleteAuditoria = useCallback(async (item) => {
-    const confirmed = await confirm({ title: 'Eliminar auditoría', message: `Eliminar auditoría ${item.id}?` }); if (!confirmed) return;
-    try {
-      await apiDelete(`/api/auditorias/${item.id}`);
-      await loadAll();
-      notifySuccess('Auditoria eliminada');
-    } catch (err) {
-      notifyError(err.message || 'No se pudo eliminar auditoria');
-    }
-  }, [confirm, loadAll, notifySuccess, notifyError]);
-
   const tabSections = useMemo(() => [
     { key: 'vendedores', title: 'Vendedores', desc: 'Acceso restringido y altas por modal.', data: vendedores, createDialog: 'vendedores',
       columns: [
         { key: 'id', label: 'ID', mono: true }, { key: 'username', label: 'Username' }, { key: 'rol', label: 'Rol' },
-      ], onEdit: handleEditVendedor, onDelete: handleDeleteVendedor, minWidth: '640px' },
+        { key: 'activo', label: 'Estado', render: (i) => (i.activo === false ? 'Inactivo' : 'Activo') },
+      ], onEdit: handleEditVendedor, onToggle: handleToggleVendedor, minWidth: '640px' },
     { key: 'admins', title: 'Administradores', desc: 'Acceso y control de admins.', data: admins, createDialog: 'admins',
       columns: [
         { key: 'id', label: 'ID', mono: true }, { key: 'username', label: 'Username' }, { key: 'rol', label: 'Rol' },
-      ], onEdit: handleEditAdmin, onDelete: handleDeleteAdmin, minWidth: '640px' },
+        { key: 'activo', label: 'Estado', render: (i) => (i.activo === false ? 'Inactivo' : 'Activo') },
+      ], onEdit: handleEditAdmin, onToggle: handleToggleAdmin, minWidth: '640px' },
     { key: 'productos', title: 'Productos', desc: 'Inventario y precios con control visual.', data: productos, createDialog: 'productos',
       columns: [
         { key: 'nombre', label: 'Nombre', mono: true },
@@ -831,18 +801,18 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         { key: 'referencia', label: 'Referencia' },
         { key: 'fecha', label: 'Fecha', render: (i) => formatDateTime(i.fecha) },
       ], onEdit: handleEditAbonoCartera, onDelete: handleDeleteAbonoCartera, minWidth: '1000px' },
-    { key: 'auditorias', title: 'Auditorías', desc: 'Registro de cambios y trazabilidad.', data: auditorias, createDialog: 'auditorias',
+    { key: 'auditorias', title: 'Auditorías', desc: 'Historial de cambios: solo se consulta, nadie lo edita ni lo borra.', data: auditorias,
       columns: [
         { key: 'modulo', label: 'Modulo', mono: true }, { key: 'entidad', label: 'Entidad' }, { key: 'accion', label: 'Accion' },
         { key: 'detalle', label: 'Detalle' }, { key: 'usuario', label: 'Usuario' },
         { key: 'fecha', label: 'Fecha', render: (i) => formatDateTime(i.fecha) },
-      ], onEdit: handleEditAuditoria, onDelete: handleDeleteAuditoria, minWidth: '1000px' },
+      ], minWidth: '1000px' },
   ], [
     vendedores, admins, productos, proveedores,
     clientesCartera, clientesTienda, clientesFidelizacion,
     ventas, pedidosProveedor, facturasCompra, gastos, abonosCartera, auditorias,
-    handleEditVendedor, handleDeleteVendedor,
-    handleEditAdmin, handleDeleteAdmin,
+    handleEditVendedor, handleToggleVendedor,
+    handleEditAdmin, handleToggleAdmin,
     handleEditProducto, handleDeleteProducto,
     handleEditProveedor, handleDeleteProveedor,
     handleEditClienteCartera, handleDeleteClienteCartera,
@@ -853,7 +823,6 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     handleEditFacturaCompra, handleDeleteFacturaCompra,
     handleEditGasto, handleDeleteGasto,
     handleEditAbonoCartera, handleDeleteAbonoCartera,
-    handleEditAuditoria, handleDeleteAuditoria,
   ]);
 
   if (!isSuperAdmin) {
@@ -960,13 +929,14 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
             key={section.key}
             title={section.title}
             description={section.desc}
-            onCreate={() => openCreateDialog(section.createDialog)}
+            onCreate={section.createDialog ? () => openCreateDialog(section.createDialog) : undefined}
           >
             <AdminTable
               columns={section.columns}
               data={section.data}
               onEdit={section.onEdit}
               onDelete={section.onDelete}
+              onToggle={section.onToggle}
               minWidth={section.minWidth}
             />
           </AdminSection>
@@ -1088,7 +1058,6 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
       <CreateAdminDialog isOpen={createDialog === CREATE_DIALOGS.admins} onClose={closeCreateDialog} onCreated={handleCreated} />
       <CreateProductoDialog isOpen={createDialog === CREATE_DIALOGS.productos} onClose={closeCreateDialog} onCreated={handleCreated} />
       <CreateProveedorDialog isOpen={createDialog === CREATE_DIALOGS.proveedores} onClose={closeCreateDialog} onCreated={handleCreated} />
-      <CreateAuditoriaDialog isOpen={createDialog === CREATE_DIALOGS.auditorias} onClose={closeCreateDialog} onCreated={handleCreated} />
       <CreateClienteCarteraDialog isOpen={createDialog === CREATE_DIALOGS.clientes_cartera} onClose={closeCreateDialog} onCreated={handleCreated} />
       <CreateClienteTiendaDialog isOpen={createDialog === CREATE_DIALOGS.clientes_tienda} onClose={closeCreateDialog} onCreated={handleCreated} />
       <CreateClienteFidelizacionDialog isOpen={createDialog === CREATE_DIALOGS.clientes_fidelizacion} onClose={closeCreateDialog} onCreated={handleCreated} />

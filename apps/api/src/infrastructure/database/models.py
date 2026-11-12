@@ -33,6 +33,8 @@ class UsuarioModel(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     rol: Mapped[str] = mapped_column(String(20), nullable=False)
     activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Los tokens emitidos antes de esta fecha ya no valen (se fija al cambiar la clave, el usuario o al desactivarlo).
+    sesiones_desde: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), nullable=True)
 
     def __repr__(self) -> str:
         return f"UsuarioModel(id={self.id!r}, username={self.username!r})"
@@ -569,3 +571,17 @@ def _asignar_turno_abierto(_mapper, connection, target) -> None:
 
 for _modelo in (VentaModel, AbonoCarteraModel, AbonoTiendaModel, GastoModel, FacturaCompraModel):
     event.listen(_modelo, "before_insert", _asignar_turno_abierto)
+
+
+class AuditoriaInmutable(RuntimeError):
+    """La auditoria solo se agrega: nadie la edita ni la borra."""
+
+
+@event.listens_for(AuditoriaModel, "before_update")
+def _auditoria_no_se_edita(_mapper, _connection, _target) -> None:
+    raise AuditoriaInmutable("Los registros de auditoria no se pueden editar")
+
+
+@event.listens_for(AuditoriaModel, "before_delete")
+def _auditoria_no_se_borra(_mapper, _connection, _target) -> None:
+    raise AuditoriaInmutable("Los registros de auditoria no se pueden borrar")

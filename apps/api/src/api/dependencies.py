@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from src.application.services.dashboard_service import DashboardService
 from src.auth.security import decode_access_token
 from src.infrastructure.database.connection import get_db
+from src.auth.sesiones import sesion_revocada
 from src.infrastructure.database.models import UsuarioModel
 from src.infrastructure.repositories.dashboard_metrics_reader import (
     SqlAlchemyDashboardMetricsReader,
@@ -86,7 +87,7 @@ def get_current_user(
     # El token solo prueba identidad: usuario existente, activo y rol vigente salen de la BD,
     # para que desactivar, borrar o cambiar de rol a alguien surta efecto de inmediato.
     usuario = auth_db.execute(
-        select(UsuarioModel.activo, UsuarioModel.rol).where(UsuarioModel.username == username),
+        select(UsuarioModel.activo, UsuarioModel.rol, UsuarioModel.sesiones_desde).where(UsuarioModel.username == username),
     ).one_or_none()
     auth_db.rollback()  # termina la transaccion de lectura y libera la conexion
     current_role = _normalize_role(usuario.rol) if usuario is not None else ""
@@ -94,6 +95,11 @@ def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuario inactivo o inexistente",
+        )
+    if sesion_revocada(usuario.sesiones_desde, payload.get("iat")):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sesion cerrada: vuelve a iniciar sesion",
         )
 
     return AuthenticatedUser(username=username, role=current_role)

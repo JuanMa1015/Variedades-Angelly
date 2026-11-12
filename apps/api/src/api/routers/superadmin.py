@@ -15,19 +15,13 @@ from src.api.services.auditoria import registrar_auditoria
 from src.api.services.caja_calculos import efectivo_esperado
 from src.api.services.stock import mover_stock
 from src.api.dependencies import AuthenticatedUser, require_roles
-from src.api.services.vendedor import (
-    create_vendedor as _create_vendedor,
-    delete_vendedor as _delete_vendedor,
-    list_vendedores as _list_vendedores,
-    update_vendedor as _update_vendedor,
-)
+from src.api.services import usuarios as servicio_usuarios
 from src.api.routers.facturas_compra import (
     FacturaCompraResponse,
     _to_factura_response,
 )
 from src.infrastructure.database.connection import get_db
 from src.infrastructure.database.models import (
-    AuditoriaModel,
     CierreCajaModel,
     DetalleVentaModel,
     FacturaCompraDetalleModel,
@@ -48,6 +42,7 @@ class UsuarioSchema(BaseModel):
     id: int
     username: str
     rol: str
+    activo: bool = True
 
 
 class UsuarioCreate(BaseModel):
@@ -101,26 +96,6 @@ class ProveedorCreateUpdate(BaseModel):
     activo: bool = True
 
 
-class AuditoriaSchema(BaseModel):
-    id: int
-    modulo: str
-    entidad: str
-    entidad_id: int | None
-    accion: str
-    detalle: str | None
-    usuario: str
-    fecha: datetime
-
-
-class AuditoriaCreate(BaseModel):
-    modulo: Annotated[str, Field(min_length=1, max_length=50)]
-    entidad: Annotated[str, Field(min_length=1, max_length=80)]
-    entidad_id: int | None = None
-    accion: Annotated[str, Field(min_length=1, max_length=30)]
-    detalle: str | None = None
-    usuario: Annotated[str | None, Field(max_length=50)] = None  # ignorado: se usa el usuario del token
-
-
 class RankingVentaSchema(BaseModel):
     vendedor: str
     ventas: int
@@ -145,136 +120,59 @@ class InformesSuperadminResponse(BaseModel):
     productos_menos_vendidos: list[RankingProductoSchema]
 
 
-# --- Usuarios (vendedores) reuse shared logic ---
-@router.get("/api/superadmin/usuarios/vendedores", response_model=list[UsuarioSchema])
-def list_vendedores(
-    db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("superadmin")),
-) -> list[UsuarioSchema]:
-    return [UsuarioSchema(**u) for u in _list_vendedores(db)]
+# --- Usuarios (vendedores y admins): se desactivan, no se borran ---
+def _rutas_de_usuarios(ruta: str, rol: str) -> None:
+    """Las mismas rutas para vendedores y admins; la logica vive en services/usuarios.py."""
+
+    @router.get(f"/api/superadmin/usuarios/{ruta}", response_model=list[UsuarioSchema], name=f"listar_{ruta}")
+    def listar(db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_roles("superadmin"))) -> list[UsuarioSchema]:
+        return [UsuarioSchema(**u) for u in servicio_usuarios.listar(db, rol)]
+
+    @router.post(f"/api/superadmin/usuarios/{ruta}", response_model=UsuarioSchema, status_code=201, name=f"crear_{ruta}")
+    def crear(
+        payload: UsuarioCreate,
+        db: Session = Depends(get_db),
+        current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
+    ) -> UsuarioSchema:
+        return UsuarioSchema(**servicio_usuarios.crear(db, rol, payload.username, payload.password, current_user.username))
+
+    @router.patch(f"/api/superadmin/usuarios/{ruta}/{{usuario_id}}", response_model=UsuarioSchema, name=f"editar_{ruta}")
+    def editar(
+        usuario_id: int,
+        payload: UsuarioUpdate,
+        db: Session = Depends(get_db),
+        current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
+    ) -> UsuarioSchema:
+        return UsuarioSchema(**servicio_usuarios.editar(db, rol, usuario_id, payload.username, payload.password, current_user.username))
+
+    @router.delete(f"/api/superadmin/usuarios/{ruta}/{{usuario_id}}", response_model=UsuarioSchema, name=f"desactivar_{ruta}")
+    def desactivar(
+        usuario_id: int,
+        db: Session = Depends(get_db),
+        current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
+    ) -> UsuarioSchema:
+        """Desactiva al usuario (no se borra) y le cierra las sesiones."""
+        return UsuarioSchema(**servicio_usuarios.desactivar(db, rol, usuario_id, current_user.username))
+
+    @router.put(f"/api/superadmin/usuarios/{ruta}/{{usuario_id}}/reactivar", response_model=UsuarioSchema, name=f"reactivar_{ruta}")
+    def reactivar(
+        usuario_id: int,
+        db: Session = Depends(get_db),
+        current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
+    ) -> UsuarioSchema:
+        return UsuarioSchema(**servicio_usuarios.reactivar(db, rol, usuario_id, current_user.username))
+
+    @router.post(f"/api/superadmin/usuarios/{ruta}/{{usuario_id}}/cerrar-sesiones", response_model=UsuarioSchema, name=f"cerrar_sesiones_{ruta}")
+    def cerrar_sesiones(
+        usuario_id: int,
+        db: Session = Depends(get_db),
+        current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
+    ) -> UsuarioSchema:
+        return UsuarioSchema(**servicio_usuarios.cerrar_sesiones(db, rol, usuario_id, current_user.username))
 
 
-@router.post("/api/superadmin/usuarios/vendedores", response_model=UsuarioSchema, status_code=201)
-def create_vendedor(
-    payload: UsuarioCreate,
-    db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
-) -> UsuarioSchema:
-    return UsuarioSchema(**_create_vendedor(payload.username, payload.password, db, current_user.username))
-
-
-@router.patch("/api/superadmin/usuarios/vendedores/{usuario_id}", response_model=UsuarioSchema)
-def update_vendedor(
-    usuario_id: int,
-    payload: UsuarioUpdate,
-    db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
-) -> UsuarioSchema:
-    return UsuarioSchema(**_update_vendedor(usuario_id, payload.username, payload.password, db, current_user.username))
-
-
-@router.delete("/api/superadmin/usuarios/vendedores/{usuario_id}", status_code=204)
-def delete_vendedor(
-    usuario_id: int,
-    db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
-) -> None:
-    _delete_vendedor(usuario_id, db, current_user.username)
-
-
-@router.get("/api/superadmin/usuarios/admins", response_model=list[UsuarioSchema])
-def list_admins(
-    db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("superadmin")),
-) -> list[UsuarioSchema]:
-    usuarios = db.execute(
-        select(UsuarioModel).where(UsuarioModel.rol == "admin").order_by(UsuarioModel.username.asc())
-    ).scalars().all()
-
-    return [UsuarioSchema(id=u.id, username=u.username, rol=u.rol) for u in usuarios]
-
-
-@router.post("/api/superadmin/usuarios/admins", response_model=UsuarioSchema, status_code=201)
-def create_admin(
-    payload: UsuarioCreate,
-    db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
-) -> UsuarioSchema:
-    ensure_password_not_pwned(payload.password)
-    username = payload.username.strip()
-    existente = db.execute(select(UsuarioModel).where(UsuarioModel.username == username)).scalar_one_or_none()
-    if existente is not None:
-        raise HTTPException(status_code=409, detail="Ya existe un usuario con ese username")
-
-    usuario = UsuarioModel(username=username, password_hash=hash_password(payload.password), rol="admin")
-    db.add(usuario)
-    db.flush()
-    registrar_auditoria(db, usuario=current_user.username, modulo="usuarios", entidad="admin", accion="crear", entidad_id=usuario.id, detalle=f"Creado admin {usuario.username}")
-    db.commit()
-    db.refresh(usuario)
-    return UsuarioSchema(id=usuario.id, username=usuario.username, rol=usuario.rol)
-
-
-@router.patch("/api/superadmin/usuarios/admins/{usuario_id}", response_model=UsuarioSchema)
-def update_admin(
-    usuario_id: int,
-    payload: UsuarioUpdate,
-    db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
-) -> UsuarioSchema:
-    usuario = db.execute(
-        select(UsuarioModel).where(
-            UsuarioModel.id == usuario_id,
-            UsuarioModel.rol == "admin",
-        ),
-    ).scalar_one_or_none()
-    if usuario is None:
-        raise HTTPException(status_code=404, detail="Admin no encontrado")
-
-    if payload.username is not None:
-        next_username = payload.username.strip()
-        if not next_username:
-            raise HTTPException(status_code=400, detail="Username invalido")
-
-        existe_username = db.execute(
-            select(UsuarioModel).where(
-                UsuarioModel.username == next_username,
-                UsuarioModel.id != usuario_id,
-            ),
-        ).scalar_one_or_none()
-        if existe_username is not None:
-            raise HTTPException(status_code=409, detail="Ya existe un usuario con ese username")
-
-        usuario.username = next_username
-
-    if payload.password is not None:
-        ensure_password_not_pwned(payload.password)
-        usuario.password_hash = hash_password(payload.password)
-
-    registrar_auditoria(db, usuario=current_user.username, modulo="usuarios", entidad="admin", accion="editar", entidad_id=usuario.id, detalle=f"Editado admin {usuario.username}")
-    db.commit()
-    db.refresh(usuario)
-    return UsuarioSchema(id=usuario.id, username=usuario.username, rol=usuario.rol)
-
-
-@router.delete("/api/superadmin/usuarios/admins/{usuario_id}", status_code=204)
-def delete_admin(
-    usuario_id: int,
-    db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
-) -> None:
-    usuario = db.execute(
-        select(UsuarioModel).where(
-            UsuarioModel.id == usuario_id,
-            UsuarioModel.rol == "admin",
-        ),
-    ).scalar_one_or_none()
-    if usuario is None:
-        raise HTTPException(status_code=404, detail="Admin no encontrado")
-
-    registrar_auditoria(db, usuario=current_user.username, modulo="usuarios", entidad="admin", accion="eliminar", entidad_id=usuario.id, detalle=f"Eliminado admin {usuario.username}")
-    db.delete(usuario)
-    db.commit()
+_rutas_de_usuarios("vendedores", "vendedor")
+_rutas_de_usuarios("admins", "admin")
 
 
 # --- Productos ---
@@ -450,63 +348,6 @@ def delete_proveedor(
 
 
 # --- Auditorias ---
-@router.get("/api/superadmin/auditorias", response_model=list[AuditoriaSchema])
-def list_auditorias(
-    page: int = Query(default=1, ge=1),
-    limit: int = Query(default=200, ge=1, le=500),
-    db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("superadmin")),
-):
-    offset = (page - 1) * limit
-    rows = db.execute(
-        select(AuditoriaModel).order_by(AuditoriaModel.fecha.desc()).offset(offset).limit(limit),
-    ).scalars().all()
-    return [AuditoriaSchema(id=r.id, modulo=r.modulo, entidad=r.entidad, entidad_id=r.entidad_id, accion=r.accion, detalle=r.detalle, usuario=r.usuario, fecha=r.fecha) for r in rows]
-
-
-@router.post("/api/superadmin/auditorias", response_model=AuditoriaSchema, status_code=201)
-def create_auditoria(payload: AuditoriaCreate, db: Session = Depends(get_db), current_user: AuthenticatedUser = Depends(require_roles("superadmin"))):
-    a = AuditoriaModel(modulo=payload.modulo, entidad=payload.entidad, entidad_id=payload.entidad_id, accion=payload.accion, detalle=payload.detalle, usuario=current_user.username)
-    db.add(a)
-    db.commit()
-    db.refresh(a)
-    return AuditoriaSchema(id=a.id, modulo=a.modulo, entidad=a.entidad, entidad_id=a.entidad_id, accion=a.accion, detalle=a.detalle, usuario=a.usuario, fecha=a.fecha)
-
-
-@router.patch("/api/superadmin/auditorias/{auditoria_id}", response_model=AuditoriaSchema)
-def update_auditoria(
-    auditoria_id: int,
-    payload: AuditoriaCreate,
-    db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("superadmin")),
-):
-    a = db.execute(select(AuditoriaModel).where(AuditoriaModel.id == auditoria_id)).scalar_one_or_none()
-    if a is None:
-        raise HTTPException(status_code=404, detail="Auditoria no encontrada")
-    a.modulo = payload.modulo
-    a.entidad = payload.entidad
-    a.entidad_id = payload.entidad_id
-    a.accion = payload.accion
-    a.detalle = payload.detalle
-    a.usuario = payload.usuario
-    db.commit()
-    db.refresh(a)
-    return AuditoriaSchema(id=a.id, modulo=a.modulo, entidad=a.entidad, entidad_id=a.entidad_id, accion=a.accion, detalle=a.detalle, usuario=a.usuario, fecha=a.fecha)
-
-
-@router.delete("/api/superadmin/auditorias/{auditoria_id}", status_code=204)
-def delete_auditoria(
-    auditoria_id: int,
-    db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("superadmin")),
-):
-    a = db.execute(select(AuditoriaModel).where(AuditoriaModel.id == auditoria_id)).scalar_one_or_none()
-    if a is None:
-        raise HTTPException(status_code=404, detail="Auditoria no encontrada")
-    db.delete(a)
-    db.commit()
-
-
 @router.get("/api/superadmin/informes", response_model=InformesSuperadminResponse)
 def informes_superadmin(
     db: Session = Depends(get_db),

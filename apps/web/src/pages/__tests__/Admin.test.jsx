@@ -92,7 +92,6 @@ vi.mock('../admin/components/CreateDialogs/CreateVendedorDialog', () => ({ defau
 vi.mock('../admin/components/CreateDialogs/CreateAdminDialog', () => ({ default: ({ isOpen }) => isOpen ? <div data-testid="create-admin-dialog" /> : null }));
 vi.mock('../admin/components/CreateDialogs/CreateProductoDialog', () => ({ default: ({ isOpen }) => isOpen ? <div data-testid="create-producto-dialog" /> : null }));
 vi.mock('../admin/components/CreateDialogs/CreateProveedorDialog', () => ({ default: ({ isOpen }) => isOpen ? <div data-testid="create-proveedor-dialog" /> : null }));
-vi.mock('../admin/components/CreateDialogs/CreateAuditoriaDialog', () => ({ default: ({ isOpen }) => isOpen ? <div data-testid="create-auditoria-dialog" /> : null }));
 vi.mock('../admin/components/CreateDialogs/CreateClienteCarteraDialog', () => ({ default: ({ isOpen }) => isOpen ? <div data-testid="create-cliente-cartera-dialog" /> : null }));
 vi.mock('../admin/components/CreateDialogs/CreateClienteTiendaDialog', () => ({ default: ({ isOpen }) => isOpen ? <div data-testid="create-cliente-tienda-dialog" /> : null }));
 vi.mock('../admin/components/CreateDialogs/CreateClienteFidelizacionDialog', () => ({ default: ({ isOpen }) => isOpen ? <div data-testid="create-cliente-fidelizacion-dialog" /> : null }));
@@ -145,7 +144,7 @@ const setupApiMock = () => {
     if (endpoint.startsWith('/api/gastos/paginados')) return Promise.resolve({ data: mockData.gastos });
     if (endpoint.startsWith('/api/clientes/tienda-fiado')) return Promise.resolve(mockData.clientesTienda);
     if (endpoint.startsWith('/api/fidelizacion/clientes')) return Promise.resolve(mockData.clientesFidelizacion);
-    if (endpoint.startsWith('/api/superadmin/auditorias')) return Promise.resolve(mockData.auditorias);
+    if (endpoint.startsWith('/api/auditorias')) return Promise.resolve(mockData.auditorias);
     if (endpoint === '/api/superadmin/usuarios/vendedores') return Promise.resolve(mockData.vendedores);
     if (endpoint === '/api/superadmin/usuarios/admins') return Promise.resolve(mockData.admins);
     if (endpoint === '/api/clientes') return Promise.resolve(mockData.clientes);
