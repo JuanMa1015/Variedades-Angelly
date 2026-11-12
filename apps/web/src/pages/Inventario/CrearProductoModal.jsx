@@ -49,7 +49,7 @@ const confirmarPrecio = (confirmar, nombre, form) => (
 );
 
 // Carga manual: un producto nuevo con todos sus datos.
-const FormularioManual = ({ proveedores, confirmar, onCreated, sinStock = false }) => {
+const FormularioManual = ({ proveedores, confirmar, onCreated, catalogo = 'tienda', sinStock = false }) => {
   const [form, setForm] = useState(VACIO);
   const [imagen, setImagen] = useState(IMAGEN_VACIA);
   const [error, setError] = useState('');
@@ -73,7 +73,7 @@ const FormularioManual = ({ proveedores, confirmar, onCreated, sinStock = false 
         precio_venta: form.precio_venta,
         stock_actual: sinStock ? 0 : Number(form.stock_actual || 0),
         stock_minimo: Number(form.stock_minimo || 0),
-        catalogo: 'tienda',
+        catalogo,
         proveedor_id: form.proveedor_id ? Number(form.proveedor_id) : null,
         imagen_url,
       });
@@ -102,9 +102,11 @@ const FormularioManual = ({ proveedores, confirmar, onCreated, sinStock = false 
       <Campo id="nuevo-minimo" etiqueta="Stock mínimo">
         <input id="nuevo-minimo" type="number" min="0" value={form.stock_minimo} onChange={(e) => campo('stock_minimo')(e.target.value)} placeholder="Ej: 5" className={INPUT} />
       </Campo>
-      <Campo id="nuevo-proveedor" etiqueta="Proveedor">
-        <SelectProveedor id="nuevo-proveedor" value={form.proveedor_id} onChange={campo('proveedor_id')} proveedores={proveedores} />
-      </Campo>
+      {proveedores && (
+        <Campo id="nuevo-proveedor" etiqueta="Proveedor">
+          <SelectProveedor id="nuevo-proveedor" value={form.proveedor_id} onChange={campo('proveedor_id')} proveedores={proveedores} />
+        </Campo>
+      )}
       <div className="sm:col-span-2"><ImagenCampo valor={imagen} onChange={setImagen} /></div>
       <button type="submit" disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-lg bg-rosewood px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300 sm:col-span-2">
         <Plus className="h-4 w-4" aria-hidden="true" />
@@ -115,7 +117,7 @@ const FormularioManual = ({ proveedores, confirmar, onCreated, sinStock = false 
 };
 
 // Por codigo de barras: si el producto ya existe suma unidades (con su motivo); si no, lo crea.
-const FormularioCodigo = ({ proveedores, confirmar, onCreated }) => {
+const FormularioCodigo = ({ proveedores, confirmar, onCreated, catalogo = 'tienda' }) => {
   const [form, setForm] = useState(VACIO);
   const [imagen, setImagen] = useState(IMAGEN_VACIA);
   const [error, setError] = useState('');
@@ -141,7 +143,7 @@ const FormularioCodigo = ({ proveedores, confirmar, onCreated }) => {
       precio_venta: form.precio_venta,
       stock_actual: Number(form.stock_actual || 1),
       stock_minimo: Number(form.stock_minimo || 0),
-      catalogo: 'tienda',
+      catalogo,
       proveedor_id: form.proveedor_id ? Number(form.proveedor_id) : null,
       imagen_url,
     });
@@ -155,7 +157,7 @@ const FormularioCodigo = ({ proveedores, confirmar, onCreated }) => {
     setSaving(true);
     setError('');
     try {
-      const existente = await buscarPorCodigo(codigo);
+      const existente = await buscarPorCodigo(codigo, catalogo);
       const mensaje = existente ? await sumarAExistente(existente) : await crearNuevo(codigo);
       if (mensaje === null) { setSaving(false); return; }
       await onCreated(mensaje);
@@ -178,9 +180,11 @@ const FormularioCodigo = ({ proveedores, confirmar, onCreated }) => {
       <Campo id="cod-nombre" etiqueta="Nombre (solo si es nuevo)">
         <input id="cod-nombre" type="text" value={form.nombre} onChange={(e) => campo('nombre')(e.target.value)} maxLength={120} className={INPUT} />
       </Campo>
-      <Campo id="cod-proveedor" etiqueta="Proveedor">
-        <SelectProveedor id="cod-proveedor" value={form.proveedor_id} onChange={campo('proveedor_id')} proveedores={proveedores} />
-      </Campo>
+      {proveedores && (
+        <Campo id="cod-proveedor" etiqueta="Proveedor">
+          <SelectProveedor id="cod-proveedor" value={form.proveedor_id} onChange={campo('proveedor_id')} proveedores={proveedores} />
+        </Campo>
+      )}
       <Precios form={form} campo={campo} />
       <div className="sm:col-span-2"><ImagenCampo valor={imagen} onChange={setImagen} /></div>
       <button type="submit" disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300 sm:col-span-2">
@@ -199,9 +203,9 @@ const PESTANAS = [
 // Cada pestaña se monta al abrirse: cerrar el cuadro siempre deja los formularios limpios.
 // `soloManual`: sin la pestaña de codigo de barras (que suma stock) ni stock inicial; lo usa la factura de compra,
 // que es la que suma las unidades.
-const Contenido = ({ proveedores, confirmar, onCreated, soloManual = false }) => {
+const Contenido = ({ proveedores, confirmar, onCreated, catalogo = 'tienda', soloManual = false }) => {
   const [pestana, setPestana] = useState('manual');
-  if (soloManual) return <FormularioManual proveedores={proveedores} confirmar={confirmar} onCreated={onCreated} sinStock />;
+  if (soloManual) return <FormularioManual proveedores={proveedores} confirmar={confirmar} onCreated={onCreated} catalogo={catalogo} sinStock />;
   const Formulario = pestana === 'manual' ? FormularioManual : FormularioCodigo;
   return (
     <>
@@ -212,7 +216,7 @@ const Contenido = ({ proveedores, confirmar, onCreated, soloManual = false }) =>
           </button>
         ))}
       </div>
-      <Formulario proveedores={proveedores} confirmar={confirmar} onCreated={onCreated} />
+      <Formulario proveedores={proveedores} confirmar={confirmar} onCreated={onCreated} catalogo={catalogo} />
     </>
   );
 };

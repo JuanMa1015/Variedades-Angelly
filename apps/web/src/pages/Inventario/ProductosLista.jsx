@@ -52,7 +52,7 @@ const Acciones = ({ producto, canDeactivate, onEditar, onHistorial, onEliminar, 
 };
 
 // Escritorio: tabla. Celular: tarjetas (la tabla obligaba a deslizar de lado y dejaba los botones fuera de la pantalla).
-const Tabla = ({ productos, ...acciones }) => (
+const Tabla = ({ productos, conProveedor = true, ...acciones }) => (
   <div className="hidden overflow-x-auto md:block">
     <table className="w-full text-sm">
       <thead>
@@ -61,7 +61,7 @@ const Tabla = ({ productos, ...acciones }) => (
           <th className="px-4 py-3 font-semibold text-gray-700">Código</th>
           <th className="px-4 py-3 font-semibold text-gray-700">Stock</th>
           <th className="px-4 py-3 font-semibold text-gray-700">Mín</th>
-          <th className="px-4 py-3 font-semibold text-gray-700">Proveedor</th>
+          {conProveedor && <th className="px-4 py-3 font-semibold text-gray-700">Proveedor</th>}
           <th className="px-4 py-3 font-semibold text-gray-700">Precio venta</th>
           <th className="px-4 py-3 text-right font-semibold text-gray-700">Acciones</th>
         </tr>
@@ -78,7 +78,7 @@ const Tabla = ({ productos, ...acciones }) => (
             <td className="px-4 py-3 text-gray-700">{producto.codigo_barras || '-'}</td>
             <td className="px-4 py-3"><StockCelda producto={producto} /></td>
             <td className="px-4 py-3 text-gray-700">{producto.stock_minimo}</td>
-            <td className="px-4 py-3 text-gray-700">{producto.proveedor_nombre || '-'}</td>
+            {conProveedor && <td className="px-4 py-3 text-gray-700">{producto.proveedor_nombre || '-'}</td>}
             <td className="px-4 py-3 text-gray-700">{formatMoney(producto.precio_venta)}</td>
             <td className="px-4 py-3"><div className="flex justify-end"><Acciones producto={producto} {...acciones} /></div></td>
           </tr>

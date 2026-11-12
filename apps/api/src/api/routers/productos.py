@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.api.services.auditoria import registrar_auditoria
+from src.api.services.catalogos import catalogo_del_rol, exigir_catalogo_propio, resolver_catalogo
 from src.api.services.stock import mover_stock
 from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.pagination import PageInfo, search_filter
@@ -162,12 +163,22 @@ def _orden(orden: OrdenProductos):
     return (ProductoModel.nombre.asc(),)
 
 
-def _nombre_repetido(db: Session, nombre: str, excluir_id: int | None = None) -> bool:
+def _producto_con_nombre(db: Session, nombre: str, excluir_id: int | None = None) -> ProductoModel | None:
     """Los nombres se comparan sin importar mayusculas: 'Arroz' y 'arroz' son el mismo producto."""
-    consulta = select(ProductoModel.id).where(func.lower(ProductoModel.nombre) == nombre.strip().lower())
+    consulta = select(ProductoModel).where(func.lower(ProductoModel.nombre) == nombre.strip().lower())
     if excluir_id is not None:
         consulta = consulta.where(ProductoModel.id != excluir_id)
-    return db.execute(consulta.limit(1)).first() is not None
+    return db.execute(consulta.limit(1)).scalar_one_or_none()
+
+
+def _detalle_repetido(otro: ProductoModel, que: str) -> str:
+    """Dice donde esta el repetido: en que catalogo y si esta desactivado (la base no permite repetirlo en ninguno)."""
+    sufijo = " (desactivado: reactivalo en lugar de crearlo de nuevo)" if not otro.activo else ""
+    return f"Ya existe un producto con ese {que} en el catalogo de {otro.catalogo}{sufijo}"
+
+
+def _nombre_repetido(db: Session, nombre: str, excluir_id: int | None = None) -> bool:
+    return _producto_con_nombre(db, nombre, excluir_id) is not None
 
 
 @router.get("/api/productos", response_model=list[ProductoResponse])
@@ -176,9 +187,10 @@ def list_productos(
     catalogo: str = Query("todos", pattern="^(todos|tienda|cartera)$"),
     q: str | None = Query(default=None, min_length=1, max_length=100),
     include_inactivos: bool = Query(default=False),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> list[ProductoResponse]:
-    """Lista todos los productos del inventario. Opcionalmente filtra por texto en nombre o código de barras."""
+    """Lista los productos del catalogo del rol. Opcionalmente filtra por texto en nombre o código de barras."""
+    catalogo = resolver_catalogo(current_user, catalogo)
     query = select(ProductoModel)
     if not include_inactivos:
         query = query.where(ProductoModel.activo == True)
@@ -202,9 +214,10 @@ def list_productos_paginados(
     proveedor_id: int | None = Query(default=None, gt=0),
     orden: OrdenProductos = Query(default="nombre"),
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> ProductoPageResponse:
-    """Lista paginada de productos con busqueda, filtro por estado de stock, proveedor y orden."""
+    """Lista paginada de productos del catalogo del rol con busqueda, filtro por estado de stock, proveedor y orden."""
+    catalogo = resolver_catalogo(current_user, catalogo)
     query = select(ProductoModel)
     if solo_inactivos:
         query = query.where(ProductoModel.activo == False)
@@ -235,14 +248,16 @@ def create_producto(
 ) -> ProductoResponse:
     """Crea un producto nuevo para inventario."""
     repository = SqlAlchemyProductoRepository(db)
+    exigir_catalogo_propio(current_user, payload.catalogo)
 
-    if _nombre_repetido(db, payload.nombre):
-        raise HTTPException(status_code=409, detail="Ya existe un producto con ese nombre")
+    repetido = _producto_con_nombre(db, payload.nombre)
+    if repetido is not None:
+        raise HTTPException(status_code=409, detail=_detalle_repetido(repetido, "nombre"))
 
     if payload.codigo_barras:
         existe_codigo = db.execute(select(ProductoModel).where(ProductoModel.codigo_barras == payload.codigo_barras.strip())).scalar_one_or_none()
         if existe_codigo is not None:
-            raise HTTPException(status_code=409, detail="Ya existe un producto con ese codigo de barras")
+            raise HTTPException(status_code=409, detail=_detalle_repetido(existe_codigo, "codigo de barras"))
 
     producto = Producto(
         nombre=payload.nombre.strip(),
@@ -311,6 +326,7 @@ def update_producto(
     producto = db.execute(select(ProductoModel).where(ProductoModel.id == producto_id)).scalar_one_or_none()
     if producto is None:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
+    exigir_catalogo_propio(current_user, producto.catalogo)
 
     enviados = payload.model_fields_set
     campos: dict = {}
@@ -319,8 +335,9 @@ def update_producto(
         nombre = payload.nombre.strip()
         if not nombre:
             raise HTTPException(status_code=400, detail="El nombre no puede estar vacio")
-        if _nombre_repetido(db, nombre, excluir_id=producto_id):
-            raise HTTPException(status_code=409, detail="Ya existe un producto con ese nombre")
+        repetido = _producto_con_nombre(db, nombre, excluir_id=producto_id)
+        if repetido is not None:
+            raise HTTPException(status_code=409, detail=_detalle_repetido(repetido, "nombre"))
         campos["nombre"] = nombre
 
     if "codigo_barras" in enviados:
@@ -330,7 +347,7 @@ def update_producto(
                 select(ProductoModel).where(ProductoModel.codigo_barras == codigo, ProductoModel.id != producto_id)
             ).scalar_one_or_none()
             if existente_codigo is not None:
-                raise HTTPException(status_code=409, detail="Ya existe un producto con ese codigo de barras")
+                raise HTTPException(status_code=409, detail=_detalle_repetido(existente_codigo, "codigo de barras"))
         campos["codigo_barras"] = codigo
 
     for nombre in ("precio_costo", "precio_venta", "stock_minimo", "catalogo", "activo"):
@@ -342,6 +359,10 @@ def update_producto(
         campos["proveedor_id"] = payload.proveedor_id
     if "imagen_url" in enviados:
         campos["imagen_url"] = payload.imagen_url or None
+
+    # Pasar un producto de un catalogo a otro cambia de quien es: solo lo decide quien ve los dos.
+    if "catalogo" in campos and campos["catalogo"] != producto.catalogo and catalogo_del_rol(current_user) is not None:
+        raise HTTPException(status_code=403, detail="Solo el superadmin puede pasar un producto de un catalogo a otro")
 
     cambios = _cambios_producto(producto, campos)
     for nombre, valor in campos.items():
@@ -377,6 +398,7 @@ def delete_producto(
     producto = db.execute(select(ProductoModel).where(ProductoModel.id == producto_id)).scalar_one_or_none()
     if producto is None:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
+    exigir_catalogo_propio(current_user, producto.catalogo)
 
     registrar_auditoria(
         db,
@@ -402,6 +424,7 @@ def reactivar_producto(
     producto = db.execute(select(ProductoModel).where(ProductoModel.id == producto_id)).scalar_one_or_none()
     if producto is None:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
+    exigir_catalogo_propio(current_user, producto.catalogo)
     registrar_auditoria(
         db,
         usuario=current_user.username,
@@ -427,6 +450,7 @@ def patch_producto_stock(
     producto = db.execute(select(ProductoModel).where(ProductoModel.id == producto_id).with_for_update()).scalar_one_or_none()
     if producto is None:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
+    exigir_catalogo_propio(current_user, producto.catalogo)
     mover_stock(db, producto, payload.delta, tipo="ajuste", usuario=current_user.username, motivo="Ajuste rapido")
     db.commit()
     db.refresh(producto)
@@ -441,6 +465,10 @@ def patch_producto_precio_venta(
     current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> ProductoResponse:
     """Permite editar precio de venta en modo inline desde el dashboard."""
+    existente = db.get(ProductoModel, producto_id)
+    if existente is None:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    exigir_catalogo_propio(current_user, existente.catalogo)
     registrar_auditoria(
         db,
         usuario=current_user.username,

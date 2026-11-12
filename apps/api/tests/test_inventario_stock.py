@@ -175,7 +175,7 @@ def test_ajustar_un_producto_inexistente_o_sin_sesion(auth_client) -> None:
 def test_el_historial_junta_ventas_compras_anulaciones_y_ajustes(auth_client) -> None:
     client, sf = auth_client
     producto = _producto(sf, stock=10)
-    admin = _admin(client)
+    admin = _login_token(client, "angelly_superadmin", "supersecure123")  # ve tienda y cartera
     venta = client.post("/api/ventas", headers=_h(admin), json={
         "items": [{"producto_id": producto, "cantidad": 3}], "es_fiado": False, "metodo_pago": "efectivo",
     }).json()["venta_id"]
@@ -412,7 +412,7 @@ def test_ver_solo_los_desactivados(auth_client) -> None:
     client, sf = auth_client
     _catalogo(sf)
 
-    solo = _lista(client, _admin(client), solo_inactivos=True)
+    solo = _lista(client, _vendedor(client), solo_inactivos=True)
 
     assert [x["nombre"] for x in solo["data"]] == ["Inactivo"] and solo["data"][0]["activo"] is False
 

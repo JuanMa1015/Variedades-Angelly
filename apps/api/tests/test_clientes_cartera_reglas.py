@@ -297,9 +297,9 @@ def test_un_abono_se_aplica_a_lo_mas_viejo_y_rejuvenece_la_deuda(auth_client) ->
 # -- Cupo y deuda --
 
 
-def _producto(sf) -> int:
+def _producto(sf, catalogo: str = "cartera") -> int:
     with sf() as db:
-        producto = ProductoModel(nombre="Arroz", precio_costo=500, precio_venta=1000, stock_actual=50, stock_minimo=1, catalogo="cartera")
+        producto = ProductoModel(nombre="Arroz", precio_costo=500, precio_venta=1000, stock_actual=50, stock_minimo=1, catalogo=catalogo)
         db.add(producto)
         db.commit()
         return producto.id
@@ -308,7 +308,7 @@ def _producto(sf) -> int:
 def test_un_cliente_nuevo_sin_cupo_definido_puede_comprar_a_credito_en_el_pos(auth_client) -> None:
     client, sf = auth_client
     cliente = _cliente(sf)  # limite_credito 0: ninguna pantalla lo fija
-    producto = _producto(sf)
+    producto = _producto(sf, catalogo="tienda")  # el punto de venta solo vende productos de la tienda
 
     respuesta = client.post(
         "/api/ventas",

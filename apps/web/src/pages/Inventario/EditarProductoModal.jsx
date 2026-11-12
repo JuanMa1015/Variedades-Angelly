@@ -22,7 +22,7 @@ export const Margen = ({ costo, venta }) => {
 };
 
 // Solo se envia lo que el usuario cambio: asi editar un precio nunca pisa el stock ni otros campos.
-const diferencias = (producto, form) => {
+const diferencias = (producto, form, conProveedor = true) => {
   const cambios = {};
   const nombre = form.nombre.trim();
   const codigo = form.codigo_barras.trim() || null;
@@ -32,7 +32,7 @@ const diferencias = (producto, form) => {
   if (form.precio_costo !== Number(producto.precio_costo)) cambios.precio_costo = form.precio_costo;
   if (form.precio_venta !== Number(producto.precio_venta)) cambios.precio_venta = form.precio_venta;
   if (Number(form.stock_minimo) !== Number(producto.stock_minimo)) cambios.stock_minimo = Number(form.stock_minimo || 0);
-  if (proveedor !== (producto.proveedor_id ?? null)) cambios.proveedor_id = proveedor;
+  if (conProveedor && proveedor !== (producto.proveedor_id ?? null)) cambios.proveedor_id = proveedor;
   return cambios;
 };
 
@@ -52,7 +52,7 @@ const Formulario = ({ producto, proveedores, confirmar, onSaved, onAjustar, onCl
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    const cambios = diferencias(producto, form);
+    const cambios = diferencias(producto, form, Boolean(proveedores));
     const imagenCambia = imagenCambio(imagen);
     if (!form.nombre.trim()) { setError('El nombre del producto es obligatorio'); return; }
     if (!(form.precio_venta > 0)) { setError('El precio de venta debe ser mayor a 0'); return; }
@@ -110,13 +110,15 @@ const Formulario = ({ producto, proveedores, confirmar, onSaved, onAjustar, onCl
           <input id="prod-minimo" type="number" min="0" value={form.stock_minimo} onChange={(e) => campo('stock_minimo')(e.target.value)} className={INPUT} />
         </div>
       </div>
-      <div>
-        <label htmlFor="prod-proveedor" className={LABEL}>Proveedor</label>
-        <select id="prod-proveedor" value={form.proveedor_id} onChange={(e) => campo('proveedor_id')(e.target.value)} className={INPUT}>
-          <option value="">Sin proveedor</option>
-          {proveedores.filter((p) => p.activo).map((prov) => <option key={prov.id} value={prov.id}>{prov.nombre}</option>)}
-        </select>
-      </div>
+      {proveedores && (
+        <div>
+          <label htmlFor="prod-proveedor" className={LABEL}>Proveedor</label>
+          <select id="prod-proveedor" value={form.proveedor_id} onChange={(e) => campo('proveedor_id')(e.target.value)} className={INPUT}>
+            <option value="">Sin proveedor</option>
+            {proveedores.filter((p) => p.activo).map((prov) => <option key={prov.id} value={prov.id}>{prov.nombre}</option>)}
+          </select>
+        </div>
+      )}
       <ImagenCampo actual={producto.imagen_url} valor={imagen} onChange={setImagen} />
       <div className="flex gap-2 pt-1">
         <button type="button" onClick={onClose} className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancelar</button>

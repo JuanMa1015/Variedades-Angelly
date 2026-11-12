@@ -15,14 +15,15 @@ const Chip = ({ activo, onClick, children }) => (
 );
 
 // Buscador (nombre, codigo o proveedor), filtro por estado de stock, proveedor y orden: todo lo resuelve el servidor.
-const InventarioToolbar = ({ texto, onTexto, filtros, onFiltro, proveedores, puedeVerDesactivados, onRecargar }) => (
+// Sin `proveedores` (cartera no los usa) no se muestra el filtro de proveedor.
+const InventarioToolbar = ({ texto, onTexto, filtros, onFiltro, proveedores, puedeVerDesactivados, onRecargar, placeholder = 'Buscar por nombre, código o proveedor' }) => (
   <div className="mb-4 space-y-3">
     <div className="flex flex-wrap items-center gap-2">
       <div className="relative min-w-[14rem] flex-1">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" aria-hidden="true" />
         <input
           type="text"
-          placeholder="Buscar por nombre, código o proveedor"
+          placeholder={placeholder}
           aria-label="Buscar productos"
           value={texto}
           onChange={(e) => onTexto(e.target.value)}
@@ -48,11 +49,15 @@ const InventarioToolbar = ({ texto, onTexto, filtros, onFiltro, proveedores, pue
         <Chip activo={filtros.soloInactivos} onClick={() => onFiltro({ soloInactivos: !filtros.soloInactivos, estado: 'todos' })}>Desactivados</Chip>
       )}
       <div className="ml-auto flex flex-wrap items-center gap-2">
-        <label htmlFor="filtro-proveedor" className="sr-only">Proveedor</label>
-        <select id="filtro-proveedor" value={filtros.proveedorId ?? ''} onChange={(e) => onFiltro({ proveedorId: e.target.value ? Number(e.target.value) : null })} className={SELECT}>
-          <option value="">Todos los proveedores</option>
-          {proveedores.filter((p) => p.activo).map((prov) => <option key={prov.id} value={prov.id}>{prov.nombre}</option>)}
-        </select>
+        {proveedores && (
+          <>
+            <label htmlFor="filtro-proveedor" className="sr-only">Proveedor</label>
+            <select id="filtro-proveedor" value={filtros.proveedorId ?? ''} onChange={(e) => onFiltro({ proveedorId: e.target.value ? Number(e.target.value) : null })} className={SELECT}>
+              <option value="">Todos los proveedores</option>
+              {proveedores.filter((p) => p.activo).map((prov) => <option key={prov.id} value={prov.id}>{prov.nombre}</option>)}
+            </select>
+          </>
+        )}
         <label htmlFor="orden-productos" className="sr-only">Ordenar por</label>
         <select id="orden-productos" value={filtros.orden} onChange={(e) => onFiltro({ orden: e.target.value })} className={SELECT}>
           <option value="nombre">Nombre</option>
