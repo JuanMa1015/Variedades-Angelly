@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
+import { reactivarClienteCartera } from '../../api/carteraClientesApi';
 import useConfirm from '../../components/useConfirm';
 import {
   deleteCarteraCliente,
@@ -339,15 +340,31 @@ export const useCarteraData = () => {
   };
 
   const handleDeleteCliente = async (cliente) => {
-    const confirmed = await confirm({ title: 'Eliminar cliente', message: `¿Eliminar cliente ${cliente.nombre}?` });
+    const confirmed = await confirm({
+      title: 'Desactivar cliente',
+      confirmLabel: 'Desactivar',
+      message: `¿Desactivar a ${cliente.nombre}? Conserva su historial y podrás reactivarlo en «Desactivados». Solo se puede si no tiene deuda.`,
+    });
     if (!confirmed) return;
 
     try {
+      cleanMessages();
       await deleteCarteraCliente({ clienteId: cliente.id });
-      setSuccess('Cliente eliminado correctamente');
+      setSuccess(`${cliente.nombre} desactivado`);
       refreshPage();
     } catch (err) {
-      setError(err.message || 'No fue posible eliminar el cliente');
+      setError(err.message || 'No fue posible desactivar el cliente');
+    }
+  };
+
+  const handleReactivarCliente = async (cliente) => {
+    try {
+      cleanMessages();
+      await reactivarClienteCartera(cliente.id);
+      setSuccess(`${cliente.nombre} reactivado`);
+      refreshPage();
+    } catch (err) {
+      setError(err.message || 'No fue posible reactivar el cliente');
     }
   };
 
@@ -749,6 +766,8 @@ export const useCarteraData = () => {
     cancelEditingProducto,
     handleSubmitCliente,
     handleDeleteCliente,
+    handleReactivarCliente,
+    reloadTick,
     handleSubmitProducto,
     handleDeleteProducto,
     handleAbrirWhatsapp,

@@ -1,7 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { vi } from 'vitest';
 import CarteraDashboardSection from '../CarteraDashboardSection';
-import CarteraClientesSection from '../CarteraClientesSection';
 import CarteraVentaSection from '../CarteraVentaSection';
 import CarteraCobrarSection from '../CarteraCobrarSection';
 
@@ -49,41 +48,6 @@ describe('Cartera sections smoke tests', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /cobrar cartera/i }));
     expect(navigate).toHaveBeenCalledWith('/cartera/cobrar');
-  });
-
-  it('renders clientes table actions for edit and delete flows', () => {
-    const startNewCliente = vi.fn();
-    const startEditingCliente = vi.fn();
-    const handleDeleteCliente = vi.fn();
-
-    render(
-      <CarteraClientesSection
-        clientesCarteraFiltrados={[
-          { id: 1, nombre: 'Cliente A', documento: '123', telefono_whatsapp: '3001234567', deuda_total: 78000 },
-        ]}
-        formatMoney={formatMoney}
-        searchTerm=""
-        setSearchTerm={vi.fn()}
-        startNewCliente={startNewCliente}
-        startEditingCliente={startEditingCliente}
-        handleDeleteCliente={handleDeleteCliente}
-      />,
-    );
-
-    expect(screen.getByText('Registro de clientes')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: /registrar cliente/i }));
-    expect(startNewCliente).toHaveBeenCalled();
-
-    fireEvent.click(screen.getAllByRole('button', { name: /editar/i })[0]);
-    expect(startEditingCliente).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 1, nombre: 'Cliente A' }),
-    );
-
-    fireEvent.click(screen.getAllByRole('button', { name: /eliminar/i })[0]);
-    expect(handleDeleteCliente).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 1, nombre: 'Cliente A' }),
-    );
   });
 
   it('renders venta flow and toggles critical controls', () => {

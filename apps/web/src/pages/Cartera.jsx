@@ -49,7 +49,6 @@ const Cartera = () => {
     activeSection,
     clientes,
     clientesCatalogo,
-    clientesCarteraFiltrados,
     clientesRanking,
     clientesMasCompras,
     clientesAccesoRapido,
@@ -92,6 +91,8 @@ const Cartera = () => {
     cancelEditingProducto,
     handleSubmitCliente,
     handleDeleteCliente,
+    handleReactivarCliente,
+    reloadTick,
     handleDeleteProducto,
     handleAbrirWhatsapp,
     handleRegistrarAbono,
@@ -182,13 +183,13 @@ const Cartera = () => {
 
       {activeSection === 'clientes' && (
         <CarteraClientesSection
-          clientesCarteraFiltrados={clientesCarteraFiltrados}
           formatMoney={formatMoney}
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
+          recargar={reloadTick}
           startNewCliente={startNewCliente}
           startEditingCliente={startEditingCliente}
           handleDeleteCliente={handleDeleteCliente}
+          handleReactivarCliente={handleReactivarCliente}
+          handleVerDetalle={handleVerDetalle}
         />
       )}
 

@@ -1,11 +1,11 @@
 import { useCallback, useState } from 'react';
 
 const useConfirm = () => {
-  const [confirmState, setConfirmState] = useState({ isOpen: false, title: '', message: '', variant: 'danger', resolve: null });
+  const [confirmState, setConfirmState] = useState({ isOpen: false, title: '', message: '', variant: 'danger', confirmLabel: '', resolve: null });
 
-  const confirm = useCallback(({ title = 'Confirmar', message = '¿Estás seguro?', variant = 'danger' } = {}) => {
+  const confirm = useCallback(({ title = 'Confirmar', message = '¿Estás seguro?', variant = 'danger', confirmLabel = '' } = {}) => {
     return new Promise((resolve) => {
-      setConfirmState({ isOpen: true, title, message, variant, resolve });
+      setConfirmState({ isOpen: true, title, message, variant, confirmLabel, resolve });
     });
   }, []);
 
@@ -46,7 +46,7 @@ const useConfirm = () => {
             onClick={handleConfirm}
             className={`rounded-lg px-4 py-2 text-sm font-semibold text-white transition ${confirmState.variant === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-rosewood hover:opacity-90'}`}
           >
-            {confirmState.variant === 'danger' ? 'Eliminar' : 'Confirmar'}
+            {confirmState.confirmLabel || (confirmState.variant === 'danger' ? 'Eliminar' : 'Confirmar')}
           </button>
         </div>
       </div>

@@ -79,7 +79,7 @@ const Fidelizacion = () => {
   };
 
   const handleDesactivar = async (cliente) => {
-    const ok = await confirm({ message: `¿Desactivar a "${cliente.nombre}"? Dejará de ganar y canjear puntos y conserva los ${cliente.puntos_acumulados} que tiene; podrás reactivarlo en «Desactivados».` });
+    const ok = await confirm({ title: 'Desactivar cliente', confirmLabel: 'Desactivar', message: `¿Desactivar a "${cliente.nombre}"? Dejará de ganar y canjear puntos y conserva los ${cliente.puntos_acumulados} que tiene; podrás reactivarlo en «Desactivados».` });
     if (!ok) return;
     try {
       await desactivarCliente(cliente.id);

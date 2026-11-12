@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 import unicodedata
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import func, select
+from pydantic import BaseModel
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from src.api.pagination import PageInfo, search_filter
 from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.routers.cartera_shared import to_cliente_model_response, to_cliente_response
 from src.api.schemas.cartera import ClienteCreateRequest, ClienteResponse, ClienteUpdateRequest
-from src.api.services.antiguedad_deuda import dias_de_deuda_cartera
+from src.api.services.antiguedad_deuda import dias_de_deuda_cartera, estado_deuda
 from src.api.services.auditoria import registrar_auditoria
 from src.api.services.telefono import TelefonoInvalido, normalizar_telefono
 from src.infrastructure.database.connection import get_db
@@ -90,6 +93,123 @@ def _auditar(db: Session, usuario: str, accion: str, cliente: ClienteModel, deta
         accion=accion,
         entidad_id=cliente.id,
         detalle=f"{cliente.nombre}: {detalle}",
+    )
+
+
+FiltroClientes = Literal["activos", "con_deuda", "alerta", "moroso", "desactivados", "todos"]
+
+
+class ClientesCarteraPageResponse(BaseModel):
+    data: list[ClienteResponse]
+    page: PageInfo
+
+
+class ResumenDeudaCarteraResponse(BaseModel):
+    """Cifras de TODA la cartera (no solo de la pagina que se ve)."""
+
+    clientes_activos: int
+    con_deuda: int
+    deuda_total: float
+    en_alerta: int
+    deuda_en_alerta: float
+    morosos: int
+    deuda_morosa: float
+    desactivados: int
+
+
+def _compras(db: Session, ids: list[int]) -> dict[int, tuple[int, float]]:
+    if not ids:
+        return {}
+    filas = db.execute(
+        select(
+            VentaModel.cliente_id,
+            func.count(VentaModel.id),
+            func.coalesce(func.sum(VentaModel.total), 0),
+        )
+        .where(VentaModel.cliente_id.in_(ids))
+        .group_by(VentaModel.cliente_id),
+    ).all()
+    return {int(f[0]): (int(f[1] or 0), float(f[2] or 0)) for f in filas if f[0] is not None}
+
+
+@router.get("/api/cartera/clientes/paginados", response_model=ClientesCarteraPageResponse)
+def list_clientes_paginados(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=10, ge=1, le=100),
+    q: str | None = Query(default=None, max_length=100, description="Nombre, documento o parte del WhatsApp"),
+    estado: FiltroClientes = Query(default="activos"),
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+) -> ClientesCarteraPageResponse:
+    """Busqueda, filtro y pagina resueltos en el servidor; alerta/moroso se juzgan por antiguedad de la deuda."""
+    query = select(ClienteModel)
+    if estado == "desactivados":
+        query = query.where(ClienteModel.activo.is_(False))
+    elif estado != "todos":
+        query = query.where(ClienteModel.activo.is_(True))
+    if estado in ("con_deuda", "alerta", "moroso"):
+        query = query.where(ClienteModel.deuda_total > 0)
+
+    termino = " ".join((q or "").split())
+    if termino:
+        condiciones = list(search_filter(termino, ClienteModel.nombre, ClienteModel.documento))
+        digitos = "".join(c for c in termino if c.isdigit())
+        if len(digitos) >= 3:  # "300 111" encuentra 573001112233 y tambien 3001112233
+            condiciones.append(ClienteModel.telefono_whatsapp.contains(digitos))
+        query = query.where(or_(*condiciones))
+
+    if estado in ("alerta", "moroso"):
+        candidatos = db.execute(query).scalars().all()
+        dias = dias_de_deuda_cartera(db, list(candidatos))
+        ids = [c.id for c in candidatos if estado_deuda(float(c.deuda_total), dias.get(c.id)) == estado]
+        query = select(ClienteModel).where(ClienteModel.id.in_(ids)) if ids else select(ClienteModel).where(False)
+
+    orden = (
+        (ClienteModel.deuda_total.desc(), ClienteModel.nombre.asc())
+        if estado in ("con_deuda", "alerta", "moroso")
+        else (ClienteModel.nombre.asc(),)
+    )
+    total = db.execute(select(func.count()).select_from(query.subquery())).scalar_one()
+    clientes = db.execute(query.order_by(*orden).offset((page - 1) * limit).limit(limit)).scalars().all()
+    compras = _compras(db, [c.id for c in clientes])
+    dias_pagina = dias_de_deuda_cartera(db, list(clientes))
+    return ClientesCarteraPageResponse(
+        data=[
+            to_cliente_model_response(
+                c,
+                compras_total=compras.get(c.id, (0, 0.0))[1],
+                compras_cantidad=compras.get(c.id, (0, 0.0))[0],
+                dias_deuda=dias_pagina.get(c.id),
+            )
+            for c in clientes
+        ],
+        page=PageInfo(total=total, total_pages=max(1, (total + limit - 1) // limit), current_page=page, limit=limit),
+    )
+
+
+@router.get("/api/cartera/clientes/resumen-deuda", response_model=ResumenDeudaCarteraResponse)
+def get_resumen_deuda(
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+) -> ResumenDeudaCarteraResponse:
+    activos = db.execute(select(ClienteModel).where(ClienteModel.activo.is_(True))).scalars().all()
+    desactivados = db.execute(
+        select(func.count()).select_from(ClienteModel).where(ClienteModel.activo.is_(False)),
+    ).scalar_one()
+    con_deuda = [c for c in activos if float(c.deuda_total or 0) > 0]
+    dias = dias_de_deuda_cartera(db, con_deuda)
+    estados = {c.id: estado_deuda(float(c.deuda_total), dias.get(c.id)) for c in con_deuda}
+    alerta = [c for c in con_deuda if estados[c.id] == "alerta"]
+    morosos = [c for c in con_deuda if estados[c.id] == "moroso"]
+    return ResumenDeudaCarteraResponse(
+        clientes_activos=len(activos),
+        con_deuda=len(con_deuda),
+        deuda_total=round(sum(float(c.deuda_total) for c in con_deuda), 2),
+        en_alerta=len(alerta),
+        deuda_en_alerta=round(sum(float(c.deuda_total) for c in alerta), 2),
+        morosos=len(morosos),
+        deuda_morosa=round(sum(float(c.deuda_total) for c in morosos), 2),
+        desactivados=int(desactivados),
     )
 
 
