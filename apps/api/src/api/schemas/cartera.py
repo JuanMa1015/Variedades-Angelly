@@ -20,6 +20,10 @@ class ClienteResponse(BaseModel):
     deuda_total: float
     compras_total: float = 0
     compras_cantidad: int = 0
+    activo: bool = True
+    # Semaforo por antiguedad de la deuda (igual que clientes de tienda): sin_deuda | al_dia | alerta | moroso.
+    estado_deuda: str | None = None
+    dias_deuda: int | None = None
 
 
 class ClienteCobroResponse(BaseModel):
@@ -77,7 +81,7 @@ class ClienteCreateRequest(BaseModel):
     """DTO de entrada para crear clientes desde UI."""
 
     nombre: Annotated[str, Field(min_length=3, max_length=120)]
-    documento: Annotated[str | None, Field(min_length=5, max_length=30)] = None
+    documento: Annotated[str | None, Field(max_length=30)] = None
     telefono_whatsapp: Annotated[str | None, Field(max_length=25)] = None
 
 
@@ -85,7 +89,7 @@ class ClienteUpdateRequest(BaseModel):
     """DTO de entrada para editar cliente de cartera."""
 
     nombre: Annotated[str | None, Field(min_length=3, max_length=120)] = None
-    documento: Annotated[str | None, Field(min_length=5, max_length=30)] = None
+    documento: Annotated[str | None, Field(max_length=30)] = None
     telefono_whatsapp: Annotated[str | None, Field(max_length=25)] = None
 
 

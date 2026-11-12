@@ -12,8 +12,8 @@ from typing import Literal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from src.api.services.deuda import FIADO_TIENDA
-from src.infrastructure.database.models import ClienteFiadoTiendaModel, VentaModel
+from src.api.services.deuda import FIADO_CARTERA, FIADO_TIENDA
+from src.infrastructure.database.models import ClienteFiadoTiendaModel, ClienteModel, VentaModel
 
 DIAS_ALERTA = 30
 DIAS_MOROSO = 60
@@ -72,6 +72,38 @@ def dias_de_deuda(
     por_cliente: dict[int, list[VentaModel]] = {}
     for venta in ventas:
         por_cliente.setdefault(venta.cliente_tienda_id, []).append(venta)
+
+    resultado: dict[int, int | None] = {}
+    for cliente in con_deuda:
+        fecha = _fecha_mas_antigua(float(cliente.deuda_total), por_cliente.get(cliente.id, []))
+        resultado[cliente.id] = None if fecha is None else max(0, (ahora - fecha).days)
+    return resultado
+
+
+def dias_de_deuda_cartera(
+    db: Session,
+    clientes: list[ClienteModel],
+    ahora: datetime | None = None,
+) -> dict[int, int | None]:
+    """Dias que lleva la deuda de cada cliente de cartera que debe (clave: id del cliente).
+
+    Es una estimacion: una venta de cartera guarda el saldo del cliente al venderse, asi que cada
+    venta aporta como maximo su total. Los abonos se aplican a lo mas viejo.
+    """
+    con_deuda = [c for c in clientes if float(c.deuda_total or 0) > 0]
+    if not con_deuda:
+        return {}
+    ahora = ahora or datetime.now(UTC).replace(tzinfo=None)
+    ventas = db.execute(
+        select(VentaModel).where(
+            VentaModel.cliente_id.in_([c.id for c in con_deuda]),
+            VentaModel.tipo_fiado == FIADO_CARTERA,
+            VentaModel.anulada.is_(False),
+        ),
+    ).scalars().all()
+    por_cliente: dict[int, list[VentaModel]] = {}
+    for venta in ventas:
+        por_cliente.setdefault(venta.cliente_id, []).append(venta)
 
     resultado: dict[int, int | None] = {}
     for cliente in con_deuda:

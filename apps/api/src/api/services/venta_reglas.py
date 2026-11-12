@@ -25,7 +25,12 @@ def exigir_cliente_activo(cliente: ClienteModel | ClienteFiadoTiendaModel) -> No
 
 
 def exigir_credito_disponible(cliente: ClienteModel, nueva_deuda: float) -> None:
-    """Rechaza fiados que dejarian la deuda del cliente por encima de su cupo."""
+    """Rechaza fiados que dejarian la deuda del cliente por encima de su cupo.
+
+    Un cupo en 0 significa "sin cupo definido": ninguna pantalla lo fija, asi que no bloquea la venta.
+    """
+    if float(cliente.limite_credito) <= 0:
+        return
     if nueva_deuda > float(cliente.limite_credito) + 1e-9:
         disponible = max(0.0, float(cliente.limite_credito) - float(cliente.deuda_total))
         raise HTTPException(

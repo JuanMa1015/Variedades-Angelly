@@ -1,31 +1,31 @@
-const NIVEL_DEUDA = {
-  verde: { max: 200000, label: 'Al día', dot: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-l-emerald-500' },
-  amarillo: { max: 400000, label: 'Alerta', dot: 'bg-amber-500', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-l-amber-500' },
-  rojo: { max: Infinity, label: 'Moroso', dot: 'bg-red-500', bg: 'bg-red-50', text: 'text-red-700', border: 'border-l-red-500' },
-};
+import { Search } from 'lucide-react';
+import ErrorMessage from '../../components/ErrorMessage';
+import PaginationControls from '../../components/PaginationControls';
+import ClientesCarteraLista from './clientes/ClientesCarteraLista';
+import ResumenDeudaClientes from './clientes/ResumenDeudaClientes';
+import { useClientesCartera } from './clientes/useClientesCartera';
 
-const nivelDeuda = (deuda) => {
-  const monto = Number(deuda || 0);
-  if (monto <= NIVEL_DEUDA.verde.max) return NIVEL_DEUDA.verde;
-  if (monto <= NIVEL_DEUDA.amarillo.max) return NIVEL_DEUDA.amarillo;
-  return NIVEL_DEUDA.rojo;
-};
+const FILTROS = [
+  { id: 'activos', etiqueta: 'Activos' },
+  { id: 'con_deuda', etiqueta: 'Con deuda' },
+  { id: 'alerta', etiqueta: 'En alerta' },
+  { id: 'moroso', etiqueta: 'Morosos' },
+  { id: 'desactivados', etiqueta: 'Desactivados' },
+];
 
-const CarteraClientesSection = ({
-  clientesCarteraFiltrados,
-  formatMoney,
-  searchTerm,
-  setSearchTerm,
-  startNewCliente,
-  startEditingCliente,
-  handleDeleteCliente,
-}) => {
+// Lista de clientes con busqueda en vivo, filtros y paginas del servidor.
+// `recargar` cambia cuando la pantalla guarda, desactiva o reactiva a alguien.
+const CarteraClientesSection = ({ formatMoney, recargar, startNewCliente, startEditingCliente, handleDeleteCliente, handleReactivarCliente, handleVerDetalle }) => {
+  const { filtros, setEstado, setPagina, texto, setTexto, lista, resumen, loading, error, setError } = useClientesCartera(recargar);
+  const hayFiltro = Boolean(texto || filtros.estado !== 'activos');
+  const vacio = hayFiltro ? 'No se encontraron clientes con ese criterio.' : 'Todavía no hay clientes registrados.';
+
   return (
     <section className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Registro de clientes</h2>
-          <p className="text-sm text-gray-600">Alta y mantenimiento de clientes de cartera desde un modal.</p>
+          <p className="text-sm text-gray-600">Alta y mantenimiento de clientes de cartera.</p>
         </div>
         <button
           type="button"
@@ -36,100 +36,50 @@ const CarteraClientesSection = ({
         </button>
       </div>
 
-      <div className="relative">
-        <input
-          type="text"
-          value={searchTerm}
-          onChange={(event) => setSearchTerm(event.target.value)}
-          placeholder="Buscar por nombre, cédula o WhatsApp"
-          className="w-full rounded-xl border-2 border-gray-200 py-3 pl-4 pr-4 text-base transition focus:border-rosewood focus:outline-none"
+      <ResumenDeudaClientes resumen={resumen} loading={loading} formatMoney={formatMoney} />
+      <ErrorMessage message={error} onDismiss={() => setError('')} />
+
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative min-w-[220px] flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" aria-hidden="true" />
+          <label htmlFor="buscar-cliente-cartera" className="sr-only">Buscar cliente</label>
+          <input
+            id="buscar-cliente-cartera"
+            type="search"
+            value={texto}
+            onChange={(event) => setTexto(event.target.value)}
+            placeholder="Buscar por nombre, cédula o WhatsApp"
+            className="w-full rounded-xl border-2 border-gray-200 py-2.5 pl-9 pr-3 text-sm transition focus:border-rosewood focus:outline-none"
+          />
+        </div>
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Filtro de clientes">
+          {FILTROS.map(({ id, etiqueta }) => (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={filtros.estado === id}
+              onClick={() => setEstado(id)}
+              className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${filtros.estado === id ? 'border-rosewood bg-rosewood text-white' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+            >
+              {etiqueta}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-gray-200 p-2 sm:p-3">
+        <ClientesCarteraLista
+          clientes={lista.data}
+          loading={loading}
+          vacio={vacio}
+          formatMoney={formatMoney}
+          onDetalle={handleVerDetalle}
+          onEditar={startEditingCliente}
+          onDesactivar={handleDeleteCliente}
+          onReactivar={handleReactivarCliente}
         />
       </div>
-
-      <div className="overflow-hidden rounded-2xl border border-gray-200">
-        <div className="hidden overflow-x-auto md:block">
-          <table className="w-full min-w-[880px] text-left text-sm">
-            <thead className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50">
-              <tr>
-                <th className="w-[30%] px-4 py-3 font-semibold text-gray-700">Cliente</th>
-                <th className="w-[18%] px-4 py-3 font-semibold text-gray-700">Documento</th>
-                <th className="w-[20%] px-4 py-3 font-semibold text-gray-700">WhatsApp</th>
-                <th className="w-[12%] px-4 py-3 text-right font-semibold text-gray-700">Deuda</th>
-                <th className="w-[8%] px-4 py-3 text-center font-semibold text-gray-700">Nivel</th>
-                <th className="w-[12%] px-4 py-3 text-center font-semibold text-gray-700">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {clientesCarteraFiltrados.map((cliente, index) => {
-                const nivel = nivelDeuda(cliente.deuda_total);
-                return (
-                  <tr key={cliente.id} className={`border-b border-gray-100 align-middle transition hover:bg-rose-50/40 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
-                    <td className="px-4 py-3 font-semibold text-gray-900">{cliente.nombre}</td>
-                    <td className="px-4 py-3 text-gray-700">{cliente.documento || '-'}</td>
-                    <td className="px-4 py-3 text-gray-700">{cliente.telefono_whatsapp || '-'}</td>
-                    <td className={`px-4 py-3 text-right font-semibold ${nivel.text}`}>{formatMoney(cliente.deuda_total)}</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${nivel.bg} ${nivel.text}`}>
-                        <span className={`h-2 w-2 rounded-full ${nivel.dot}`} />
-                        {nivel.label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-center gap-2">
-                        <button type="button" onClick={() => startEditingCliente(cliente)} className="rounded-lg border border-blue-300 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-50">Editar</button>
-                        <button type="button" onClick={() => handleDeleteCliente(cliente)} className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">Eliminar</button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-
-              {clientesCarteraFiltrados.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-gray-500">
-                    No hay clientes que coincidan con la búsqueda actual.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="space-y-3 p-4 md:hidden">
-          {clientesCarteraFiltrados.map((cliente) => {
-            const nivel = nivelDeuda(cliente.deuda_total);
-            return (
-              <div key={`card-${cliente.id}`} className={`rounded-2xl border border-gray-200 bg-white p-4 shadow-sm border-l-4 ${nivel.border}`}>
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-base font-semibold text-gray-900">{cliente.nombre}</p>
-                    <p className="mt-1 text-xs text-gray-500">Documento: {cliente.documento || '-'}</p>
-                    <p className="text-xs text-gray-500">WhatsApp: {cliente.telefono_whatsapp || '-'}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-gray-500">Deuda</p>
-                    <p className={`text-base font-bold ${nivel.text}`}>{formatMoney(cliente.deuda_total)}</p>
-                    <span className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${nivel.bg} ${nivel.text}`}>
-                      <span className={`h-1.5 w-1.5 rounded-full ${nivel.dot}`} />
-                      {nivel.label}
-                    </span>
-                  </div>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button type="button" onClick={() => startEditingCliente(cliente)} className="rounded-lg border border-blue-300 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-50">Editar</button>
-                  <button type="button" onClick={() => handleDeleteCliente(cliente)} className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">Eliminar</button>
-                </div>
-              </div>
-            );
-          })}
-
-          {clientesCarteraFiltrados.length === 0 && (
-            <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-5 text-center text-sm text-gray-500">
-              No hay clientes que coincidan con la búsqueda actual.
-            </div>
-          )}
-        </div>
-      </div>
+      {lista.totalPages > 1 && <PaginationControls currentPage={filtros.page} totalPages={lista.totalPages} onPageChange={setPagina} />}
     </section>
   );
 };
