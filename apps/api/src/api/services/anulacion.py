@@ -141,7 +141,7 @@ def _exigir_sin_abonos_posteriores(db: Session, venta: VentaModel) -> None:
         )
 
 
-def _devolver_stock(db: Session, venta_id: int, usuario: str) -> None:
+def devolver_stock_de_venta(db: Session, venta_id: int, usuario: str) -> None:
     detalles = db.execute(
         select(DetalleVentaModel).where(DetalleVentaModel.venta_id == venta_id),
     ).scalars().all()
@@ -175,7 +175,7 @@ def anular_venta(
 
     mover_deuda_tienda(db, deuda_pendiente_tienda(venta), SIN_DEUDA)
     revertir_puntos_de_venta(db, venta, usuario=solicitante, tipo="anulacion_venta")
-    _devolver_stock(db, venta.id, solicitante)
+    devolver_stock_de_venta(db, venta.id, solicitante)
 
     venta.anulada = True
     venta.anulada_en = datetime.now(UTC).replace(tzinfo=None)

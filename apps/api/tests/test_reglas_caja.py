@@ -106,7 +106,7 @@ def test_cada_turno_cuenta_solo_lo_suyo(auth_client) -> None:
     assert turno_2["saldo_esperado"] == 2500  # 500 de base + 2000
 
 
-def test_abonos_y_gastos_tambien_pertenecen_al_turno(auth_client) -> None:
+def test_abonos_de_tienda_y_gastos_pertenecen_al_turno_y_los_de_cartera_no(auth_client) -> None:
     client, sf = auth_client
     vendedor = _login_token(client, "vendedor1", "ventas123")
     superadmin = _login_token(client, "angelly_superadmin", "supersecure123")
@@ -124,14 +124,15 @@ def test_abonos_y_gastos_tambien_pertenecen_al_turno(auth_client) -> None:
     client.post("/api/gastos", headers=_h(vendedor), json={"categoria": "servicios", "descripcion": "pago de luz", "monto": 500})
 
     with sf() as db:
-        assert db.execute(select(AbonoCarteraModel.caja_id)).scalar_one() == caja_id
+        abono_cartera = db.execute(select(AbonoCarteraModel)).scalar_one()
+        assert abono_cartera.caja_id is None and abono_cartera.fuera_de_caja is True  # cartera lleva su propia cuenta
         assert db.execute(select(AbonoTiendaModel.caja_id)).scalar_one() == caja_id
         assert db.execute(select(GastoModel.caja_id)).scalar_one() == caja_id
     turno = _estado(client, superadmin)
-    assert turno["monto_ventas_efectivo"] == 3000
+    assert turno["monto_ventas_efectivo"] == 0  # los 3000 cobrados por cartera no estan en el cajon del vendedor
     assert turno["monto_ventas_transferencia"] == 2000
     assert turno["monto_gastos"] == 500
-    assert turno["saldo_esperado"] == 2500  # 3000 efectivo - 500 de gastos
+    assert turno["saldo_esperado"] == -500  # solo el gasto: la plata de cartera no entro a este cajon
 
 
 def test_un_abono_con_fecha_anterior_a_la_apertura_no_entra_al_turno(auth_client) -> None:

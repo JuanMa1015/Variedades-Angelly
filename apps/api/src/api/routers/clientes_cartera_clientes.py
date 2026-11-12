@@ -126,7 +126,7 @@ def _compras(db: Session, ids: list[int]) -> dict[int, tuple[int, float]]:
             func.count(VentaModel.id),
             func.coalesce(func.sum(VentaModel.total), 0),
         )
-        .where(VentaModel.cliente_id.in_(ids))
+        .where(VentaModel.cliente_id.in_(ids), VentaModel.anulada.is_(False))
         .group_by(VentaModel.cliente_id),
     ).all()
     return {int(f[0]): (int(f[1] or 0), float(f[2] or 0)) for f in filas if f[0] is not None}
@@ -236,7 +236,7 @@ def list_clientes(
                 func.count(VentaModel.id).label("compras_cantidad"),
                 func.coalesce(func.sum(VentaModel.total), 0).label("compras_total"),
             )
-            .where(VentaModel.cliente_id.in_(cliente_ids))
+            .where(VentaModel.cliente_id.in_(cliente_ids), VentaModel.anulada.is_(False))
             .group_by(VentaModel.cliente_id),
         ).all()
 

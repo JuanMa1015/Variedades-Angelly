@@ -190,6 +190,9 @@ class VentaModel(Base):
         index=True,
     )
 
+    # Las ventas del modulo de cartera (admin) no pasan por la caja del vendedor.
+    fuera_de_caja: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=expression.false())
+
     # Una venta anulada no se borra: queda marcada con quien, cuando, por que y quien autorizo.
     anulada: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=expression.false())
     anulada_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), nullable=True)
@@ -406,6 +409,10 @@ class AbonoCarteraModel(Base):
         nullable=True,
         index=True,
     )
+    # Los cobros del modulo de cartera (admin) no pasan por la caja del vendedor.
+    fuera_de_caja: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=expression.false())
+    # Venta de la que sale este abono (el abono inicial); permite devolverlo si la venta se anula.
+    venta_id: Mapped[int | None] = mapped_column(ForeignKey("ventas.id", ondelete="SET NULL"), nullable=True, index=True)
 
     def __repr__(self) -> str:
         return f"AbonoCarteraModel(id={self.id!r}, monto={self.monto!r})"
@@ -536,7 +543,7 @@ def _asignar_turno_abierto(_mapper, connection, target) -> None:
     Lo que ocurre con la caja cerrada queda sin turno, y las operaciones con fecha anterior a la
     apertura (p. ej. un abono registrado con fecha pasada) tampoco entran al turno actual.
     """
-    if target.caja_id is not None:
+    if target.caja_id is not None or getattr(target, "fuera_de_caja", False):
         return
     abierta = connection.execute(
         select(CierreCajaModel.id, CierreCajaModel.fecha_apertura)
