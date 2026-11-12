@@ -366,10 +366,10 @@ describe('Admin page', () => {
   it('hides role groups and summary when moduleKey prop given', async () => {
     useAuthMock.mockReturnValue({ token: 'token', isSuperAdmin: true });
     setupApiMock();
-    render(<Admin moduleKey="vendedores" />);
+    render(<Admin moduleKey="productos" />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('admin-section-vendedores')).toBeInTheDocument();
+      expect(screen.getByTestId('admin-section-productos')).toBeInTheDocument();
     });
 
     expect(screen.queryByText(/Resumen:/)).not.toBeInTheDocument();

@@ -12,8 +12,8 @@ import EditFormModal from '../components/EditFormModal';
 import { formatDateTime, formatMoney } from '../utils/format';
 import AdminSection from './admin/components/AdminSection';
 import AdminTable from './admin/components/AdminTable';
-import CreateVendedorDialog from './admin/components/CreateDialogs/CreateVendedorDialog';
-import CreateAdminDialog from './admin/components/CreateDialogs/CreateAdminDialog';
+import UsuariosPantalla from './admin/usuarios/UsuariosPantalla';
+import AuditoriasPantalla from './admin/auditorias/AuditoriasPantalla';
 import CreateProductoDialog from './admin/components/CreateDialogs/CreateProductoDialog';
 import CreateProveedorDialog from './admin/components/CreateDialogs/CreateProveedorDialog';
 import CreateClienteCarteraDialog from './admin/components/CreateDialogs/CreateClienteCarteraDialog';
@@ -75,8 +75,6 @@ const MODULE_LABELS = {
 };
 
 const CREATE_DIALOGS = {
-  admins: 'admins',
-  vendedores: 'vendedores',
   productos: 'productos',
   proveedores: 'proveedores',
   clientes_cartera: 'clientes_cartera',
@@ -89,7 +87,7 @@ const CREATE_DIALOGS = {
   abonos_cartera: 'abonos_cartera',
 };
 
-const Admin = ({ moduleKey: moduleKeyProp }) => {
+const AdminPanel = ({ moduleKey: moduleKeyProp }) => {
   const { moduleKey: moduleKeyParam } = useParams();
   const moduleKey = moduleKeyProp ?? moduleKeyParam ?? null;
   const { token, isSuperAdmin } = useAuth();
@@ -120,8 +118,6 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
 
   const [proveedores, setProveedores] = useState([]);
   const [productos, setProductos] = useState([]);
-  const [admins, setAdmins] = useState([]);
-  const [vendedores, setVendedores] = useState([]);
   const [clientesCartera, setClientesCartera] = useState([]);
   const [clientesTienda, setClientesTienda] = useState([]);
   const [clientesFidelizacion, setClientesFidelizacion] = useState([]);
@@ -130,7 +126,6 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
   const [facturasCompra, setFacturasCompra] = useState([]);
   const [gastos, setGastos] = useState([]);
   const [abonosCartera, setAbonosCartera] = useState([]);
-  const [auditorias, setAuditorias] = useState([]);
   const [informes, setInformes] = useState({
     ventas_totales: 0,
     facturacion_total: 0,
@@ -183,8 +178,6 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
       const [
         proveedoresPayload,
         productosPayload,
-        vendedoresPayload,
-        adminsPayload,
         clientesPayload,
         clientesTiendaPayload,
         clientesFidelizacionPayload,
@@ -193,13 +186,10 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         facturasPayload,
         gastosPayload,
         abonosPayload,
-        auditoriasPayload,
         informesPayload,
       ] = await Promise.all([
         request({ endpoint: '/api/superadmin/proveedores', signal }),
         request({ endpoint: '/api/superadmin/productos', signal }),
-        request({ endpoint: '/api/superadmin/usuarios/vendedores', signal }),
-        request({ endpoint: '/api/superadmin/usuarios/admins', signal }),
         request({ endpoint: '/api/clientes', signal }),
         request({ endpoint: '/api/clientes/tienda-fiado', signal }),
         request({ endpoint: '/api/fidelizacion/clientes', signal }),
@@ -208,14 +198,11 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         request({ endpoint: '/api/facturas-compra', signal }),
         request({ endpoint: '/api/gastos', signal }),
         request({ endpoint: '/api/cartera/abonos', signal }),
-        request({ endpoint: '/api/auditorias?limit=200', signal }),
         request({ endpoint: '/api/superadmin/informes', signal }),
       ]);
 
       setProveedores(Array.isArray(proveedoresPayload) ? proveedoresPayload : []);
       setProductos(Array.isArray(productosPayload) ? productosPayload : []);
-      setVendedores(Array.isArray(vendedoresPayload) ? vendedoresPayload : []);
-      setAdmins(Array.isArray(adminsPayload) ? adminsPayload : []);
       setClientesCartera(Array.isArray(clientesPayload) ? clientesPayload : []);
       setClientesTienda(Array.isArray(clientesTiendaPayload) ? clientesTiendaPayload : []);
       setClientesFidelizacion(Array.isArray(clientesFidelizacionPayload) ? clientesFidelizacionPayload : []);
@@ -224,7 +211,6 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
       setFacturasCompra(Array.isArray(facturasPayload) ? facturasPayload : []);
       setGastos(Array.isArray(gastosPayload) ? gastosPayload : []);
       setAbonosCartera(Array.isArray(abonosPayload) ? abonosPayload : []);
-      setAuditorias(Array.isArray(auditoriasPayload) ? auditoriasPayload : []);
       setInformes({
         ventas_totales: Number(informesPayload?.ventas_totales || 0),
         facturacion_total: Number(informesPayload?.facturacion_total || 0),
@@ -588,75 +574,6 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     );
   }, [openEditModal, notifyError, loadAll, notifySuccess]);
 
-  const handleEditAdmin = useCallback((item) => {
-    openEditModal(
-      'Editar admin',
-      [
-        { name: 'username', label: 'Username', type: 'text', required: true },
-        { name: 'password', label: 'Nueva contraseña (en blanco para mantener)', type: 'password', required: false },
-      ],
-      { username: item.username, password: '' },
-      async (values) => {
-        const payload = { username: values.username.trim() };
-        if (values.password.trim()) payload.password = values.password;
-        await request({
-          endpoint: `/api/superadmin/usuarios/admins/${item.id}`,
-          method: 'PATCH',
-          body: payload,
-        });
-        await loadAll();
-        notifySuccess('Admin actualizado');
-      },
-    );
-  }, [openEditModal, request, loadAll, notifySuccess]);
-
-  const handleEditVendedor = useCallback((item) => {
-    openEditModal(
-      'Editar vendedor',
-      [
-        { name: 'username', label: 'Username', type: 'text', required: true },
-        { name: 'password', label: 'Nueva contraseña (en blanco para mantener)', type: 'password', required: false },
-      ],
-      { username: item.username, password: '' },
-      async (values) => {
-        const payload = { username: values.username.trim() };
-        if (values.password.trim()) payload.password = values.password;
-        await request({
-          endpoint: `/api/superadmin/usuarios/vendedores/${item.id}`,
-          method: 'PATCH',
-          body: payload,
-        });
-        await loadAll();
-        notifySuccess('Vendedor actualizado');
-      },
-    );
-  }, [openEditModal, request, loadAll, notifySuccess]);
-
-  const alternarUsuario = useCallback(async (ruta, etiqueta, item) => {
-    const desactivar = item.activo !== false;
-    const confirmed = await confirm({
-      title: desactivar ? `Desactivar ${etiqueta}` : `Activar ${etiqueta}`,
-      message: desactivar
-        ? `${item.username} ya no podrá entrar y se le cerrarán las sesiones abiertas. Su historial se conserva.`
-        : `${item.username} podrá volver a entrar con su usuario y clave.`,
-      confirmLabel: desactivar ? 'Desactivar' : 'Activar',
-    });
-    if (!confirmed) return;
-    try {
-      await request({
-        endpoint: desactivar ? `/api/superadmin/usuarios/${ruta}/${item.id}` : `/api/superadmin/usuarios/${ruta}/${item.id}/reactivar`,
-        method: desactivar ? 'DELETE' : 'PUT',
-      });
-      await loadAll();
-      notifySuccess(desactivar ? 'Usuario desactivado' : 'Usuario activado');
-    } catch (err) {
-      notifyError(err.message || 'No se pudo cambiar el estado del usuario');
-    }
-  }, [confirm, request, loadAll, notifySuccess, notifyError]);
-
-  const handleToggleAdmin = useCallback((item) => alternarUsuario('admins', 'admin', item), [alternarUsuario]);
-  const handleToggleVendedor = useCallback((item) => alternarUsuario('vendedores', 'vendedor', item), [alternarUsuario]);
-
   const handleEditProducto = useCallback((item) => {
     openEditModal(
       'Editar producto',
@@ -721,16 +638,6 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
   }, [confirm, loadAll, notifySuccess, notifyError]);
 
   const tabSections = useMemo(() => [
-    { key: 'vendedores', title: 'Vendedores', desc: 'Acceso restringido y altas por modal.', data: vendedores, createDialog: 'vendedores',
-      columns: [
-        { key: 'id', label: 'ID', mono: true }, { key: 'username', label: 'Username' }, { key: 'rol', label: 'Rol' },
-        { key: 'activo', label: 'Estado', render: (i) => (i.activo === false ? 'Inactivo' : 'Activo') },
-      ], onEdit: handleEditVendedor, onToggle: handleToggleVendedor, minWidth: '640px' },
-    { key: 'admins', title: 'Administradores', desc: 'Acceso y control de admins.', data: admins, createDialog: 'admins',
-      columns: [
-        { key: 'id', label: 'ID', mono: true }, { key: 'username', label: 'Username' }, { key: 'rol', label: 'Rol' },
-        { key: 'activo', label: 'Estado', render: (i) => (i.activo === false ? 'Inactivo' : 'Activo') },
-      ], onEdit: handleEditAdmin, onToggle: handleToggleAdmin, minWidth: '640px' },
     { key: 'productos', title: 'Productos', desc: 'Inventario y precios con control visual.', data: productos, createDialog: 'productos',
       columns: [
         { key: 'nombre', label: 'Nombre', mono: true },
@@ -801,18 +708,10 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         { key: 'referencia', label: 'Referencia' },
         { key: 'fecha', label: 'Fecha', render: (i) => formatDateTime(i.fecha) },
       ], onEdit: handleEditAbonoCartera, onDelete: handleDeleteAbonoCartera, minWidth: '1000px' },
-    { key: 'auditorias', title: 'Auditorías', desc: 'Historial de cambios: solo se consulta, nadie lo edita ni lo borra.', data: auditorias,
-      columns: [
-        { key: 'modulo', label: 'Modulo', mono: true }, { key: 'entidad', label: 'Entidad' }, { key: 'accion', label: 'Accion' },
-        { key: 'detalle', label: 'Detalle' }, { key: 'usuario', label: 'Usuario' },
-        { key: 'fecha', label: 'Fecha', render: (i) => formatDateTime(i.fecha) },
-      ], minWidth: '1000px' },
   ], [
-    vendedores, admins, productos, proveedores,
+    productos, proveedores,
     clientesCartera, clientesTienda, clientesFidelizacion,
-    ventas, pedidosProveedor, facturasCompra, gastos, abonosCartera, auditorias,
-    handleEditVendedor, handleToggleVendedor,
-    handleEditAdmin, handleToggleAdmin,
+    ventas, pedidosProveedor, facturasCompra, gastos, abonosCartera,
     handleEditProducto, handleDeleteProducto,
     handleEditProveedor, handleDeleteProveedor,
     handleEditClienteCartera, handleDeleteClienteCartera,
@@ -873,7 +772,7 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
 
       {!moduleKey && (
         <div className="rounded-2xl border border-blush-300 bg-white/80 px-4 py-3 text-xs text-rosewood/80 shadow-sm sm:text-sm">
-          Resumen: Admins {admins.length} · Vendedores {vendedores.length} · Productos {productos.length} · Proveedores {proveedores.length} · Auditorias {auditorias.length} · Facturacion {formatMoney(informes.facturacion_total)}
+          Resumen: Productos {productos.length} · Proveedores {proveedores.length} · Facturacion {formatMoney(informes.facturacion_total)}
         </div>
       )}
 
@@ -922,6 +821,10 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
           })}
         </div>
       )}
+
+      {activeTab === 'vendedores' && <UsuariosPantalla tipo="vendedores" />}
+      {activeTab === 'admins' && <UsuariosPantalla tipo="admins" />}
+      {activeTab === 'auditorias' && <AuditoriasPantalla />}
 
       {tabSections.map((section) => (
         activeTab === section.key && (
@@ -1054,8 +957,6 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
       )}
 
 
-      <CreateVendedorDialog isOpen={createDialog === CREATE_DIALOGS.vendedores} onClose={closeCreateDialog} onCreated={handleCreated} />
-      <CreateAdminDialog isOpen={createDialog === CREATE_DIALOGS.admins} onClose={closeCreateDialog} onCreated={handleCreated} />
       <CreateProductoDialog isOpen={createDialog === CREATE_DIALOGS.productos} onClose={closeCreateDialog} onCreated={handleCreated} />
       <CreateProveedorDialog isOpen={createDialog === CREATE_DIALOGS.proveedores} onClose={closeCreateDialog} onCreated={handleCreated} />
       <CreateClienteCarteraDialog isOpen={createDialog === CREATE_DIALOGS.clientes_cartera} onClose={closeCreateDialog} onCreated={handleCreated} />
@@ -1079,6 +980,15 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
       />
     </div>
   );
+};
+
+// Usuarios y auditorias tienen pantalla propia: abrirlas no carga todo lo demas del panel.
+const Admin = ({ moduleKey: moduleKeyProp }) => {
+  const { moduleKey: moduleKeyParam } = useParams();
+  const moduleKey = moduleKeyProp ?? moduleKeyParam ?? null;
+  if (moduleKey === 'vendedores' || moduleKey === 'admins') return <UsuariosPantalla tipo={moduleKey} />;
+  if (moduleKey === 'auditorias') return <AuditoriasPantalla />;
+  return <AdminPanel moduleKey={moduleKeyProp} />;
 };
 
 export default Admin;
