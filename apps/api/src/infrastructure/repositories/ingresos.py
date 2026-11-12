@@ -28,7 +28,7 @@ def cobrado_en_venta():
 
 
 def cobros_por_metodo(db: Session, caja_id: int | None = None) -> dict[str, float]:
-    """Suma lo cobrado por medio de pago (ventas + abonos de cartera + abonos de tienda).
+    """Suma lo cobrado por medio de pago (ventas + abonos de cartera + abonos de tienda), sin lo del modulo de cartera.
 
     Con ``caja_id`` solo cuenta lo asociado a ese turno; sin el, es el historico completo.
     """
@@ -44,6 +44,8 @@ def cobros_por_metodo(db: Session, caja_id: int | None = None) -> dict[str, floa
         )
         if modelo is AbonoTiendaModel:
             consulta = consulta.where(AbonoTiendaModel.anulado.is_(False))
+        else:
+            consulta = consulta.where(modelo.fuera_de_caja.is_(False))  # cartera (admin) lleva su propia cuenta
         if caja_id is not None:
             consulta = consulta.where(modelo.caja_id == caja_id)
         for metodo, total in db.execute(consulta.group_by(modelo.metodo_pago)).all():

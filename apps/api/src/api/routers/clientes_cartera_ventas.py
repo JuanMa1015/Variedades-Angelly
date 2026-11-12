@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
@@ -11,20 +11,45 @@ from sqlalchemy.orm import Session
 
 from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.routers.cartera_shared import normalize_naive_datetime
-from src.application.services.ventas_service import build_recibo_text
-from src.infrastructure.database.connection import get_db
-from src.api.services.stock import mover_stock
-from src.infrastructure.database.models import ClienteModel, DetalleVentaModel, ProductoModel, VentaModel, AbonoCarteraModel
 from src.api.schemas.cartera import (
+    AnularVentaCarteraRequest,
     CarteraVentaCreateRequest,
     CarteraVentaHistorialItemResponse,
     VentaDetalleResponse,
     VentaResponse,
 )
+from src.api.services.anulacion import devolver_stock_de_venta
+from src.api.services.auditoria import registrar_auditoria
+from src.api.services.stock import mover_stock
+from src.api.services.venta_reglas import (
+    exigir_cliente_activo,
+    exigir_metodo_pago_si_hay_cobro,
+    exigir_producto_vendible,
+)
+from src.application.services.ventas_service import build_recibo_text
+from src.infrastructure.database.connection import get_db
+from src.infrastructure.database.models import (
+    AbonoCarteraModel,
+    ClienteModel,
+    DetalleVentaModel,
+    ProductoModel,
+    VentaModel,
+)
 
 router = APIRouter(tags=["clientes-cartera-ventas"])
 
 FIADO_ORIGEN_CARTERA = "cartera"
+CATALOGO_CARTERA = "cartera"
+TOLERANCIA_FECHA = timedelta(minutes=5)  # relojes del navegador y del servidor no coinciden al segundo
+
+
+def _fecha_de_venta(valor: datetime | None) -> datetime:
+    """La venta puede registrarse con fecha pasada (cuaderno), nunca futura: falsearia la antiguedad de la deuda."""
+    ahora = datetime.now(UTC).replace(tzinfo=None)
+    fecha = normalize_naive_datetime(valor) or ahora
+    if fecha > ahora + TOLERANCIA_FECHA:
+        raise HTTPException(status_code=400, detail="La fecha de la venta no puede ser futura")
+    return fecha
 
 
 @router.post("/api/cartera/ventas", response_model=VentaResponse, status_code=201)
@@ -47,6 +72,8 @@ def create_cartera_venta(
 
             if cliente is None:
                 raise HTTPException(status_code=404, detail="Cliente no encontrado")
+            exigir_cliente_activo(cliente)
+            fecha_venta = _fecha_de_venta(payload.fecha_venta)
 
             for item in payload.items:
                 producto = db.execute(
@@ -59,6 +86,12 @@ def create_cartera_venta(
                     raise HTTPException(
                         status_code=404,
                         detail=f"Producto {item.producto_id} no encontrado",
+                    )
+                exigir_producto_vendible(producto)
+                if producto.catalogo != CATALOGO_CARTERA:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"'{producto.nombre}' no es un producto de cartera",
                     )
 
                 if producto.stock_actual < item.cantidad:
@@ -73,8 +106,8 @@ def create_cartera_venta(
                 movimientos_stock.append(
                     mover_stock(db, producto, -item.cantidad, tipo="venta_cartera", usuario=current_user.username, referencia_tipo="venta"),
                 )
-                subtotal = float(item.cantidad * producto.precio_venta)
-                total += subtotal
+                subtotal = round(float(item.cantidad * producto.precio_venta), 2)
+                total = round(total + subtotal, 2)
 
                 detalle_payload.append(
                     VentaDetalleResponse(
@@ -86,18 +119,19 @@ def create_cartera_venta(
                     ),
                 )
 
-            abono_inicial = float(payload.abono_inicial)
+            abono_inicial = round(float(payload.abono_inicial), 2)
             if abono_inicial > total:
                 raise HTTPException(
                     status_code=400,
                     detail="El abono inicial no puede superar el total de la venta",
                 )
+            exigir_metodo_pago_si_hay_cobro(payload.metodo_pago, abono_inicial > 0)
 
-            deuda_incremento = float(total - abono_inicial)
-            cliente.deuda_total = float(cliente.deuda_total + deuda_incremento)
+            deuda_incremento = round(total - abono_inicial, 2)
+            cliente.deuda_total = round(float(cliente.deuda_total) + deuda_incremento, 2)
 
-            fecha_venta = normalize_naive_datetime(payload.fecha_venta) or datetime.now(UTC)
             venta = VentaModel(
+                creado_por=current_user.username,
                 cliente_id=cliente.id,
                 cliente_tienda_id=None,
                 tipo_fiado=FIADO_ORIGEN_CARTERA if deuda_incremento > 0 else None,
@@ -106,6 +140,7 @@ def create_cartera_venta(
                 total=total,
                 saldo_pendiente=cliente.deuda_total,
                 fecha=fecha_venta,
+                fuera_de_caja=True,
             )
             db.add(venta)
             db.flush()
@@ -133,8 +168,20 @@ def create_cartera_venta(
                         saldo_cliente=cliente.deuda_total,
                         referencia=payload.referencia or f"Abono aplicado en venta #{venta.id}",
                         fecha=fecha_venta,
+                        fuera_de_caja=True,
+                        venta_id=venta.id,
                     ),
                 )
+
+            registrar_auditoria(
+                db,
+                usuario=current_user.username,
+                modulo="cartera",
+                entidad="venta",
+                accion="crear",
+                entidad_id=venta.id,
+                detalle=f"{cliente.nombre}: total {total}, abono inicial {abono_inicial}, queda debiendo {cliente.deuda_total}",
+            )
 
     except IntegrityError as exc:
         db.rollback()
@@ -165,6 +212,85 @@ def create_cartera_venta(
         detalles=detalle_payload,
         resumen_recibo=resumen,
     )
+
+
+def _abonos_iniciales(db: Session, venta: VentaModel) -> list[AbonoCarteraModel]:
+    """Abono(s) que salieron de esta venta. Las ventas viejas no tienen enlace: se reconocen por cliente y fecha exacta."""
+    enlazados = db.execute(select(AbonoCarteraModel).where(AbonoCarteraModel.venta_id == venta.id)).scalars().all()
+    if enlazados:
+        return list(enlazados)
+    return list(
+        db.execute(
+            select(AbonoCarteraModel).where(
+                AbonoCarteraModel.cliente_id == venta.cliente_id,
+                AbonoCarteraModel.venta_id.is_(None),
+                AbonoCarteraModel.fecha == venta.fecha,
+            ),
+        ).scalars(),
+    )
+
+
+@router.post("/api/cartera/ventas/{venta_id}/anular", status_code=200)
+def anular_venta_cartera(
+    venta_id: int,
+    payload: AnularVentaCarteraRequest,
+    db: Session = Depends(get_db),
+    current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+) -> dict:
+    """Anula la venta: devuelve el stock y le quita al cliente la deuda que dejo. No borra la venta.
+
+    Si el cliente ya abono por encima de lo que debe de otras ventas, la deuda no alcanza para devolverla:
+    primero se corrige ese abono.
+    """
+    venta = db.execute(select(VentaModel).where(VentaModel.id == venta_id).with_for_update()).scalar_one_or_none()
+    if venta is None or venta.cliente_id is None:
+        raise HTTPException(status_code=404, detail="Venta de cartera no encontrada")
+    if venta.anulada:
+        raise HTTPException(status_code=409, detail="La venta ya esta anulada")
+    if not venta.fuera_de_caja:
+        raise HTTPException(
+            status_code=409,
+            detail="Esta venta se registro en el punto de venta (caja del vendedor): se corrige desde ese modulo",
+        )
+
+    cliente = db.execute(select(ClienteModel).where(ClienteModel.id == venta.cliente_id).with_for_update()).scalar_one()
+    abonos = _abonos_iniciales(db, venta)
+    abono_inicial = round(sum(float(a.monto) for a in abonos), 2)
+    deuda_de_la_venta = round(max(0.0, float(venta.total) - abono_inicial), 2)
+    deuda_actual = float(cliente.deuda_total)
+    if deuda_actual + 0.005 < deuda_de_la_venta:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"El cliente ya abono: debe {deuda_actual:.0f} y esta venta dejo {deuda_de_la_venta:.0f}. "
+                "Corrige o elimina primero el abono que se aplico a ella."
+            ),
+        )
+
+    cliente.deuda_total = round(deuda_actual - deuda_de_la_venta, 2)
+    for abono in abonos:
+        db.delete(abono)
+    devolver_stock_de_venta(db, venta.id, current_user.username)
+
+    venta.anulada = True
+    venta.anulada_en = datetime.now(UTC).replace(tzinfo=None)
+    venta.anulada_por = current_user.username
+    venta.autorizada_por = current_user.username
+    venta.motivo_anulacion = payload.motivo.strip()
+    registrar_auditoria(
+        db,
+        usuario=current_user.username,
+        modulo="cartera",
+        entidad="venta",
+        accion="anular",
+        entidad_id=venta.id,
+        detalle=(
+            f"{cliente.nombre}: total {venta.total}, abono inicial devuelto {abono_inicial}, "
+            f"deuda {deuda_actual} -> {cliente.deuda_total}. Motivo: {venta.motivo_anulacion}"
+        ),
+    )
+    db.commit()
+    return {"message": "Venta anulada", "venta_id": venta.id, "deuda_cliente": float(cliente.deuda_total)}
 
 
 @router.get(
@@ -219,6 +345,10 @@ def list_cartera_ventas_historial(
                 articulos=articulos,
                 articulos_detalle=articulos_detalle or '-',
                 fecha=venta.fecha,
+                es_fiado=bool(venta.es_fiado),
+                anulada=bool(venta.anulada),
+                motivo_anulacion=venta.motivo_anulacion,
+                creado_por=venta.creado_por,
             ),
         )
 

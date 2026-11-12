@@ -159,6 +159,16 @@ class CarteraVentaHistorialItemResponse(BaseModel):
     articulos: int
     articulos_detalle: str
     fecha: datetime
+    es_fiado: bool = False
+    anulada: bool = False
+    motivo_anulacion: str | None = None
+    creado_por: str | None = None
+
+
+class AnularVentaCarteraRequest(BaseModel):
+    """Anular una venta de cartera exige decir por que."""
+
+    motivo: Annotated[str, Field(min_length=3, max_length=200)]
 
 
 class AbonoCarteraCreateRequest(BaseModel):

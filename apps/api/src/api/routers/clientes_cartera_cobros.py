@@ -125,6 +125,7 @@ def list_cliente_movimientos(
     ).where(
         VentaModel.cliente_id == cliente_id,
         DetalleVentaModel.venta_id == VentaModel.id,
+        VentaModel.anulada.is_(False),
         DetalleVentaModel.producto_id == ProductoModel.id,
         ProductoModel.catalogo == 'cartera',
     )
@@ -230,6 +231,7 @@ def create_abono_cartera(
             saldo_cliente=cliente.deuda_total,
             referencia=payload.referencia,
             fecha=normalize_naive_datetime(payload.fecha) or datetime.now(UTC),
+            fuera_de_caja=True,
         )
         db.add(abono)
         db.flush()
@@ -269,6 +271,7 @@ def create_abono_cartera_direct(
             saldo_cliente=cliente.deuda_total,
             referencia=payload.referencia,
             fecha=normalize_naive_datetime(payload.fecha) or datetime.now(UTC),
+            fuera_de_caja=True,
         )
         db.add(abono)
         db.flush()

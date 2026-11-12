@@ -39,7 +39,7 @@ def _nombres(db: Session, modelo, ids: set[int]) -> dict[int, str]:
 
 def _ventas(db: Session, caja: CierreCajaModel, hasta: datetime) -> list[MovimientoCajaResponse]:
     filas = db.execute(
-        select(VentaModel, cobrado_en_venta().label("cobrado")).where(_del_turno(VentaModel, caja, hasta)),
+        select(VentaModel, cobrado_en_venta().label("cobrado")).where(_del_turno(VentaModel, caja, hasta), VentaModel.fuera_de_caja.is_(False)),
     ).all()
     clientes = _nombres(db, ClienteModel, {v.cliente_id for v, _ in filas if v.cliente_id})
     tienda = _nombres(db, ClienteFiadoTiendaModel, {v.cliente_tienda_id for v, _ in filas if v.cliente_tienda_id})
@@ -68,7 +68,10 @@ def _abonos(db: Session, caja: CierreCajaModel, hasta: datetime) -> list[Movimie
         (AbonoTiendaModel, "abono_tienda", ClienteFiadoTiendaModel),
         (AbonoCarteraModel, "abono_cartera", ClienteModel),
     ):
-        abonos = db.execute(select(modelo).where(_del_turno(modelo, caja, hasta))).scalars().all()
+        consulta = select(modelo).where(_del_turno(modelo, caja, hasta))
+        if modelo is AbonoCarteraModel:
+            consulta = consulta.where(AbonoCarteraModel.fuera_de_caja.is_(False))  # los cobros del modulo de cartera no pasan por la caja
+        abonos = db.execute(consulta).scalars().all()
         nombres = _nombres(db, modelo_cliente, {a.cliente_id for a in abonos})
         movimientos.extend(
             MovimientoCajaResponse(
