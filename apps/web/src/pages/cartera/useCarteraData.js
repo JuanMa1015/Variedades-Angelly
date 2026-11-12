@@ -8,7 +8,6 @@ import {
   deleteCarteraProducto,
   fetchCarteraInitialData,
   fetchCarteraMovimientos,
-  fetchCarteraVentasHistorial,
   saveCarteraAbono,
   saveCarteraCliente,
   saveCarteraProducto,
@@ -131,8 +130,6 @@ export const useCarteraData = () => {
   const [referenciaVenta, setReferenciaVenta] = useState('');
   const [ventaItems, setVentaItems] = useState([{ ...EMPTY_ITEM }]);
   const [savingVenta, setSavingVenta] = useState(false);
-  const [ventasHistorial, setVentasHistorial] = useState([]);
-  const [loadingVentasHistorial, setLoadingVentasHistorial] = useState(false);
   const [isVentasHistorialOpen, setIsVentasHistorialOpen] = useState(false);
 
   const [selectedClienteAbono, setSelectedClienteAbono] = useState(null);
@@ -519,7 +516,15 @@ export const useCarteraData = () => {
     }
   };
 
+  // Nunca se agrega mas de lo que hay en stock: el servidor lo rechazaria al registrar la venta.
   const handleAddProductoVenta = (producto) => {
+    const stock = Number(producto.stock_actual ?? Infinity);
+    const enVenta = Number(ventaItems.find((item) => Number(item.producto_id) === Number(producto.id))?.cantidad || 0);
+    if (enVenta + 1 > stock) {
+      setError(stock <= 0 ? `${producto.nombre} no tiene stock` : `Solo hay ${stock} de ${producto.nombre}`);
+      return;
+    }
+    setError('');
     setVentaItems((current) => {
       const existingIndex = current.findIndex((item) => Number(item.producto_id) === Number(producto.id));
 
@@ -531,7 +536,7 @@ export const useCarteraData = () => {
         ));
       }
 
-      return [...current, { producto_id: String(producto.id), cantidad: 1 }];
+      return [...current.filter((item) => Number(item.producto_id) > 0), { producto_id: String(producto.id), cantidad: 1 }];
     });
   };
 
@@ -674,22 +679,9 @@ export const useCarteraData = () => {
     setSelectedClienteDetalle(cliente);
   };
 
-  const handleOpenVentasHistorial = async () => {
+  const handleOpenVentasHistorial = () => {
     cleanMessages();
-
-    try {
-      setLoadingVentasHistorial(true);
-      setIsVentasHistorialOpen(true);
-
-      const responsePayload = await fetchCarteraVentasHistorial({ limit: 80 });
-      setVentasHistorial(Array.isArray(responsePayload) ? responsePayload : []);
-    } catch (err) {
-      setError(err.message || 'No fue posible cargar el historial de ventas');
-      setVentasHistorial([]);
-      setIsVentasHistorialOpen(false);
-    } finally {
-      setLoadingVentasHistorial(false);
-    }
+    setIsVentasHistorialOpen(true);
   };
 
   return {
@@ -730,8 +722,6 @@ export const useCarteraData = () => {
     ventaItems,
     setVentaItems,
     savingVenta,
-    ventasHistorial,
-    loadingVentasHistorial,
     isVentasHistorialOpen,
     setIsVentasHistorialOpen,
     selectedClienteAbono,
