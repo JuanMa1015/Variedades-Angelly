@@ -12,11 +12,10 @@ import EditFormModal from '../components/EditFormModal';
 import { formatDateTime, formatMoney } from '../utils/format';
 import AdminSection from './admin/components/AdminSection';
 import AdminTable from './admin/components/AdminTable';
-import CreateVendedorDialog from './admin/components/CreateDialogs/CreateVendedorDialog';
-import CreateAdminDialog from './admin/components/CreateDialogs/CreateAdminDialog';
+import UsuariosPantalla from './admin/usuarios/UsuariosPantalla';
+import AuditoriasPantalla from './admin/auditorias/AuditoriasPantalla';
 import CreateProductoDialog from './admin/components/CreateDialogs/CreateProductoDialog';
 import CreateProveedorDialog from './admin/components/CreateDialogs/CreateProveedorDialog';
-import CreateAuditoriaDialog from './admin/components/CreateDialogs/CreateAuditoriaDialog';
 import CreateClienteCarteraDialog from './admin/components/CreateDialogs/CreateClienteCarteraDialog';
 import CreateClienteTiendaDialog from './admin/components/CreateDialogs/CreateClienteTiendaDialog';
 import CreateClienteFidelizacionDialog from './admin/components/CreateDialogs/CreateClienteFidelizacionDialog';
@@ -76,8 +75,6 @@ const MODULE_LABELS = {
 };
 
 const CREATE_DIALOGS = {
-  admins: 'admins',
-  vendedores: 'vendedores',
   productos: 'productos',
   proveedores: 'proveedores',
   clientes_cartera: 'clientes_cartera',
@@ -88,10 +85,9 @@ const CREATE_DIALOGS = {
   facturas_compra: 'facturas_compra',
   gastos: 'gastos',
   abonos_cartera: 'abonos_cartera',
-  auditorias: 'auditorias',
 };
 
-const Admin = ({ moduleKey: moduleKeyProp }) => {
+const AdminPanel = ({ moduleKey: moduleKeyProp }) => {
   const { moduleKey: moduleKeyParam } = useParams();
   const moduleKey = moduleKeyProp ?? moduleKeyParam ?? null;
   const { token, isSuperAdmin } = useAuth();
@@ -122,8 +118,6 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
 
   const [proveedores, setProveedores] = useState([]);
   const [productos, setProductos] = useState([]);
-  const [admins, setAdmins] = useState([]);
-  const [vendedores, setVendedores] = useState([]);
   const [clientesCartera, setClientesCartera] = useState([]);
   const [clientesTienda, setClientesTienda] = useState([]);
   const [clientesFidelizacion, setClientesFidelizacion] = useState([]);
@@ -132,7 +126,6 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
   const [facturasCompra, setFacturasCompra] = useState([]);
   const [gastos, setGastos] = useState([]);
   const [abonosCartera, setAbonosCartera] = useState([]);
-  const [auditorias, setAuditorias] = useState([]);
   const [informes, setInformes] = useState({
     ventas_totales: 0,
     facturacion_total: 0,
@@ -185,8 +178,6 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
       const [
         proveedoresPayload,
         productosPayload,
-        vendedoresPayload,
-        adminsPayload,
         clientesPayload,
         clientesTiendaPayload,
         clientesFidelizacionPayload,
@@ -195,13 +186,10 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         facturasPayload,
         gastosPayload,
         abonosPayload,
-        auditoriasPayload,
         informesPayload,
       ] = await Promise.all([
         request({ endpoint: '/api/superadmin/proveedores', signal }),
         request({ endpoint: '/api/superadmin/productos', signal }),
-        request({ endpoint: '/api/superadmin/usuarios/vendedores', signal }),
-        request({ endpoint: '/api/superadmin/usuarios/admins', signal }),
         request({ endpoint: '/api/clientes', signal }),
         request({ endpoint: '/api/clientes/tienda-fiado', signal }),
         request({ endpoint: '/api/fidelizacion/clientes', signal }),
@@ -210,14 +198,11 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         request({ endpoint: '/api/facturas-compra', signal }),
         request({ endpoint: '/api/gastos', signal }),
         request({ endpoint: '/api/cartera/abonos', signal }),
-        request({ endpoint: '/api/superadmin/auditorias', signal }),
         request({ endpoint: '/api/superadmin/informes', signal }),
       ]);
 
       setProveedores(Array.isArray(proveedoresPayload) ? proveedoresPayload : []);
       setProductos(Array.isArray(productosPayload) ? productosPayload : []);
-      setVendedores(Array.isArray(vendedoresPayload) ? vendedoresPayload : []);
-      setAdmins(Array.isArray(adminsPayload) ? adminsPayload : []);
       setClientesCartera(Array.isArray(clientesPayload) ? clientesPayload : []);
       setClientesTienda(Array.isArray(clientesTiendaPayload) ? clientesTiendaPayload : []);
       setClientesFidelizacion(Array.isArray(clientesFidelizacionPayload) ? clientesFidelizacionPayload : []);
@@ -226,7 +211,6 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
       setFacturasCompra(Array.isArray(facturasPayload) ? facturasPayload : []);
       setGastos(Array.isArray(gastosPayload) ? gastosPayload : []);
       setAbonosCartera(Array.isArray(abonosPayload) ? abonosPayload : []);
-      setAuditorias(Array.isArray(auditoriasPayload) ? auditoriasPayload : []);
       setInformes({
         ventas_totales: Number(informesPayload?.ventas_totales || 0),
         facturacion_total: Number(informesPayload?.facturacion_total || 0),
@@ -590,74 +574,6 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     );
   }, [openEditModal, notifyError, loadAll, notifySuccess]);
 
-  const handleEditAdmin = useCallback((item) => {
-    openEditModal(
-      'Editar admin',
-      [
-        { name: 'username', label: 'Username', type: 'text', required: true },
-        { name: 'password', label: 'Nueva contraseña (en blanco para mantener)', type: 'password', required: false },
-      ],
-      { username: item.username, password: '' },
-      async (values) => {
-        const payload = { username: values.username.trim() };
-        if (values.password.trim()) payload.password = values.password;
-        await request({
-          endpoint: `/api/superadmin/usuarios/admins/${item.id}`,
-          method: 'PATCH',
-          body: payload,
-        });
-        await loadAll();
-        notifySuccess('Admin actualizado');
-      },
-    );
-  }, [openEditModal, request, loadAll, notifySuccess]);
-
-  const handleDeleteAdmin = useCallback(async (item) => {
-    const confirmed = await confirm({ title: 'Eliminar admin', message: `Eliminar admin ${item.username}?` }); if (!confirmed) return;
-    try {
-      await runDelete({
-        endpoint: `/api/superadmin/usuarios/admins/${item.id}`,
-        successMessage: 'Admin eliminado',
-      });
-    } catch (err) {
-      notifyError(err.message || 'No se pudo eliminar admin');
-    }
-  }, [confirm, runDelete, notifyError]);
-
-  const handleEditVendedor = useCallback((item) => {
-    openEditModal(
-      'Editar vendedor',
-      [
-        { name: 'username', label: 'Username', type: 'text', required: true },
-        { name: 'password', label: 'Nueva contraseña (en blanco para mantener)', type: 'password', required: false },
-      ],
-      { username: item.username, password: '' },
-      async (values) => {
-        const payload = { username: values.username.trim() };
-        if (values.password.trim()) payload.password = values.password;
-        await request({
-          endpoint: `/api/superadmin/usuarios/vendedores/${item.id}`,
-          method: 'PATCH',
-          body: payload,
-        });
-        await loadAll();
-        notifySuccess('Vendedor actualizado');
-      },
-    );
-  }, [openEditModal, request, loadAll, notifySuccess]);
-
-  const handleDeleteVendedor = useCallback(async (item) => {
-    const confirmed = await confirm({ title: 'Eliminar vendedor', message: `Eliminar vendedor ${item.username}?` }); if (!confirmed) return;
-    try {
-      await runDelete({
-        endpoint: `/api/superadmin/usuarios/vendedores/${item.id}`,
-        successMessage: 'Vendedor eliminado',
-      });
-    } catch (err) {
-      notifyError(err.message || 'No se pudo eliminar vendedor');
-    }
-  }, [confirm, runDelete, notifyError]);
-
   const handleEditProducto = useCallback((item) => {
     openEditModal(
       'Editar producto',
@@ -721,46 +637,7 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     }
   }, [confirm, loadAll, notifySuccess, notifyError]);
 
-  const handleEditAuditoria = useCallback((item) => {
-    openEditModal(
-      'Editar auditoría',
-      [
-        { name: 'modulo', label: 'Módulo', type: 'text', required: true },
-        { name: 'accion', label: 'Acción', type: 'text', required: true },
-      ],
-      { modulo: item.modulo, accion: item.accion },
-      async (values) => {
-        await request({
-          endpoint: `/api/auditorias/${item.id}`,
-          method: 'PATCH',
-          body: { modulo: values.modulo.trim(), accion: values.accion.trim() },
-        });
-        await loadAll();
-        notifySuccess('Auditoria actualizada');
-      },
-    );
-  }, [openEditModal, request, loadAll, notifySuccess]);
-
-  const handleDeleteAuditoria = useCallback(async (item) => {
-    const confirmed = await confirm({ title: 'Eliminar auditoría', message: `Eliminar auditoría ${item.id}?` }); if (!confirmed) return;
-    try {
-      await apiDelete(`/api/auditorias/${item.id}`);
-      await loadAll();
-      notifySuccess('Auditoria eliminada');
-    } catch (err) {
-      notifyError(err.message || 'No se pudo eliminar auditoria');
-    }
-  }, [confirm, loadAll, notifySuccess, notifyError]);
-
   const tabSections = useMemo(() => [
-    { key: 'vendedores', title: 'Vendedores', desc: 'Acceso restringido y altas por modal.', data: vendedores, createDialog: 'vendedores',
-      columns: [
-        { key: 'id', label: 'ID', mono: true }, { key: 'username', label: 'Username' }, { key: 'rol', label: 'Rol' },
-      ], onEdit: handleEditVendedor, onDelete: handleDeleteVendedor, minWidth: '640px' },
-    { key: 'admins', title: 'Administradores', desc: 'Acceso y control de admins.', data: admins, createDialog: 'admins',
-      columns: [
-        { key: 'id', label: 'ID', mono: true }, { key: 'username', label: 'Username' }, { key: 'rol', label: 'Rol' },
-      ], onEdit: handleEditAdmin, onDelete: handleDeleteAdmin, minWidth: '640px' },
     { key: 'productos', title: 'Productos', desc: 'Inventario y precios con control visual.', data: productos, createDialog: 'productos',
       columns: [
         { key: 'nombre', label: 'Nombre', mono: true },
@@ -831,18 +708,10 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         { key: 'referencia', label: 'Referencia' },
         { key: 'fecha', label: 'Fecha', render: (i) => formatDateTime(i.fecha) },
       ], onEdit: handleEditAbonoCartera, onDelete: handleDeleteAbonoCartera, minWidth: '1000px' },
-    { key: 'auditorias', title: 'Auditorías', desc: 'Registro de cambios y trazabilidad.', data: auditorias, createDialog: 'auditorias',
-      columns: [
-        { key: 'modulo', label: 'Modulo', mono: true }, { key: 'entidad', label: 'Entidad' }, { key: 'accion', label: 'Accion' },
-        { key: 'detalle', label: 'Detalle' }, { key: 'usuario', label: 'Usuario' },
-        { key: 'fecha', label: 'Fecha', render: (i) => formatDateTime(i.fecha) },
-      ], onEdit: handleEditAuditoria, onDelete: handleDeleteAuditoria, minWidth: '1000px' },
   ], [
-    vendedores, admins, productos, proveedores,
+    productos, proveedores,
     clientesCartera, clientesTienda, clientesFidelizacion,
-    ventas, pedidosProveedor, facturasCompra, gastos, abonosCartera, auditorias,
-    handleEditVendedor, handleDeleteVendedor,
-    handleEditAdmin, handleDeleteAdmin,
+    ventas, pedidosProveedor, facturasCompra, gastos, abonosCartera,
     handleEditProducto, handleDeleteProducto,
     handleEditProveedor, handleDeleteProveedor,
     handleEditClienteCartera, handleDeleteClienteCartera,
@@ -853,7 +722,6 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
     handleEditFacturaCompra, handleDeleteFacturaCompra,
     handleEditGasto, handleDeleteGasto,
     handleEditAbonoCartera, handleDeleteAbonoCartera,
-    handleEditAuditoria, handleDeleteAuditoria,
   ]);
 
   if (!isSuperAdmin) {
@@ -904,7 +772,7 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
 
       {!moduleKey && (
         <div className="rounded-2xl border border-blush-300 bg-white/80 px-4 py-3 text-xs text-rosewood/80 shadow-sm sm:text-sm">
-          Resumen: Admins {admins.length} · Vendedores {vendedores.length} · Productos {productos.length} · Proveedores {proveedores.length} · Auditorias {auditorias.length} · Facturacion {formatMoney(informes.facturacion_total)}
+          Resumen: Productos {productos.length} · Proveedores {proveedores.length} · Facturacion {formatMoney(informes.facturacion_total)}
         </div>
       )}
 
@@ -954,19 +822,24 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
         </div>
       )}
 
+      {activeTab === 'vendedores' && <UsuariosPantalla tipo="vendedores" />}
+      {activeTab === 'admins' && <UsuariosPantalla tipo="admins" />}
+      {activeTab === 'auditorias' && <AuditoriasPantalla />}
+
       {tabSections.map((section) => (
         activeTab === section.key && (
           <AdminSection
             key={section.key}
             title={section.title}
             description={section.desc}
-            onCreate={() => openCreateDialog(section.createDialog)}
+            onCreate={section.createDialog ? () => openCreateDialog(section.createDialog) : undefined}
           >
             <AdminTable
               columns={section.columns}
               data={section.data}
               onEdit={section.onEdit}
               onDelete={section.onDelete}
+              onToggle={section.onToggle}
               minWidth={section.minWidth}
             />
           </AdminSection>
@@ -1084,11 +957,8 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
       )}
 
 
-      <CreateVendedorDialog isOpen={createDialog === CREATE_DIALOGS.vendedores} onClose={closeCreateDialog} onCreated={handleCreated} />
-      <CreateAdminDialog isOpen={createDialog === CREATE_DIALOGS.admins} onClose={closeCreateDialog} onCreated={handleCreated} />
       <CreateProductoDialog isOpen={createDialog === CREATE_DIALOGS.productos} onClose={closeCreateDialog} onCreated={handleCreated} />
       <CreateProveedorDialog isOpen={createDialog === CREATE_DIALOGS.proveedores} onClose={closeCreateDialog} onCreated={handleCreated} />
-      <CreateAuditoriaDialog isOpen={createDialog === CREATE_DIALOGS.auditorias} onClose={closeCreateDialog} onCreated={handleCreated} />
       <CreateClienteCarteraDialog isOpen={createDialog === CREATE_DIALOGS.clientes_cartera} onClose={closeCreateDialog} onCreated={handleCreated} />
       <CreateClienteTiendaDialog isOpen={createDialog === CREATE_DIALOGS.clientes_tienda} onClose={closeCreateDialog} onCreated={handleCreated} />
       <CreateClienteFidelizacionDialog isOpen={createDialog === CREATE_DIALOGS.clientes_fidelizacion} onClose={closeCreateDialog} onCreated={handleCreated} />
@@ -1110,6 +980,15 @@ const Admin = ({ moduleKey: moduleKeyProp }) => {
       />
     </div>
   );
+};
+
+// Usuarios y auditorias tienen pantalla propia: abrirlas no carga todo lo demas del panel.
+const Admin = ({ moduleKey: moduleKeyProp }) => {
+  const { moduleKey: moduleKeyParam } = useParams();
+  const moduleKey = moduleKeyProp ?? moduleKeyParam ?? null;
+  if (moduleKey === 'vendedores' || moduleKey === 'admins') return <UsuariosPantalla tipo={moduleKey} />;
+  if (moduleKey === 'auditorias') return <AuditoriasPantalla />;
+  return <AdminPanel moduleKey={moduleKeyProp} />;
 };
 
 export default Admin;

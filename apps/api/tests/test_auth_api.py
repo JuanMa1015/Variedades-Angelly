@@ -536,7 +536,7 @@ def test_password_corta_rechazada_al_crear_vendedor(
     superadmin_token = _login_token(client, "angelly_superadmin", "supersecure123")
 
     response = client.post(
-        "/api/usuarios/vendedores",
+        "/api/superadmin/usuarios/vendedores",
         headers={"Authorization": f"Bearer {superadmin_token}"},
         json={"username": "vendedor_nuevo", "password": "corta12"},
     )
