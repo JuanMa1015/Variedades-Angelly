@@ -1,6 +1,7 @@
 import { Fragment, useState } from 'react';
 import { Ban, ChevronDown, ChevronUp, Printer, Search } from 'lucide-react';
 import PaymentBadge from '../../components/PaymentBadge';
+import SelectBuscable from '../../components/SelectBuscable';
 import Skeleton from '../../components/Skeleton';
 import { formatDateTime, formatMoney } from '../../utils/format';
 import AnularVentaForm from '../Ventas/AnularVentaForm';
@@ -19,11 +20,14 @@ const Filtros = ({ texto, onTexto, filtros, onFiltro, proveedores }) => (
       <input id="facturas-buscar" type="search" value={texto} onChange={(e) => onTexto(e.target.value)} placeholder="Buscar por número de factura o proveedor" className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-rosewood focus:outline-none" />
     </div>
     <div>
-      <label htmlFor="facturas-filtro-proveedor" className="sr-only">Filtrar por proveedor</label>
-      <select id="facturas-filtro-proveedor" value={filtros.proveedorId} onChange={(e) => onFiltro({ proveedorId: e.target.value })} className={SELECT}>
-        <option value="">Todos los proveedores</option>
-        {proveedores.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-      </select>
+      <SelectBuscable
+        id="facturas-filtro-proveedor"
+        ariaLabel="Filtrar por proveedor"
+        value={filtros.proveedorId}
+        onChange={(valor) => onFiltro({ proveedorId: valor })}
+        opciones={proveedores.map((p) => ({ valor: String(p.id), etiqueta: p.nombre }))}
+        placeholder="Todos los proveedores"
+      />
     </div>
     <div>
       <label htmlFor="facturas-filtro-medio" className="sr-only">Filtrar por medio de pago</label>

@@ -31,10 +31,19 @@ const cargarPagina = async () => {
   fireEvent.click(await screen.findByText('Arroz Diana'));
 };
 
+// El selector de proveedor es una lista donde se escribe para filtrar: se abre, se (opcionalmente) escribe y se elige.
+const elegirEn = (etiqueta, nombre, escribir = '') => {
+  const campo = screen.getByLabelText(etiqueta);
+  fireEvent.focus(campo);
+  if (escribir) fireEvent.change(campo, { target: { value: escribir } });
+  fireEvent.click(within(screen.getByRole('listbox')).getByText(nombre));
+};
+const NOMBRES_PROVEEDOR = { 5: 'Distribuidora', 6: 'Coca-Cola' };
+
 // Lo minimo que pide una factura para guardarse: proveedor, como se pago y un producto con precio.
 const prepararFactura = async ({ medio = 'transferencia', precio = '2000', proveedor = '5' } = {}) => {
   await cargarPagina();
-  fireEvent.change(screen.getByLabelText('Proveedor'), { target: { value: proveedor } });
+  elegirEn('Proveedor', NOMBRES_PROVEEDOR[proveedor]);
   if (medio) fireEvent.change(screen.getByLabelText('Pagado con'), { target: { value: medio } });
   fireEvent.change(screen.getByLabelText('Precio de factura sin IVA'), { target: { value: precio } });
 };
@@ -116,6 +125,7 @@ describe('Facturas de compra', () => {
     fireEvent.change(screen.getByLabelText('Precio de factura sin IVA'), { target: { value: '2000' } });
 
     expect(screen.getByLabelText('Proveedor')).toHaveValue('');
+    expect(screen.getByLabelText('Proveedor')).toHaveAttribute('placeholder', 'Selecciona proveedor');
     guardar();
 
     expect(await screen.findByText('Selecciona un proveedor')).toBeTruthy();
@@ -321,7 +331,7 @@ describe('Facturas registradas', () => {
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/ }));
     await waitFor(() => expect(consultasHistorial().at(-1)).toContain('page=2'));
 
-    fireEvent.change(screen.getByLabelText('Filtrar por proveedor'), { target: { value: '6' } });
+    elegirEn('Filtrar por proveedor', 'Coca-Cola');
     await waitFor(() => expect(consultasHistorial().at(-1)).toMatch(/proveedor_id=6.*|page=1/));
     expect(consultasHistorial().at(-1)).toContain('page=1');
     fireEvent.change(screen.getByLabelText('Filtrar por medio de pago'), { target: { value: 'credito' } });
@@ -499,5 +509,108 @@ describe('Facturas: buscador de producto y producto nuevo', () => {
     expect(await screen.findByText('Producto "Galleta Nueva" creado: ya está en la factura')).toBeTruthy();
     expect(screen.getByText('Galleta Nueva')).toBeTruthy();
     expect(screen.getByLabelText('Precio de factura sin IVA')).toHaveValue(900);
+  });
+});
+
+describe('Facturas: proveedor con busqueda en vivo', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    try { localStorage.clear(); } catch { // sin localStorage
+    }
+    useAuthMock.mockReturnValue({ token: 't', user: { username: 'vendedor1', role: 'vendedor' } });
+    confirmMock.mockResolvedValue(true);
+    fetchCajaEstadoMock.mockResolvedValue({ abierta: true });
+    apiGetMock.mockImplementation((endpoint) => {
+      if (endpoint === '/api/proveedores') {
+        return Promise.resolve(['Aquies Dulcería', 'Arepas', 'Bimbo', 'Bimbo Real', 'Coca-Cola', 'Dulce Mundo'].map((nombre, i) => ({ id: i + 1, nombre, activo: true })));
+      }
+      if (endpoint.startsWith('/api/productos')) return Promise.resolve(productos);
+      if (endpoint === '/api/facturas-compra/config') return Promise.resolve({ iva_rate: 0.19 });
+      if (endpoint.startsWith('/api/facturas-compra/paginadas')) return Promise.resolve(pagina([]));
+      return Promise.resolve([]);
+    });
+  });
+
+  const opciones = () => within(screen.getByRole('listbox')).getAllByRole('option').map((o) => o.textContent);
+
+  it('al abrirlo muestra todos los proveedores y al escribir filtra en vivo', async () => {
+    render(<Facturas />);
+    const campo = await screen.findByLabelText('Proveedor');
+
+    fireEvent.focus(campo);
+    expect(opciones()).toEqual(['Selecciona proveedor', 'Aquies Dulcería', 'Arepas', 'Bimbo', 'Bimbo Real', 'Coca-Cola', 'Dulce Mundo']);
+
+    fireEvent.change(campo, { target: { value: 'bim' } });
+    expect(opciones()).toEqual(['Bimbo', 'Bimbo Real']);
+    fireEvent.change(campo, { target: { value: 'bimbo r' } });
+    expect(opciones()).toEqual(['Bimbo Real']);
+  });
+
+  it('ignora tildes y mayusculas', async () => {
+    render(<Facturas />);
+    const campo = await screen.findByLabelText('Proveedor');
+
+    fireEvent.focus(campo);
+    fireEvent.change(campo, { target: { value: 'DULCERIA' } });
+
+    expect(opciones()).toEqual(['Aquies Dulcería']);
+  });
+
+  it('sin coincidencias lo dice y elegir uno lo deja seleccionado', async () => {
+    render(<Facturas />);
+    const campo = await screen.findByLabelText('Proveedor');
+
+    fireEvent.focus(campo);
+    fireEvent.change(campo, { target: { value: 'zzz' } });
+    expect(screen.getByText('Sin resultados')).toBeTruthy();
+
+    fireEvent.change(campo, { target: { value: 'coca' } });
+    fireEvent.click(within(screen.getByRole('listbox')).getByText('Coca-Cola'));
+
+    expect(screen.queryByRole('listbox')).toBeNull();
+    expect(screen.getByLabelText('Proveedor')).toHaveValue('Coca-Cola');
+  });
+
+  it('se maneja con el teclado: flechas, Enter y Escape', async () => {
+    render(<Facturas />);
+    const campo = await screen.findByLabelText('Proveedor');
+
+    fireEvent.focus(campo);
+    fireEvent.change(campo, { target: { value: 'bim' } });
+    fireEvent.keyDown(campo, { key: 'ArrowDown' });
+    expect(within(screen.getByRole('listbox')).getAllByRole('option')[1]).toHaveAttribute('aria-selected', 'false');
+    fireEvent.keyDown(campo, { key: 'Enter' });
+
+    expect(screen.getByLabelText('Proveedor')).toHaveValue('Bimbo Real');
+    fireEvent.focus(screen.getByLabelText('Proveedor'));
+    fireEvent.keyDown(screen.getByLabelText('Proveedor'), { key: 'Escape' });
+    expect(screen.queryByRole('listbox')).toBeNull();
+    expect(screen.getByLabelText('Proveedor')).toHaveValue('Bimbo Real');
+  });
+
+  it('se puede quitar la eleccion con la primera opcion', async () => {
+    render(<Facturas />);
+    const campo = await screen.findByLabelText('Proveedor');
+    fireEvent.focus(campo);
+    fireEvent.click(within(screen.getByRole('listbox')).getByText('Bimbo'));
+    expect(screen.getByLabelText('Proveedor')).toHaveValue('Bimbo');
+
+    fireEvent.focus(screen.getByLabelText('Proveedor'));
+    fireEvent.click(within(screen.getByRole('listbox')).getByText('Selecciona proveedor'));
+
+    expect(screen.getByLabelText('Proveedor')).toHaveValue('');
+  });
+
+  it('el filtro del historial tambien se busca escribiendo', async () => {
+    render(<Facturas />);
+    const campo = await screen.findByLabelText('Filtrar por proveedor');
+
+    fireEvent.focus(campo);
+    fireEvent.change(campo, { target: { value: 'arep' } });
+    expect(opciones()).toEqual(['Arepas']);
+    fireEvent.click(within(screen.getByRole('listbox')).getByText('Arepas'));
+
+    await waitFor(() => expect(consultasHistorial().at(-1)).toContain('proveedor_id=2'));
+    expect(screen.getByLabelText('Filtrar por proveedor')).toHaveValue('Arepas');
   });
 });

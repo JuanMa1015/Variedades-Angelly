@@ -174,7 +174,7 @@ def anular_venta(
     _exigir_anulable(db, venta)
 
     mover_deuda_tienda(db, deuda_pendiente_tienda(venta), SIN_DEUDA)
-    revertir_puntos_de_venta(db, venta)
+    revertir_puntos_de_venta(db, venta, usuario=solicitante, tipo="anulacion_venta")
     _devolver_stock(db, venta.id, solicitante)
 
     venta.anulada = True
