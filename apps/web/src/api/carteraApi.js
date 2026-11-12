@@ -19,22 +19,29 @@ const buildSearchParams = ({ page, limit, search } = {}) => {
   return query ? `?${query}` : '';
 };
 
-export const fetchCarteraInitialData = async ({ page, limit, search, signal }) => {
-  const query = buildSearchParams({ page, limit, search });
+// Las ventas del dashboard son las del modulo de cartera (no las de la tienda): salen de /api/cartera/dashboard
+// con la forma que ya usa la pantalla.
+const ventasDelDashboard = (dashboard) => ({
+  ventas_diarias: dashboard?.ventas?.hoy?.total ?? 0,
+  ventas_semanales: dashboard?.ventas?.semana?.total ?? 0,
+  ventas_mensuales: dashboard?.ventas?.mes?.total ?? 0,
+  transacciones_diarias: dashboard?.ventas?.hoy?.transacciones ?? 0,
+  transacciones_semanales: dashboard?.ventas?.semana?.transacciones ?? 0,
+  transacciones_mensuales: dashboard?.ventas?.mes?.transacciones ?? 0,
+});
 
-  const [clientes, clientesCatalogo, productosCartera, dashboardVentas, resumenCartera] = await Promise.all([
-    apiGet(`/api/cartera/clientes${query}`, { signal }),
+export const fetchCarteraInitialData = async ({ signal } = {}) => {
+  const [clientesCatalogo, productosCartera, dashboard, resumenCartera] = await Promise.all([
     apiGet('/api/clientes', { signal }),
     apiGet('/api/productos?catalogo=cartera', { signal }),
-    apiGet('/api/dashboard/resumen', { signal }),
+    apiGet('/api/cartera/dashboard', { signal }),
     apiGet('/api/cartera/resumen', { signal }),
   ]);
 
   return {
-    clientes,
     clientesCatalogo,
     productosCartera,
-    dashboardVentas,
+    dashboardVentas: ventasDelDashboard(dashboard),
     resumenCartera,
   };
 };

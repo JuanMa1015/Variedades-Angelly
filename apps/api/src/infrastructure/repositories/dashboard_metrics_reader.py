@@ -27,7 +27,11 @@ class SqlAlchemyDashboardMetricsReader(DashboardMetricsReader):
             select(
                 func.coalesce(func.sum(VentaModel.total), 0.0),
                 func.count(VentaModel.id),
-            ).where(VentaModel.fecha >= start_date, VentaModel.anulada.is_(False)),
+            ).where(
+                VentaModel.fecha >= start_date,
+                VentaModel.anulada.is_(False),
+                VentaModel.fuera_de_caja.is_(False),  # las ventas del modulo de cartera tienen su propio dashboard
+            ),
         ).one()
 
         return VentasMetricDTO(

@@ -120,7 +120,7 @@ def test_dashboard_resumen_incluye_totales_por_metodo(
         )
         session.commit()
 
-    admin_token = _login_token(client, "angelly_admin", "cambiame123")
+    admin_token = _login_token(client, "vendedor1", "ventas123")  # el dashboard de ventas es del vendedor y el superadmin
     response = client.get(
         "/api/dashboard/resumen",
         headers={"Authorization": f"Bearer {admin_token}"},

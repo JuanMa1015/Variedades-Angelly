@@ -4,19 +4,19 @@ import { apiGet, apiPost } from './httpClient';
 const sinCache = (signal) => ({ signal, skipCache: true });
 
 // Busqueda, filtro por estado de stock, proveedor y orden: todo lo resuelve el servidor sobre el catalogo completo.
-export const fetchProductos = ({ page = 1, limit = 25, q = '', estado = 'todos', orden = 'nombre', proveedorId = null, soloInactivos = false, signal } = {}) => {
-  const params = new URLSearchParams({ catalogo: 'tienda', page: String(page), limit: String(limit), estado, orden });
+export const fetchProductos = ({ page = 1, limit = 25, q = '', estado = 'todos', orden = 'nombre', proveedorId = null, soloInactivos = false, catalogo = 'tienda', signal } = {}) => {
+  const params = new URLSearchParams({ catalogo, page: String(page), limit: String(limit), estado, orden });
   if (q) params.set('q', q);
   if (proveedorId) params.set('proveedor_id', String(proveedorId));
   if (soloInactivos) params.set('solo_inactivos', 'true');
   return apiGet(`/api/productos/paginados?${params.toString()}`, sinCache(signal));
 };
 
-export const fetchResumenInventario = ({ signal } = {}) => apiGet('/api/productos/resumen?catalogo=tienda', sinCache(signal));
+export const fetchResumenInventario = ({ catalogo = 'tienda', signal } = {}) => apiGet(`/api/productos/resumen?catalogo=${catalogo}`, sinCache(signal));
 
 // Producto con ese codigo de barras exacto (o null). El servidor busca en todo el catalogo.
-export const buscarPorCodigo = async (codigo) => {
-  const pagina = await fetchProductos({ q: codigo, limit: 5, estado: 'todos' });
+export const buscarPorCodigo = async (codigo, catalogo = 'tienda') => {
+  const pagina = await fetchProductos({ q: codigo, limit: 5, estado: 'todos', catalogo });
   return (pagina?.data ?? []).find((producto) => String(producto.codigo_barras ?? '').trim() === codigo) ?? null;
 };
 
@@ -30,4 +30,4 @@ export const fetchMovimientosStock = (productoId, { page = 1, limit = 10, signal
 );
 
 // Productos agotados o por agotarse agrupados por proveedor, con la cantidad sugerida y el costo estimado.
-export const fetchReposicion = ({ signal } = {}) => apiGet('/api/productos/reposicion?catalogo=tienda', sinCache(signal));
+export const fetchReposicion = ({ catalogo = 'tienda', signal } = {}) => apiGet(`/api/productos/reposicion?catalogo=${catalogo}`, sinCache(signal));

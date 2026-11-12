@@ -33,7 +33,7 @@ const CarteraDashboardSection = ({
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm lg:col-span-2">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Ventas del negocio</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Ventas de cartera</p>
               <h2 className="mt-2 text-xl font-bold text-gray-900">Resumen operativo</h2>
             </div>
             <CalendarDays className="h-5 w-5 text-rosewood" />

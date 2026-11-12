@@ -29,6 +29,7 @@ from src.api.limiter import limiter
 from src.api.routers.auditorias import router as auditorias_router
 from src.api.routers.auth import router as auth_router
 from src.api.routers.caja import router as caja_router
+from src.api.routers.cartera_dashboard import router as cartera_dashboard_router
 from src.api.routers.clientes_cartera_clientes import router as clientes_cartera_clientes_router
 from src.api.routers.clientes_cartera_cobros import router as clientes_cartera_cobros_router
 from src.api.routers.clientes_cartera_ventas import router as clientes_cartera_ventas_router
@@ -525,6 +526,7 @@ app.include_router(fidelizacion_clientes_router)
 app.include_router(clientes_cartera_cobros_router)
 app.include_router(clientes_cartera_clientes_router)
 app.include_router(clientes_cartera_ventas_router)
+app.include_router(cartera_dashboard_router)
 app.include_router(proveedores_router)
 app.include_router(pedidos_proveedor_router)
 app.include_router(gastos_router)

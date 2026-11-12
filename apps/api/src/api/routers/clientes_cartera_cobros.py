@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, literal, null, or_, select, union
@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from src.api.services.antiguedad_deuda import dias_de_deuda_cartera, estado_deuda
 from src.api.services.auditoria import registrar_auditoria
+from src.domain.zona_horaria import inicio_del_dia_local
 from src.api.services.deuda import reajustar_deuda_cartera
 from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.pagination import search_filter
@@ -65,27 +66,18 @@ def cartera_resumen(
     )
 
 
-# Colombia no tiene horario de verano: el dia, la semana y el mes de un cobro se cuentan con la hora de Bogota (UTC-5).
-BOGOTA = timezone(timedelta(hours=-5))
-
-
 def _utc_sin_zona(momento: datetime) -> datetime:
     """Como se guarda `fecha`: UTC sin zona."""
     return momento.astimezone(UTC).replace(tzinfo=None)
 
 
-@router.get("/api/cartera/cobros/resumen", response_model=CobradoCarteraResponse)
-def get_cobrado_cartera(
-    db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
-) -> CobradoCarteraResponse:
+def calcular_cobrado(db: Session) -> CobradoCarteraResponse:
     """Lo que cartera ha cobrado hoy, esta semana (desde el lunes) y este mes, por medio de pago.
 
     Cuenta los abonos del modulo de cartera, incluido el abono inicial de cada venta. No incluye lo que el
     vendedor cobra en el punto de venta: eso va en su caja.
     """
-    ahora = datetime.now(BOGOTA)
-    inicio_dia = ahora.replace(hour=0, minute=0, second=0, microsecond=0)
+    inicio_dia = inicio_del_dia_local(datetime.now(UTC))
     inicios = {
         "hoy": inicio_dia,
         "semana": inicio_dia - timedelta(days=inicio_dia.weekday()),
@@ -111,6 +103,14 @@ def get_cobrado_cartera(
                 setattr(periodo, metodo, round(getattr(periodo, metodo) + monto, 2))
         periodos[nombre] = periodo
     return CobradoCarteraResponse(**periodos)
+
+
+@router.get("/api/cartera/cobros/resumen", response_model=CobradoCarteraResponse)
+def get_cobrado_cartera(
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+) -> CobradoCarteraResponse:
+    return calcular_cobrado(db)
 
 
 @router.get("/api/cartera/clientes", response_model=ClienteCarteraPageResponse)
