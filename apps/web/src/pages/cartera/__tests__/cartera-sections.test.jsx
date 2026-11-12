@@ -2,7 +2,6 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { vi } from 'vitest';
 import CarteraDashboardSection from '../CarteraDashboardSection';
 import CarteraVentaSection from '../CarteraVentaSection';
-import CarteraCobrarSection from '../CarteraCobrarSection';
 
 const formatMoney = (value) => `$${Number(value || 0).toLocaleString('es-CO')}`;
 
@@ -115,45 +114,5 @@ describe('Cartera sections smoke tests', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /historial/i }));
     expect(handleOpenVentasHistorial).toHaveBeenCalled();
-  });
-
-  it('renders cobro cards and exposes client actions', () => {
-    const toggleCobroCliente = vi.fn();
-    const handleAbrirWhatsapp = vi.fn();
-    const handleRegistrarAbono = vi.fn();
-    const handleVerDetalle = vi.fn();
-    const startEditingCliente = vi.fn();
-    const handleDeleteCliente = vi.fn();
-
-    render(
-      <CarteraCobrarSection
-        clientes={[
-          { id: 1, nombre: 'Cliente A', deuda_total: 25000, telefono_whatsapp: '3001234567' },
-        ]}
-        loading={false}
-        error=""
-        searchTerm=""
-        setSearchTerm={vi.fn()}
-        expandedCobroClientes={[]}
-        toggleCobroCliente={toggleCobroCliente}
-        handleAbrirWhatsapp={handleAbrirWhatsapp}
-        handleRegistrarAbono={handleRegistrarAbono}
-        handleVerDetalle={handleVerDetalle}
-        startEditingCliente={startEditingCliente}
-        handleDeleteCliente={handleDeleteCliente}
-        formatMoney={formatMoney}
-        totalPages={1}
-        currentPage={1}
-        setCurrentPage={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByText('Cobrar cartera')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: /ver detalles/i }));
-    expect(toggleCobroCliente).toHaveBeenCalledWith(1);
-
-    fireEvent.click(screen.getByRole('button', { name: /whatsapp/i }));
-    expect(handleAbrirWhatsapp).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
   });
 });

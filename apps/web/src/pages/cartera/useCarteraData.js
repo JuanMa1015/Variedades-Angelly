@@ -9,7 +9,6 @@ import {
   deleteCarteraProducto,
   fetchCarteraInitialData,
   fetchEstadoCuenta,
-  saveCarteraAbono,
   saveCarteraCliente,
   saveCarteraProducto,
   saveCarteraVenta,
@@ -135,7 +134,6 @@ export const useCarteraData = () => {
 
   const [selectedClienteAbono, setSelectedClienteAbono] = useState(null);
   const [selectedClienteDetalle, setSelectedClienteDetalle] = useState(null);
-  const [expandedCobroClientes, setExpandedCobroClientes] = useState([]);
   const [productoForm, setProductoForm] = useState(EMPTY_PRODUCT_FORM);
   const [savingProducto, setSavingProducto] = useState(false);
   const [editingProductoId, setEditingProductoId] = useState(null);
@@ -461,27 +459,11 @@ export const useCarteraData = () => {
     setSelectedClienteAbono(cliente);
   };
 
-  const handleConfirmAbono = async (monto, metodoPagoAbono = 'efectivo') => {
-    if (!selectedClienteAbono) return;
-
-    try {
-      setSavingCliente(true);
-      await saveCarteraAbono({
-        clienteId: selectedClienteAbono.id,
-        payload: {
-          monto,
-          metodo_pago: metodoPagoAbono,
-        },
-      });
-
-      setSuccess('Abono registrado correctamente');
-      setSelectedClienteAbono(null);
-      refreshPage();
-    } catch (err) {
-      setError(err.message || 'No fue posible registrar el abono');
-    } finally {
-      setSavingCliente(false);
-    }
+  // El cuadro de abono ya guardo el abono y muestra su propio resultado: aqui solo se avisa y se recarga.
+  const handleAbonoRegistrado = async (abono) => {
+    setError('');
+    setSuccess(`Abono de ${formatMoney(abono.monto)} registrado`);
+    refreshPage();
   };
 
   // Nunca se agrega mas de lo que hay en stock: el servidor lo rechazaria al registrar la venta.
@@ -634,14 +616,6 @@ export const useCarteraData = () => {
     ));
   }, [clientesCatalogo, searchTerm]);
 
-  const toggleCobroCliente = (clienteId) => {
-    setExpandedCobroClientes((current) => (
-      current.includes(clienteId)
-        ? current.filter((id) => id !== clienteId)
-        : [...current, clienteId]
-    ));
-  };
-
   const handleVerDetalle = (cliente) => {
     cleanMessages();
     setSelectedClienteDetalle(cliente);
@@ -696,8 +670,6 @@ export const useCarteraData = () => {
     setSelectedClienteAbono,
     selectedClienteDetalle,
     setSelectedClienteDetalle,
-    expandedCobroClientes,
-    setExpandedCobroClientes,
     productoForm,
     setProductoForm,
     savingProducto,
@@ -730,12 +702,11 @@ export const useCarteraData = () => {
     handleDeleteProducto,
     handleAbrirWhatsapp,
     handleRegistrarAbono,
-    handleConfirmAbono,
+    handleAbonoRegistrado,
     handleAddProductoVenta,
     handleRemoveVentaItem,
     handleChangeVentaItem,
     handleSubmitVentaCartera,
-    toggleCobroCliente,
     handleVerDetalle,
     handleOpenVentasHistorial,
     navigate,

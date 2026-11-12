@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, literal, null, or_, select, union
@@ -22,6 +22,8 @@ from src.api.schemas.cartera import (
     AbonoCarteraResponse,
     AbonoCarteraUpdateRequest,
     CarteraResumenResponse,
+    CobradoCarteraResponse,
+    CobradoPeriodoResponse,
     ClienteCarteraPageResponse,
     EstadoCuentaResponse,
     MovimientoClientePageResponse,
@@ -61,6 +63,54 @@ def cartera_resumen(
         clientes_riesgo_medio=clientes_riesgo_medio,
         saldo_promedio=saldo_promedio,
     )
+
+
+# Colombia no tiene horario de verano: el dia, la semana y el mes de un cobro se cuentan con la hora de Bogota (UTC-5).
+BOGOTA = timezone(timedelta(hours=-5))
+
+
+def _utc_sin_zona(momento: datetime) -> datetime:
+    """Como se guarda `fecha`: UTC sin zona."""
+    return momento.astimezone(UTC).replace(tzinfo=None)
+
+
+@router.get("/api/cartera/cobros/resumen", response_model=CobradoCarteraResponse)
+def get_cobrado_cartera(
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+) -> CobradoCarteraResponse:
+    """Lo que cartera ha cobrado hoy, esta semana (desde el lunes) y este mes, por medio de pago.
+
+    Cuenta los abonos del modulo de cartera, incluido el abono inicial de cada venta. No incluye lo que el
+    vendedor cobra en el punto de venta: eso va en su caja.
+    """
+    ahora = datetime.now(BOGOTA)
+    inicio_dia = ahora.replace(hour=0, minute=0, second=0, microsecond=0)
+    inicios = {
+        "hoy": inicio_dia,
+        "semana": inicio_dia - timedelta(days=inicio_dia.weekday()),
+        "mes": inicio_dia.replace(day=1),
+    }
+    periodos: dict[str, CobradoPeriodoResponse] = {}
+    for nombre, inicio in inicios.items():
+        filas = db.execute(
+            select(AbonoCarteraModel.metodo_pago, func.coalesce(func.sum(AbonoCarteraModel.monto), 0.0), func.count(AbonoCarteraModel.id))
+            .where(
+                AbonoCarteraModel.fuera_de_caja.is_(True),
+                AbonoCarteraModel.anulado.is_(False),
+                AbonoCarteraModel.fecha >= _utc_sin_zona(inicio),
+            )
+            .group_by(AbonoCarteraModel.metodo_pago),
+        ).all()
+        periodo = CobradoPeriodoResponse()
+        for metodo, suma, cantidad in filas:
+            monto = round(float(suma or 0), 2)
+            periodo.total = round(periodo.total + monto, 2)
+            periodo.abonos += int(cantidad or 0)
+            if metodo in ("efectivo", "transferencia", "tarjeta"):
+                setattr(periodo, metodo, round(getattr(periodo, metodo) + monto, 2))
+        periodos[nombre] = periodo
+    return CobradoCarteraResponse(**periodos)
 
 
 @router.get("/api/cartera/clientes", response_model=ClienteCarteraPageResponse)

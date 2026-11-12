@@ -3,7 +3,7 @@ import { ImageUp, Package, Plus, UserPlus, X } from 'lucide-react';
 import ErrorMessage from '../components/ErrorMessage';
 import SuccessMessage from '../components/SuccessMessage';
 import Skeleton from '../components/Skeleton';
-import RegistrarAbonoModal from '../components/RegistrarAbonoModal';
+import AbonoCarteraModal from './cartera/cobrar/AbonoCarteraModal';
 import VerDetalleModal from '../components/VerDetalleModal';
 import CarteraDashboardSection from './cartera/CarteraDashboardSection';
 import CarteraClientesSection from './cartera/CarteraClientesSection';
@@ -47,7 +47,6 @@ const Cartera = () => {
 
   const {
     activeSection,
-    clientes,
     clientesCatalogo,
     clientesRanking,
     clientesMasCompras,
@@ -55,20 +54,12 @@ const Cartera = () => {
     dashboardVentas,
     resumenCartera,
     productosCartera,
-    loading,
     error,
     success,
-    searchTerm,
-    setSearchTerm,
-    currentPage,
-    setCurrentPage,
-    totalPages,
     selectedClienteAbono,
     setSelectedClienteAbono,
     selectedClienteDetalle,
     setSelectedClienteDetalle,
-    expandedCobroClientes,
-    toggleCobroCliente,
     isVentasHistorialOpen,
     setIsVentasHistorialOpen,
     clienteForm,
@@ -95,7 +86,7 @@ const Cartera = () => {
     handleDeleteProducto,
     handleAbrirWhatsapp,
     handleRegistrarAbono,
-    handleConfirmAbono,
+    handleAbonoRegistrado,
     handleOpenVentasHistorial,
     handleVerDetalle,
     handleSubmitVentaCartera,
@@ -204,22 +195,11 @@ const Cartera = () => {
 
       {activeSection === 'cobrar' && (
         <CarteraCobrarSection
-          clientes={clientes}
-          loading={loading}
-          error={error}
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
-          expandedCobroClientes={expandedCobroClientes}
-          toggleCobroCliente={toggleCobroCliente}
+          formatMoney={formatMoney}
+          recargar={reloadTick}
           handleAbrirWhatsapp={handleAbrirWhatsapp}
           handleRegistrarAbono={handleRegistrarAbono}
           handleVerDetalle={handleVerDetalle}
-          startEditingCliente={startEditingCliente}
-          handleDeleteCliente={handleDeleteCliente}
-          formatMoney={formatMoney}
-          totalPages={totalPages}
-          currentPage={currentPage}
-          setCurrentPage={setCurrentPage}
         />
       )}
 
@@ -354,14 +334,11 @@ const Cartera = () => {
         onCambio={refreshPage}
       />
 
-      {selectedClienteAbono && (
-        <RegistrarAbonoModal
-          cliente={selectedClienteAbono}
-          isOpen={true}
-          onClose={() => setSelectedClienteAbono(null)}
-          onConfirm={handleConfirmAbono}
-        />
-      )}
+      <AbonoCarteraModal
+        cliente={selectedClienteAbono}
+        onRegistrado={handleAbonoRegistrado}
+        onClose={() => setSelectedClienteAbono(null)}
+      />
 
       {selectedClienteDetalle && (
         <VerDetalleModal

@@ -14,3 +14,6 @@ export const fetchClientesCartera = ({ page = 1, limit = 10, q = '', estado = 'a
 export const fetchResumenDeuda = ({ signal } = {}) => apiGet('/api/cartera/clientes/resumen-deuda', sinCache(signal));
 
 export const reactivarClienteCartera = (clienteId) => apiRequest(`/api/clientes/${clienteId}/reactivar`, { method: 'PUT' });
+
+// Lo que cartera cobro hoy, esta semana y este mes por medio de pago (no pasa por la caja del vendedor).
+export const fetchCobradoCartera = ({ signal } = {}) => apiGet('/api/cartera/cobros/resumen', sinCache(signal));
