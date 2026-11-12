@@ -6,8 +6,8 @@ const SEARCH_DELAY_MS = 300;
 
 // Clientes de cartera con busqueda, filtro y pagina en el servidor, mas el resumen de TODA la cartera.
 // `recargar` cambia cuando otra parte de la pantalla guarda o borra algo: vuelve a pedir los datos.
-export const useClientesCartera = (recargar = 0) => {
-  const [filtros, setFiltros] = useState({ q: '', estado: 'activos', page: 1 });
+export const useClientesCartera = (recargar = 0, estadoInicial = 'activos') => {
+  const [filtros, setFiltros] = useState({ q: '', estado: estadoInicial, page: 1 });
   const [texto, setTexto] = useState('');
   const [lista, setLista] = useState({ data: [], total: 0, totalPages: 1 });
   const [resumen, setResumen] = useState(null);

@@ -234,3 +234,21 @@ class EstadoCuentaResponse(BaseModel):
     estado_deuda: str
     ultimas_compras: list[UltimaCompraFiada]
     ultimo_abono: UltimoAbonoResponse | None = None
+
+
+class CobradoPeriodoResponse(BaseModel):
+    """Lo que cartera cobro en un periodo, separado por medio de pago."""
+
+    total: float = 0
+    efectivo: float = 0
+    transferencia: float = 0
+    tarjeta: float = 0
+    abonos: int = 0
+
+
+class CobradoCarteraResponse(BaseModel):
+    """Lo cobrado por el modulo de cartera (no pasa por la caja del vendedor): hoy, semana y mes de Bogota."""
+
+    hoy: CobradoPeriodoResponse
+    semana: CobradoPeriodoResponse
+    mes: CobradoPeriodoResponse
