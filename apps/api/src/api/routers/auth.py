@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import os
-from typing import Annotated, Literal
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from src.api.dependencies import AuthenticatedUser, require_roles
 from src.auth.security import (
     create_access_token,
     create_refresh_token,

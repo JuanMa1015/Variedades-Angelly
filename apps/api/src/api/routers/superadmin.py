@@ -11,7 +11,6 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from src.api.services.auditoria import registrar_auditoria
 from src.api.services.caja_calculos import efectivo_esperado
 from src.api.services.stock import mover_stock
 from src.api.dependencies import AuthenticatedUser, require_roles
@@ -29,11 +28,8 @@ from src.infrastructure.database.models import (
     MovimientoStockModel,
     ProductoModel,
     ProveedorModel,
-    UsuarioModel,
     VentaModel,
 )
-from src.auth.password_policy import ensure_password_not_pwned
-from src.auth.security import hash_password
 
 router = APIRouter(tags=["superadmin"])
 
