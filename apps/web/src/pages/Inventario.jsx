@@ -5,7 +5,6 @@ import { apiDelete, apiGet, apiRequest } from '../api/httpClient';
 import ErrorMessage from '../components/ErrorMessage';
 import PaginationControls from '../components/PaginationControls';
 import SuccessMessage from '../components/SuccessMessage';
-import { SkeletonCard } from '../components/Skeleton';
 import useConfirm from '../components/useConfirm';
 import AjusteStockModal from './Inventario/AjusteStockModal';
 import CrearProductoModal from './Inventario/CrearProductoModal';
@@ -13,52 +12,9 @@ import EditarProductoModal from './Inventario/EditarProductoModal';
 import HistorialStockModal from './Inventario/HistorialStockModal';
 import InventarioToolbar from './Inventario/InventarioToolbar';
 import ProductosLista from './Inventario/ProductosLista';
+import ResumenInventario from './Inventario/ResumenInventario';
 import ReposicionModal from './Inventario/ReposicionModal';
 import { useInventario } from './Inventario/useInventario';
-
-const TarjetaResumen = ({ titulo, valor, tono = 'text-gray-900', activa = false, onClick, children }) => {
-  const contenido = (
-    <>
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">{titulo}</p>
-      <p className={`mt-2 text-2xl font-bold sm:text-3xl ${tono}`}>{valor}</p>
-      {children}
-    </>
-  );
-  const base = 'rounded-2xl border bg-white p-4 text-left shadow-sm sm:p-5';
-  if (!onClick) return <div className={`${base} border-gray-200`}>{contenido}</div>;
-  return (
-    <button type="button" onClick={onClick} aria-pressed={activa} className={`${base} transition hover:shadow-md ${activa ? 'border-rosewood ring-2 ring-rosewood/20' : 'border-gray-200'}`}>
-      {contenido}
-    </button>
-  );
-};
-
-const Resumen = ({ resumen, loading, estado, onEstado }) => {
-  if (loading && !resumen) {
-    return <>{[1, 2, 3, 4].map((n) => <SkeletonCard key={n} />)}</>;
-  }
-  if (!resumen) return null;
-  const alternar = (nuevo) => onEstado(estado === nuevo ? 'todos' : nuevo);
-  return (
-    <>
-      <TarjetaResumen titulo="Productos" valor={resumen.total} />
-      <TarjetaResumen titulo="Stock total" valor={`${resumen.stock_total} u`} />
-      <TarjetaResumen titulo="Agotados" valor={resumen.agotados} tono="text-red-700" activa={estado === 'agotado'} onClick={() => alternar('agotado')} />
-      <TarjetaResumen titulo="Bajo stock" valor={resumen.bajo_stock} tono="text-orange-600" activa={estado === 'bajo'} onClick={() => alternar('bajo')}>
-        {resumen.urgentes.length > 0 && (
-          <ul className="mt-2 space-y-1">
-            {resumen.urgentes.slice(0, 3).map((p) => (
-              <li key={p.id} className="flex items-center justify-between text-xs">
-                <span className="truncate text-gray-700">{p.nombre}</span>
-                <span className="ml-2 shrink-0 font-semibold text-orange-600">{p.stock_actual} u</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </TarjetaResumen>
-    </>
-  );
-};
 
 const Inventario = () => {
   const { token, user } = useAuth();
@@ -159,7 +115,7 @@ const Inventario = () => {
       </section>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Resumen resumen={resumen} loading={loading} estado={filtros.estado} onEstado={(estado) => setFiltro({ estado, soloInactivos: false })} />
+        <ResumenInventario resumen={resumen} loading={loading} estado={filtros.estado} onEstado={(estado) => setFiltro({ estado, soloInactivos: false })} />
       </div>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">

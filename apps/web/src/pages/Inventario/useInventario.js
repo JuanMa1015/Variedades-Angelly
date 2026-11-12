@@ -6,7 +6,7 @@ const SEARCH_DELAY_MS = 300;
 
 // Lista del inventario con busqueda, filtro y orden resueltos por el servidor (llega a todo el catalogo),
 // mas el resumen de TODO el catalogo (no solo de la pagina visible).
-export const useInventario = (token) => {
+export const useInventario = (token, catalogo = 'tienda') => {
   const [filtros, setFiltros] = useState({ q: '', estado: 'todos', orden: 'nombre', proveedorId: null, soloInactivos: false, page: 1 });
   const [texto, setTexto] = useState('');
   const [lista, setLista] = useState({ data: [], total: 0, totalPages: 1 });
@@ -27,8 +27,8 @@ export const useInventario = (token) => {
     if (!silent) setLoading(true);
     try {
       const [pagina, nuevoResumen] = await Promise.all([
-        fetchProductos({ ...filtros, limit: PAGE_SIZE, signal }),
-        fetchResumenInventario({ signal }),
+        fetchProductos({ ...filtros, catalogo, limit: PAGE_SIZE, signal }),
+        fetchResumenInventario({ catalogo, signal }),
       ]);
       if (signal?.aborted) return;
       setLista({ data: pagina?.data ?? [], total: pagina?.page?.total ?? 0, totalPages: Math.max(1, pagina?.page?.total_pages ?? 1) });
@@ -40,7 +40,7 @@ export const useInventario = (token) => {
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
-  }, [token, filtros]);
+  }, [token, filtros, catalogo]);
 
   useEffect(() => {
     const controller = new AbortController();
