@@ -159,7 +159,7 @@ def test_crear_y_reactivar_quedan_en_la_auditoria(auth_client) -> None:
     creado = client.post("/api/clientes/tienda-fiado", headers=_h(token), json={"nombre": "Maria Gomez", "telefono_whatsapp": "573104445566"})
     cliente = creado.json()["id"]
     client.delete(f"/api/clientes/tienda-fiado/{cliente}", headers=_h(token))
-    admin = _login_token(client, "angelly_admin", "cambiame123")
+    admin = _login_token(client, "angelly_superadmin", "supersecure123")
     reactivado = client.put(f"/api/clientes/tienda-fiado/{cliente}/reactivar", headers=_h(admin))
 
     assert creado.status_code == 201 and reactivado.status_code == 200

@@ -17,7 +17,7 @@ def _vendedor(client) -> str:
 
 
 def _admin(client) -> str:
-    return _login_token(client, "angelly_admin", "cambiame123")
+    return _login_token(client, "angelly_superadmin", "supersecure123")
 
 
 def _proveedor(sf, nombre: str) -> int:

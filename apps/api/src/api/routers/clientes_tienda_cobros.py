@@ -60,7 +60,7 @@ def _respuesta_abono(abono: AbonoTiendaModel, cliente: ClienteFiadoTiendaModel |
 @router.get("/api/clientes/tienda/resumen", response_model=TiendaResumenResponse)
 def tienda_resumen(
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("superadmin", "admin", "vendedor")),
+    _: AuthenticatedUser = Depends(require_roles("superadmin", "vendedor")),
 ) -> TiendaResumenResponse:
     clientes = db.execute(
         select(ClienteFiadoTiendaModel).where(ClienteFiadoTiendaModel.activo.is_(True)),
@@ -92,7 +92,7 @@ def lista_clientes_tienda(
     orden: OrdenLista = Query(default="deuda"),
     inactivos: bool = Query(default=False),
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("superadmin", "admin", "vendedor")),
+    current_user: AuthenticatedUser = Depends(require_roles("superadmin", "vendedor")),
 ) -> ClienteTiendaListaPage:
     """Lista unica de clientes: buscador, filtro por estado y orden (por defecto, quien mas debe primero)."""
     if inactivos and current_user.role == "vendedor":
@@ -158,7 +158,7 @@ def list_clientes_tienda_cobro(
     limit: int = Query(default=20, ge=1, le=100),
     search: str | None = Query(default=None, min_length=1),
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("superadmin", "admin", "vendedor")),
+    _: AuthenticatedUser = Depends(require_roles("superadmin", "vendedor")),
 ) -> ClienteTiendaPageResponse:
     query = select(ClienteFiadoTiendaModel).where(
         ClienteFiadoTiendaModel.activo.is_(True),
@@ -219,7 +219,7 @@ def list_cliente_tienda_movimientos(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=10, ge=1, le=100),
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("superadmin", "admin", "vendedor")),
+    _: AuthenticatedUser = Depends(require_roles("superadmin", "vendedor")),
 ) -> MovimientoTiendaPageResponse:
     """Historial del cliente: cada venta fiada (con sus productos) y cada abono, del mas reciente al mas antiguo."""
     cliente = db.get(ClienteFiadoTiendaModel, cliente_id)
@@ -272,7 +272,7 @@ def create_abono_tienda(
     cliente_id: int,
     payload: AbonoTiendaCreateRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("superadmin", "admin", "vendedor")),
+    current_user: AuthenticatedUser = Depends(require_roles("superadmin", "vendedor")),
 ) -> AbonoTiendaResponse:
     with db.begin():
         # Un abono es dinero que entra: sin turno abierto no quedaria en ningun cuadre de caja.
@@ -325,7 +325,7 @@ def anular_abono(
     abono_id: int,
     payload: AnularRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("superadmin", "admin", "vendedor")),
+    current_user: AuthenticatedUser = Depends(require_roles("superadmin", "vendedor")),
 ) -> AbonoTiendaResponse:
     """Anula un abono del turno abierto: la deuda vuelve a subir y queda el registro con motivo y autorizacion."""
     with db.begin():

@@ -37,7 +37,7 @@ def _vendedor(client) -> str:
 
 
 def _admin(client) -> str:
-    return _login_token(client, "angelly_admin", "cambiame123")
+    return _login_token(client, "angelly_superadmin", "supersecure123")
 
 
 def _ahora() -> datetime:
@@ -486,5 +486,5 @@ def test_el_abono_anulado_guarda_quien_lo_anulo_y_quien_lo_autorizo(auth_client)
 
     with sf() as db:
         fila = db.get(AbonoTiendaModel, abono["id"])
-        assert fila.anulado is True and fila.anulado_por == "angelly_admin" and fila.autorizado_por == "angelly_admin"
+        assert fila.anulado is True and fila.anulado_por == "angelly_superadmin" and fila.autorizado_por == "angelly_superadmin"
         assert fila.anulado_en is not None and fila.motivo_anulacion == "Error al digitar"

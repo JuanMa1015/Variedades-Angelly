@@ -93,7 +93,7 @@ def _to_proveedor_response(proveedor: ProveedorModel) -> ProveedorResponse:
 def list_proveedores(
     db: Session = Depends(get_db),
     include_inactivos: bool = Query(default=False),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> list[ProveedorResponse]:
     query = select(ProveedorModel)
     if not include_inactivos:
@@ -110,7 +110,7 @@ def list_proveedores_paginados(
     limit: int = Query(default=20, ge=1, le=200),
     include_inactivos: bool = Query(default=False),
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> ProveedorPageResponse:
     query = select(ProveedorModel)
     if not include_inactivos:
@@ -126,7 +126,7 @@ def list_proveedores_paginados(
 def create_proveedor(
     payload: ProveedorCreateRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> ProveedorResponse:
     nombre = payload.nombre.strip()
     if len(nombre) < 3:
@@ -161,7 +161,7 @@ def update_proveedor(
     proveedor_id: int,
     payload: ProveedorUpdateRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> ProveedorResponse:
     proveedor = db.execute(
         select(ProveedorModel).where(ProveedorModel.id == proveedor_id),
@@ -223,7 +223,7 @@ def update_proveedor(
 def toggle_proveedor_activo(
     proveedor_id: int,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> ProveedorResponse:
     proveedor = db.execute(
         select(ProveedorModel).where(ProveedorModel.id == proveedor_id),
@@ -255,7 +255,7 @@ def toggle_proveedor_activo(
 def delete_proveedor(
     proveedor_id: int,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> Response:
     proveedor = db.execute(
         select(ProveedorModel).where(ProveedorModel.id == proveedor_id),

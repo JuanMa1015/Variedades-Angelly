@@ -27,7 +27,7 @@ def _h(token: str) -> dict[str, str]:
 
 
 def _admin(client) -> str:
-    return _login_token(client, "angelly_admin", "cambiame123")
+    return _login_token(client, "angelly_superadmin", "supersecure123")
 
 
 def _vendedor(client) -> str:
@@ -122,8 +122,8 @@ def test_el_admin_anula_una_venta_y_se_devuelve_el_stock(auth_client) -> None:
     cuerpo = respuesta.json()
     assert cuerpo["anulada"] is True
     assert cuerpo["motivo_anulacion"] == "Error al digitar"
-    assert cuerpo["anulada_por"] == "angelly_admin"
-    assert cuerpo["autorizada_por"] == "angelly_admin"
+    assert cuerpo["anulada_por"] == "angelly_superadmin"
+    assert cuerpo["autorizada_por"] == "angelly_superadmin"
     assert _stock(sf, producto) == 10
     with sf() as db:
         assert db.get(VentaModel, venta) is not None  # no se borra

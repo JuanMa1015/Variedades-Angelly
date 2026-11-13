@@ -165,7 +165,7 @@ def test_exporte_neutraliza_formulas_de_excel(auth_client) -> None:
             stock_actual=1, stock_minimo=0, codigo_barras="+123",
         ))
         db.commit()
-    token = _login_token(client, "angelly_admin", "cambiame123")
+    token = _login_token(client, "angelly_superadmin", "supersecure123")
 
     respuesta = client.get("/api/export/productos", headers=_h(token))
 
@@ -183,7 +183,7 @@ def test_exporte_de_ventas_neutraliza_el_nombre_del_cliente(auth_client) -> None
         db.flush()
         db.add(VentaModel(cliente_id=cliente.id, total=10, saldo_pendiente=0, creado_por="-cmd"))
         db.commit()
-    token = _login_token(client, "angelly_admin", "cambiame123")
+    token = _login_token(client, "angelly_superadmin", "supersecure123")
 
     texto = client.get("/api/export/ventas", headers=_h(token)).text
 

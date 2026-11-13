@@ -85,7 +85,7 @@ def _to_pedido_proveedor_response(
 @router.get("/api/proveedores/pedidos", response_model=list[PedidoProveedorResponse])
 def list_pedidos_proveedor(
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> list[PedidoProveedorResponse]:
     pedidos = db.execute(
         select(PedidoProveedorModel).order_by(PedidoProveedorModel.fecha_creacion.desc()),
@@ -116,7 +116,7 @@ def list_pedidos_proveedor_paginados(
     proveedor_id: int | None = Query(default=None, gt=0),
     q: str | None = Query(default=None, max_length=100),
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> PedidoProveedorPageResponse:
     query = select(PedidoProveedorModel).join(ProveedorModel, ProveedorModel.id == PedidoProveedorModel.proveedor_id)
     if estado != "todos":
@@ -156,7 +156,7 @@ def list_pedidos_proveedor_paginados(
 def create_pedido_proveedor(
     payload: PedidoProveedorCreateRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> PedidoProveedorResponse:
     proveedor = db.execute(
         select(ProveedorModel).where(ProveedorModel.id == payload.proveedor_id),
@@ -200,7 +200,7 @@ def cambiar_estado_pedido(
     pedido_id: int,
     payload: PedidoEstadoRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> PedidoProveedorResponse:
     """enviado -> recibido | cancelado. Reabrir (volver a enviado) solo si no tiene factura."""
     pedido = db.execute(
@@ -256,7 +256,7 @@ def update_pedido_proveedor(
     pedido_id: int,
     payload: PedidoProveedorUpdateRequest,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> PedidoProveedorResponse:
     pedido = db.execute(
         select(PedidoProveedorModel).where(PedidoProveedorModel.id == pedido_id),
@@ -289,7 +289,7 @@ def update_pedido_proveedor(
 def delete_pedido_proveedor(
     pedido_id: int,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> Response:
     pedido = db.execute(
         select(PedidoProveedorModel).where(PedidoProveedorModel.id == pedido_id),

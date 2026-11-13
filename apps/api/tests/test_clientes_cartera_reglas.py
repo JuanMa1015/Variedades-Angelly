@@ -312,7 +312,7 @@ def test_un_cliente_nuevo_sin_cupo_definido_puede_comprar_a_credito_en_el_pos(au
 
     respuesta = client.post(
         "/api/ventas",
-        headers=_admin(client),
+        headers={"Authorization": f"Bearer {_login_token(client, 'angelly_superadmin', 'supersecure123')}"},
         json={
             "cliente_id": cliente,
             "items": [{"producto_id": producto, "cantidad": 3}],

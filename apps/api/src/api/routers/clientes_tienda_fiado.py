@@ -113,7 +113,7 @@ def list_clientes_fiado_tienda(
     limit: int = Query(default=200, ge=1, le=500),
     include_inactivos: bool = Query(default=False),
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("superadmin", "admin", "vendedor")),
+    _: AuthenticatedUser = Depends(require_roles("superadmin", "vendedor")),
 ) -> list[ClienteFiadoTiendaResponse]:
     query = select(ClienteFiadoTiendaModel)
     if not include_inactivos:
@@ -138,7 +138,7 @@ def list_clientes_fiado_tienda(
 def create_cliente_fiado_tienda(
     payload: ClienteFiadoTiendaCreateRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("superadmin", "admin", "vendedor")),
+    current_user: AuthenticatedUser = Depends(require_roles("superadmin", "vendedor")),
 ) -> ClienteFiadoTiendaResponse | JSONResponse:
     nombre = " ".join(payload.nombre.split())
     telefono = _telefono_o_error(payload.telefono_whatsapp)
@@ -166,7 +166,7 @@ def update_cliente_fiado_tienda(
     cliente_id: int,
     payload: ClienteFiadoTiendaUpdateRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("superadmin", "admin", "vendedor")),
+    current_user: AuthenticatedUser = Depends(require_roles("superadmin", "vendedor")),
 ) -> ClienteFiadoTiendaResponse | JSONResponse:
     cliente = db.execute(
         select(ClienteFiadoTiendaModel).where(ClienteFiadoTiendaModel.id == cliente_id).with_for_update(),
@@ -227,7 +227,7 @@ def update_cliente_fiado_tienda(
 def delete_cliente_fiado_tienda(
     cliente_id: int,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("superadmin", "admin", "vendedor")),
+    current_user: AuthenticatedUser = Depends(require_roles("superadmin", "vendedor")),
 ) -> Response:
     cliente = db.execute(
         select(ClienteFiadoTiendaModel).where(ClienteFiadoTiendaModel.id == cliente_id).with_for_update(),
@@ -263,7 +263,7 @@ def delete_cliente_fiado_tienda(
 def reactivar_cliente_fiado_tienda(
     cliente_id: int,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> dict:
     cliente = db.execute(
         select(ClienteFiadoTiendaModel).where(ClienteFiadoTiendaModel.id == cliente_id),

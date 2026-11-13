@@ -44,8 +44,8 @@ Feature: Ventas
     Then la respuesta es 403
     And el detalle del error es "Solo admin puede registrar fiados de cartera"
 
-  Scenario: Admin registra fiado de cartera exitosamente
-    Given estoy autenticado como "angelly_admin" con password "cambiame123"
+  Scenario: Superadmin registra fiado de cartera exitosamente
+    Given estoy autenticado como "angelly_superadmin" con password "supersecure123"
     And existe un cliente de cartera:
       | nombre        | documento | limite_credito |
       | Carlos Ruiz   | 10001     | 50000          |

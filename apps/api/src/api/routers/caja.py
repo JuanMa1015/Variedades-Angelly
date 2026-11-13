@@ -80,7 +80,7 @@ def _es_cierre_ciego(user: AuthenticatedUser, esta_abierta: bool) -> bool:
 @router.get("/api/caja/estado", response_model=CajaEstadoResponse)
 def caja_estado(
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> CajaEstadoResponse:
     """Retorna estado actual de la caja y ultimo cierre."""
     caja_abierta = db.execute(
@@ -124,7 +124,7 @@ def _hay_caja_abierta(db: Session) -> bool:
 def caja_apertura(
     payload: AperturaCajaRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> CierreCajaResponse:
     """Abre la caja con un monto inicial. Rechaza si ya hay una caja abierta."""
     if _hay_caja_abierta(db):
@@ -158,7 +158,7 @@ def caja_apertura(
 def caja_cierre(
     payload: CierreCajaRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> CierreCajaResponse:
     """Cierra la caja abierta. Calcula ventas/gastos del turno."""
     caja = db.execute(
@@ -219,7 +219,7 @@ def _item_historial(c: CierreCajaModel, user: AuthenticatedUser, db: Session) ->
 @router.get("/api/caja", response_model=list[CajaHistorialItemResponse])
 def caja_listar(
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> list[CajaHistorialItemResponse]:
     """Lista todas las aperturas y cierres de caja."""
     cierres = db.execute(
@@ -232,7 +232,7 @@ def caja_listar(
 def caja_movimientos(
     caja_id: int,
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> list[MovimientoCajaResponse]:
     """Ventas (lo cobrado), abonos y gastos de un turno: lo que explica su efectivo esperado."""
     caja = db.get(CierreCajaModel, caja_id)

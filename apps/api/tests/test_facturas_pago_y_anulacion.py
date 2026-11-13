@@ -28,7 +28,7 @@ def _vendedor(client) -> str:
 
 
 def _admin(client) -> str:
-    return _login_token(client, "angelly_admin", "cambiame123")
+    return _login_token(client, "angelly_superadmin", "supersecure123")
 
 
 def _proveedor(sf, nombre="Distribuidora") -> int:
@@ -199,7 +199,7 @@ def test_el_admin_se_autoriza_a_si_mismo(auth_client) -> None:
     client, sf = auth_client
     factura = _factura(client, _vendedor(client), _proveedor(sf), _producto(sf)).json()
 
-    assert _anular(client, _admin(client), factura["id"]).json()["autorizada_por"] == "angelly_admin"
+    assert _anular(client, _admin(client), factura["id"]).json()["autorizada_por"] == "angelly_superadmin"
 
 
 def test_la_clave_incorrecta_no_anula(auth_client) -> None:
@@ -278,7 +278,7 @@ def test_anular_deja_auditoria_y_el_historial_de_stock(auth_client) -> None:
     registro = _auditoria(sf, "anular")
     movimientos = client.get(f"/api/productos/{producto}/movimientos-stock", headers=_h(_vendedor(client))).json()["data"]
 
-    assert len(registro) == 1 and "Autorizo: angelly_admin" in registro[0] and "Error al digitar" in registro[0]
+    assert len(registro) == 1 and "Autorizo: angelly_superadmin" in registro[0] and "Error al digitar" in registro[0]
     assert movimientos[0]["delta"] == -5
     assert movimientos[0]["motivo"] == "Factura de compra anulada"
 

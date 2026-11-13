@@ -61,7 +61,7 @@ def test_admin_puede_crear_factura_compra_y_totales_iva(
 ) -> None:
     client, testing_session_local = operaciones_client
 
-    admin_token = _login_token(client, "angelly_admin", "cambiame123")
+    admin_token = _login_token(client, "angelly_superadmin", "supersecure123")
 
     proveedor_response = client.post(
         "/api/proveedores",
@@ -140,7 +140,7 @@ def test_vendedor_puede_crear_facturas_compra(
 ) -> None:
     client, _ = operaciones_client
 
-    admin_token = _login_token(client, "angelly_admin", "cambiame123")
+    admin_token = _login_token(client, "angelly_superadmin", "supersecure123")
     vendedor_token = _login_token(client, "vendedor1", "ventas123")
 
     proveedor_response = client.post(
@@ -180,7 +180,7 @@ def test_no_se_puede_eliminar_proveedor_con_pedidos(
 ) -> None:
     client, _ = operaciones_client
 
-    admin_token = _login_token(client, "angelly_admin", "cambiame123")
+    admin_token = _login_token(client, "angelly_superadmin", "supersecure123")
     vendedor_token = _login_token(client, "vendedor1", "ventas123")
 
     proveedor_response = client.post(
@@ -219,7 +219,7 @@ def test_vendedor_puede_crear_pedido_y_admin_actualizarlo(
 ) -> None:
     client, _ = operaciones_client
 
-    admin_token = _login_token(client, "angelly_admin", "cambiame123")
+    admin_token = _login_token(client, "angelly_superadmin", "supersecure123")
     vendedor_token = _login_token(client, "vendedor1", "ventas123")
 
     proveedor_response = client.post(

@@ -27,7 +27,7 @@ def _vendedor(client) -> str:
 
 
 def _admin(client) -> str:
-    return _login_token(client, "angelly_admin", "cambiame123")
+    return _login_token(client, "angelly_superadmin", "supersecure123")
 
 
 def _gasto(client, token, monto=50000, medio="efectivo", categoria="servicios", descripcion="Pago de la luz", **extra):
@@ -225,7 +225,7 @@ def test_el_admin_anula_su_propia_autorizacion(auth_client) -> None:
     respuesta = _anular(client, _admin(client), gasto["id"])
 
     assert respuesta.status_code == 200
-    assert respuesta.json()["autorizado_por"] == "angelly_admin"
+    assert respuesta.json()["autorizado_por"] == "angelly_superadmin"
 
 
 def test_una_clave_de_admin_incorrecta_no_anula(auth_client) -> None:
@@ -391,7 +391,7 @@ def test_crear_y_anular_dejan_registro(auth_client) -> None:
     assert _auditoria(sf, "crear") == ["servicios: 50000.0 por efectivo. Pago de la luz"]
     anulacion_registro = _auditoria(sf, "anular")
     assert len(anulacion_registro) == 1
-    assert "Autorizo: angelly_admin" in anulacion_registro[0]
+    assert "Autorizo: angelly_superadmin" in anulacion_registro[0]
     assert "Error al digitar" in anulacion_registro[0]
 
 

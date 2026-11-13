@@ -216,8 +216,9 @@ def test_las_listas_de_ventas_son_de_cada_rol(auth_client) -> None:
 
     for ruta in ("/api/ventas", "/api/ventas/paginadas"):
         assert ids(ruta, "vendedor") == {de_tienda}
-        assert ids(ruta, "admin") == {de_cartera}
         assert ids(ruta, "super") == {de_tienda, de_cartera}
+        assert client.get(ruta, headers=_admin(client)).status_code == 403  # el admin no entra a las ventas de la tienda
+    assert ids("/api/cartera/ventas/paginadas", "admin") == {de_cartera}
 
 
 def test_un_abono_de_cartera_no_mueve_nada_del_vendedor(auth_client) -> None:

@@ -88,8 +88,8 @@ def test_anular_la_venta_devuelve_lo_canjeado_y_quita_lo_ganado_en_el_historial(
     assert respuesta.status_code == 200
     anulaciones = [m for m in _movimientos(sf, cliente) if m["tipo"] == "anulacion_venta"]
     assert [(m["puntos"], m["saldo"], m["usuario"], m["ref"]) for m in anulaciones] == [
-        (100, 168, "angelly_admin", ("venta", venta)),
-        (-18, 150, "angelly_admin", ("venta", venta)),
+        (100, 168, "angelly_superadmin", ("venta", venta)),
+        (-18, 150, "angelly_superadmin", ("venta", venta)),
     ]
     assert _puntos(sf, cliente) == 150
 
@@ -146,7 +146,7 @@ def test_el_admin_ajusta_los_puntos(auth_client, modo, puntos, esperado) -> None
     assert respuesta.status_code == 200
     assert respuesta.json()["puntos_acumulados"] == esperado
     ultimo = _movimientos(sf, cliente)[-1]
-    assert (ultimo["tipo"], ultimo["saldo"], ultimo["usuario"], ultimo["motivo"]) == ("ajuste", esperado, "angelly_admin", "Conteo de una promocion")
+    assert (ultimo["tipo"], ultimo["saldo"], ultimo["usuario"], ultimo["motivo"]) == ("ajuste", esperado, "angelly_superadmin", "Conteo de una promocion")
 
 
 def test_el_ajuste_exige_motivo_y_lo_deja_en_la_auditoria(auth_client) -> None:

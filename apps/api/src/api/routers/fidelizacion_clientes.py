@@ -25,7 +25,7 @@ from src.infrastructure.database.models import ClienteFidelizacionModel, Movimie
 router = APIRouter(tags=["fidelizacion-clientes"])
 
 PUNTOS_MAXIMOS = 1_000_000
-ROLES_ADMIN = {"admin", "superadmin"}
+ROLES_ADMIN = {"superadmin"}
 
 
 class FidelizacionConfigResponse(BaseModel):
@@ -38,7 +38,7 @@ class FidelizacionConfigResponse(BaseModel):
 
 @router.get("/api/fidelizacion/config", response_model=FidelizacionConfigResponse)
 def get_fidelizacion_config(
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> FidelizacionConfigResponse:
     return FidelizacionConfigResponse(
         umbral_bono=umbral_bono(),
@@ -163,7 +163,7 @@ def list_clientes_fidelizacion_paginados(
     q: str | None = Query(default=None, max_length=100, description="Nombre o parte del WhatsApp"),
     estado: Literal["activos", "canjeables", "desactivados", "todos"] = Query(default="activos"),
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> ClientesFidelizacionPageResponse:
     """Busqueda, filtro y pagina resueltos en el servidor. Ver los desactivados es de administradores."""
     if estado in ("desactivados", "todos") and current_user.role not in ROLES_ADMIN:
@@ -198,7 +198,7 @@ def list_clientes_fidelizacion_paginados(
 @router.get("/api/fidelizacion/resumen", response_model=ResumenFidelizacionResponse)
 def get_resumen_fidelizacion(
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> ResumenFidelizacionResponse:
     activos = ClienteFidelizacionModel.activo.is_(True)
     total_activos = db.execute(select(func.count()).select_from(ClienteFidelizacionModel).where(activos)).scalar_one()
@@ -226,7 +226,7 @@ def list_clientes_fidelizacion(
     limit: int = Query(default=200, ge=1, le=500),
     include_inactivos: bool = Query(default=False),
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> list[ClienteFidelizacionResponse]:
     query = select(ClienteFidelizacionModel)
     if not include_inactivos:
@@ -246,7 +246,7 @@ def list_clientes_fidelizacion(
 def create_cliente_fidelizacion(
     payload: ClienteFidelizacionCreateRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> ClienteFidelizacionResponse:
     if not payload.acepta_datos:
         raise HTTPException(status_code=400, detail="El cliente debe autorizar el tratamiento de sus datos")
@@ -288,7 +288,7 @@ def update_cliente_fidelizacion(
     cliente_id: int,
     payload: ClienteFidelizacionUpdateRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> ClienteFidelizacionResponse:
     cliente = cliente_bloqueado(db, cliente_id)
     if cliente is None:
@@ -338,7 +338,7 @@ def ajustar_puntos_cliente(
     cliente_id: int,
     payload: AjustePuntosRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> ClienteFidelizacionResponse:
     """Corrige los puntos de un cliente: sumar, restar o dejarlos en una cantidad exacta, siempre con motivo."""
     cliente = cliente_bloqueado(db, cliente_id)
@@ -377,7 +377,7 @@ def list_movimientos_puntos(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=10, ge=1, le=100),
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> MovimientosPuntosPageResponse:
     """Historial de puntos del cliente, del mas reciente al mas antiguo."""
     if db.get(ClienteFidelizacionModel, cliente_id) is None:
@@ -405,7 +405,7 @@ def list_movimientos_puntos(
 def delete_cliente_fidelizacion(
     cliente_id: int,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> Response:
     cliente = db.execute(
         select(ClienteFidelizacionModel).where(ClienteFidelizacionModel.id == cliente_id),
@@ -431,7 +431,7 @@ def delete_cliente_fidelizacion(
 def reactivar_cliente_fidelizacion(
     cliente_id: int,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> dict:
     cliente = db.execute(
         select(ClienteFidelizacionModel).where(ClienteFidelizacionModel.id == cliente_id),
