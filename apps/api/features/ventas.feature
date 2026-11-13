@@ -45,7 +45,7 @@ Feature: Ventas
     And el detalle del error es "Solo admin puede registrar fiados de cartera"
 
   Scenario: Superadmin registra fiado de cartera exitosamente
-    Given estoy autenticado como "angelly_superadmin" con password "supersecure123"
+    Given estoy autenticado como superadmin
     And existe un cliente de cartera:
       | nombre        | documento | limite_credito |
       | Carlos Ruiz   | 10001     | 50000          |

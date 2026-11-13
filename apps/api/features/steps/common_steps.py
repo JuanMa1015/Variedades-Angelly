@@ -1,4 +1,5 @@
 import json
+import os
 from datetime import datetime
 
 from behave import given, when, then
@@ -56,6 +57,11 @@ def step_caja_abierta(context):
             ),
         )
         session.commit()
+
+
+@given("estoy autenticado como superadmin")
+def step_autenticado_superadmin(context):
+    _login(context, os.environ["AUTH_SUPERADMIN_USERNAME"], os.environ["AUTH_SUPERADMIN_PASSWORD"])
 
 
 @given('estoy autenticado como "{usuario}" con password "{password}"')
