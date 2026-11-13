@@ -70,18 +70,18 @@ def test_las_ventas_del_punto_de_venta_no_cuentan_en_cartera_ni_las_de_cartera_e
     assert venta.status_code == 201, venta.text  # 1.400 de la tienda
 
     cartera = _dashboard(client).json()["ventas"]["hoy"]
-    negocio = client.get("/api/dashboard/resumen", headers=vendedor).json()
+    negocio = client.get("/api/dashboard/vendedor", headers=vendedor).json()["ventas"]["hoy"]
 
     assert cartera["total"] == 3000 and cartera["transacciones"] == 1
-    assert negocio["ventas_diarias"] == 1400 and negocio["transacciones_diarias"] == 1
+    assert negocio["total"] == 1400 and negocio["transacciones"] == 1
 
 
-def test_el_dashboard_de_ventas_es_del_vendedor_y_el_superadmin_no_del_admin(auth_client) -> None:
+def test_el_dashboard_de_la_tienda_es_del_vendedor_y_el_superadmin_no_del_admin(auth_client) -> None:
     client, _ = auth_client
 
-    assert client.get("/api/dashboard/resumen", headers=_token(client, "vendedor")).status_code == 200
-    assert client.get("/api/dashboard/resumen", headers=_token(client, "super")).status_code == 200
-    assert client.get("/api/dashboard/resumen", headers=_admin(client)).status_code == 403
+    assert client.get("/api/dashboard/vendedor", headers=_token(client, "vendedor")).status_code == 200
+    assert client.get("/api/dashboard/vendedor", headers=_token(client, "super")).status_code == 200
+    assert client.get("/api/dashboard/vendedor", headers=_admin(client)).status_code == 403
 
 
 def test_lo_cobrado_es_lo_que_cartera_recibio(auth_client) -> None:

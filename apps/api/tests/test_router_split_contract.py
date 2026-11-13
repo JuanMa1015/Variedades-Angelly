@@ -120,16 +120,16 @@ def test_dashboard_resumen_incluye_totales_por_metodo(
         )
         session.commit()
 
-    admin_token = _login_token(client, "vendedor1", "ventas123")  # el dashboard de ventas es del vendedor y el superadmin
+    vendedor_token = _login_token(client, "vendedor1", "ventas123")  # el dashboard de la tienda es del vendedor y el superadmin
     response = client.get(
-        "/api/dashboard/resumen",
-        headers={"Authorization": f"Bearer {admin_token}"},
+        "/api/dashboard/vendedor",
+        headers={"Authorization": f"Bearer {vendedor_token}"},
     )
 
     assert response.status_code == 200
-    payload = response.json()
-    assert payload["pagos_efectivo"] == 57000
-    assert payload["pagos_transferencia"] == 33000
+    cobrado = response.json()["cobrado"]["mes"]
+    assert cobrado["efectivo"] == 57000
+    assert cobrado["transferencia"] == 33000
 
 
 def test_clientes_tienda_fiado_crud_basico(

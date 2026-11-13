@@ -8,14 +8,10 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from src.application.services.dashboard_service import DashboardService
 from src.auth.security import decode_access_token
 from src.infrastructure.database.connection import get_db
 from src.auth.sesiones import sesion_revocada
 from src.infrastructure.database.models import UsuarioModel
-from src.infrastructure.repositories.dashboard_metrics_reader import (
-    SqlAlchemyDashboardMetricsReader,
-)
 
 
 class AuthenticatedUser(BaseModel):
@@ -125,7 +121,3 @@ def require_roles(*roles: str):
     return _dependency
 
 
-def get_dashboard_service(db: Session = Depends(get_db)) -> DashboardService:
-    """Construye servicio de dashboard con dependencias inyectadas."""
-    metrics_reader = SqlAlchemyDashboardMetricsReader(db)
-    return DashboardService(metrics_reader)

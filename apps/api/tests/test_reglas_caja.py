@@ -229,11 +229,11 @@ def test_el_dashboard_separa_tarjeta_transferencia_y_efectivo(auth_client) -> No
         tienda_id = tienda.id
     client.post(f"/api/clientes/tienda/{tienda_id}/abonos", headers=_h(vendedor), json={"monto": 1500, "metodo_pago": "efectivo"})
 
-    resumen = client.get("/api/dashboard/resumen", headers=_h(vendedor)).json()
+    cobrado = client.get("/api/dashboard/vendedor", headers=_h(vendedor)).json()["cobrado"]["hoy"]
 
-    assert resumen["pagos_efectivo"] == 2500  # venta 1000 + abono de tienda 1500
-    assert resumen["pagos_transferencia"] == 2000
-    assert resumen["pagos_tarjeta"] == 3000
+    assert cobrado["efectivo"] == 2500  # venta 1000 + abono de tienda 1500
+    assert cobrado["transferencia"] == 2000
+    assert cobrado["tarjeta"] == 3000
 
 
 def test_los_abonos_aceptan_tarjeta_pero_no_metodos_inventados(auth_client) -> None:
@@ -262,7 +262,7 @@ def test_el_superadmin_ve_el_efectivo_esperado_sin_sumar_transferencias(auth_cli
     _vender(client, vendedor, producto, "transferencia", cantidad=5)
     client.post("/api/caja/cierre", headers=_h(vendedor), json={"monto_cierre": 1000})
 
-    lista = client.get("/api/superadmin/caja", headers=_h(superadmin)).json()
+    lista = client.get("/api/caja", headers=_h(superadmin)).json()
 
     assert lista[0]["saldo_esperado"] == 1000  # antes sumaba las transferencias (6000)
     assert lista[0]["monto_ventas_transferencia"] == 5000

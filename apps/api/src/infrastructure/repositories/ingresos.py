@@ -28,10 +28,15 @@ def cobrado_en_venta():
     )
 
 
-def cobros_por_metodo(db: Session, caja_id: int | None = None, desde: datetime | None = None) -> dict[str, float]:
+def cobros_por_metodo(
+    db: Session,
+    caja_id: int | None = None,
+    desde: datetime | None = None,
+    hasta: datetime | None = None,
+) -> dict[str, float]:
     """Suma lo cobrado por medio de pago (ventas + abonos de cartera + abonos de tienda), sin lo del modulo de cartera.
 
-    Con ``caja_id`` solo cuenta lo asociado a ese turno; con ``desde``, lo cobrado desde esa fecha (UTC sin zona);
+    Con ``caja_id`` solo cuenta lo asociado a ese turno; con ``desde``, lo cobrado desde esa fecha y con ``hasta``, hasta antes de ella (UTC sin zona);
     sin ninguno, es el historico completo.
     """
     totales: dict[str, float] = defaultdict(float)
@@ -54,6 +59,8 @@ def cobros_por_metodo(db: Session, caja_id: int | None = None, desde: datetime |
             consulta = consulta.where(modelo.caja_id == caja_id)
         if desde is not None:
             consulta = consulta.where(modelo.fecha >= desde)
+        if hasta is not None:
+            consulta = consulta.where(modelo.fecha < hasta)
         for metodo, total in db.execute(consulta.group_by(modelo.metodo_pago)).all():
             totales[metodo] += float(total or 0.0)
     return dict(totales)

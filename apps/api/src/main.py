@@ -35,7 +35,6 @@ from src.api.routers.clientes_cartera_cobros import router as clientes_cartera_c
 from src.api.routers.clientes_cartera_ventas import router as clientes_cartera_ventas_router
 from src.api.routers.clientes_tienda_cobros import router as clientes_tienda_cobros_router
 from src.api.routers.clientes_tienda_fiado import router as clientes_tienda_fiado_router
-from src.api.routers.dashboard import router as dashboard_router
 from src.api.routers.dashboard_vendedor import router as dashboard_vendedor_router
 from src.api.routers.export import router as export_router
 from src.api.routers.facturas_compra import router as facturas_compra_router
@@ -518,7 +517,6 @@ def health_check():
 app.include_router(auth_router)
 app.include_router(productos_router)
 app.include_router(productos_stock_router)
-app.include_router(dashboard_router)
 app.include_router(dashboard_vendedor_router)
 app.include_router(superadmin_router)
 app.include_router(ventas_fidelizacion_router)
