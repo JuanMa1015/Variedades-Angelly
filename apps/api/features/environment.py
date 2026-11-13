@@ -1,4 +1,5 @@
 import os
+import secrets
 
 # Debe configurarse ANTES de importar src.main: los decoradores de slowapi
 # evaluan login_rate_limit() una unica vez en tiempo de importacion.
@@ -22,6 +23,8 @@ def before_scenario(context, scenario):
             del os.environ[key]
     os.environ["APP_ENV"] = "test"
     os.environ["AUTH_BOOTSTRAP_ENABLED"] = "true"
+    os.environ["AUTH_SUPERADMIN_USERNAME"] = "angelly_superadmin"
+    os.environ["AUTH_SUPERADMIN_PASSWORD"] = secrets.token_urlsafe(18)  # al azar en cada corrida; los pasos la leen del entorno
     os.environ["AUTH_ADMIN_USERNAME"] = "angelly_admin"
     os.environ["AUTH_ADMIN_PASSWORD"] = "cambiame123"
     os.environ["AUTH_SELLER_USERNAME"] = "vendedor1"

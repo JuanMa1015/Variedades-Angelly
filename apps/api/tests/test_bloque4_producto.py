@@ -100,7 +100,7 @@ def test_eliminar_la_venta_quita_los_puntos_otorgados(auth_client) -> None:
     client, sf = auth_client
     producto, cliente = _producto(sf), _cliente_fidelizacion(sf, puntos=3)
     vendedor = _login_token(client, "vendedor1", "ventas123")
-    admin = _login_token(client, "angelly_admin", "cambiame123")
+    admin = _login_token(client, "angelly_superadmin", "supersecure123")
     venta_id = _vender(client, vendedor, producto, cliente).json()["venta_id"]
     assert _puntos(sf, cliente) == 8
 

@@ -52,7 +52,7 @@ def _csv_response(rows, filename: str) -> StreamingResponse:
 @router.get("/api/export/productos")
 def export_productos(
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> StreamingResponse:
     productos = db.execute(
         select(ProductoModel).order_by(ProductoModel.nombre.asc()),
@@ -82,7 +82,7 @@ def export_ventas(
     fecha_desde: str | None = Query(default=None),
     fecha_hasta: str | None = Query(default=None),
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> StreamingResponse:
     query = select(VentaModel).where(VentaModel.anulada.is_(False)).order_by(VentaModel.fecha.desc())
     if fecha_desde:
@@ -123,7 +123,7 @@ def export_gastos(
     fecha_desde: str | None = Query(default=None),
     fecha_hasta: str | None = Query(default=None),
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> StreamingResponse:
     query = select(GastoModel).order_by(GastoModel.fecha.desc())
     if fecha_desde:

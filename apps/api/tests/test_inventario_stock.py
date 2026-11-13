@@ -24,7 +24,7 @@ def _vendedor(client) -> str:
 
 
 def _admin(client) -> str:
-    return _login_token(client, "angelly_admin", "cambiame123")
+    return _login_token(client, "angelly_superadmin", "supersecure123")
 
 
 def _producto(sf, nombre="Arroz", stock=10, minimo=3, precio_costo=500.0, precio_venta=1000.0, activo=True, proveedor_id=None, imagen=None) -> int:

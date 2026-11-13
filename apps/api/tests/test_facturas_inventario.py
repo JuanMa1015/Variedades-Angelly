@@ -73,7 +73,7 @@ def test_costo_unitario_incluye_iva_solo_cuando_aplica() -> None:
 def test_factura_suma_stock_y_deja_el_ultimo_costo_sin_tocar_el_precio_de_venta(auth_client) -> None:
     client, sf = auth_client
     proveedor, producto = _proveedor(sf), _producto(sf)
-    admin = _login_token(client, "angelly_admin", "cambiame123")
+    admin = _login_token(client, "angelly_superadmin", "supersecure123")
 
     respuesta = _factura(client, admin, proveedor, [
         {"producto_id": producto, "cantidad": 5, "precio_unitario": 2000, "aplica_iva": True},
@@ -103,7 +103,7 @@ def test_el_vendedor_registra_y_consulta_facturas_de_compra(auth_client) -> None
 def test_factura_con_confirmacion_actualiza_el_precio_con_el_sugerido_redondeado(auth_client) -> None:
     client, sf = auth_client
     proveedor, producto = _proveedor(sf), _producto(sf)
-    admin = _login_token(client, "angelly_admin", "cambiame123")
+    admin = _login_token(client, "angelly_superadmin", "supersecure123")
 
     _factura(client, admin, proveedor, [
         {"producto_id": producto, "cantidad": 1, "precio_unitario": 2000, "actualizar_precio": True},
@@ -115,7 +115,7 @@ def test_factura_con_confirmacion_actualiza_el_precio_con_el_sugerido_redondeado
 def test_factura_respeta_el_precio_editado_por_el_usuario(auth_client) -> None:
     client, sf = auth_client
     proveedor, producto = _proveedor(sf), _producto(sf)
-    admin = _login_token(client, "angelly_admin", "cambiame123")
+    admin = _login_token(client, "angelly_superadmin", "supersecure123")
 
     _factura(client, admin, proveedor, [
         {"producto_id": producto, "cantidad": 1, "precio_unitario": 2000, "actualizar_precio": True, "precio_venta": 3000},
@@ -127,7 +127,7 @@ def test_factura_respeta_el_precio_editado_por_el_usuario(auth_client) -> None:
 def test_lineas_repetidas_del_mismo_producto_acumulan_stock(auth_client) -> None:
     client, sf = auth_client
     proveedor, producto = _proveedor(sf), _producto(sf, stock=0)
-    admin = _login_token(client, "angelly_admin", "cambiame123")
+    admin = _login_token(client, "angelly_superadmin", "supersecure123")
 
     _factura(client, admin, proveedor, [
         {"producto_id": producto, "cantidad": 3, "precio_unitario": 1000},
@@ -141,7 +141,7 @@ def test_lineas_repetidas_del_mismo_producto_acumulan_stock(auth_client) -> None
 def test_factura_deja_auditoria_de_costo_y_precio(auth_client) -> None:
     client, sf = auth_client
     proveedor, producto = _proveedor(sf), _producto(sf)
-    admin = _login_token(client, "angelly_admin", "cambiame123")
+    admin = _login_token(client, "angelly_superadmin", "supersecure123")
 
     _factura(client, admin, proveedor, [
         {"producto_id": producto, "cantidad": 2, "precio_unitario": 2000, "actualizar_precio": True},
@@ -149,14 +149,14 @@ def test_factura_deja_auditoria_de_costo_y_precio(auth_client) -> None:
 
     with sf() as db:
         fila = db.execute(select(AuditoriaModel).where(AuditoriaModel.accion == "compra")).scalar_one()
-    assert fila.usuario == "angelly_admin"
+    assert fila.usuario == "angelly_superadmin"
     assert "+2 u." in fila.detalle and "costo 1000.0->2000.0" in fila.detalle and "venta 1500.0->2900.0" in fila.detalle
 
 
 def test_margen_fuera_de_rango_se_rechaza(auth_client) -> None:
     client, sf = auth_client
     proveedor, producto = _proveedor(sf), _producto(sf)
-    admin = _login_token(client, "angelly_admin", "cambiame123")
+    admin = _login_token(client, "angelly_superadmin", "supersecure123")
 
     respuesta = _factura(client, admin, proveedor, [
         {"producto_id": producto, "cantidad": 1, "precio_unitario": 1000},
@@ -172,7 +172,7 @@ def test_margen_fuera_de_rango_se_rechaza(auth_client) -> None:
 def test_eliminar_factura_devuelve_el_stock_que_sumo(auth_client) -> None:
     client, sf = auth_client
     proveedor, producto = _proveedor(sf), _producto(sf)
-    admin = _login_token(client, "angelly_admin", "cambiame123")
+    admin = _login_token(client, "angelly_superadmin", "supersecure123")
     factura_id = _factura(client, admin, proveedor, [
         {"producto_id": producto, "cantidad": 5, "precio_unitario": 2000},
     ]).json()["id"]
@@ -187,7 +187,7 @@ def test_eliminar_factura_devuelve_el_stock_que_sumo(auth_client) -> None:
 def test_no_se_elimina_una_factura_cuya_mercancia_ya_se_vendio(auth_client) -> None:
     client, sf = auth_client
     proveedor, producto = _proveedor(sf), _producto(sf, stock=0)
-    admin = _login_token(client, "angelly_admin", "cambiame123")
+    admin = _login_token(client, "angelly_superadmin", "supersecure123")
     factura_id = _factura(client, admin, proveedor, [
         {"producto_id": producto, "cantidad": 5, "precio_unitario": 2000},
     ]).json()["id"]

@@ -99,7 +99,7 @@ def test_eliminar_venta_fiada_de_tienda_revierte_la_deuda(auth_client) -> None:
     client, sf = auth_client
     producto, cliente = _producto(sf), _cliente_tienda(sf)
     vendedor = _login_token(client, "vendedor1", "ventas123")
-    admin = _login_token(client, "angelly_admin", "cambiame123")
+    admin = _login_token(client, "angelly_superadmin", "supersecure123")
     venta_id = _vender_fiado_tienda(client, vendedor, producto, cliente).json()["venta_id"]
 
     assert client.delete(f"/api/ventas/{venta_id}", headers=_h(admin)).status_code == 204
@@ -111,7 +111,7 @@ def test_editar_total_de_venta_fiada_ajusta_la_deuda_por_la_diferencia(auth_clie
     client, sf = auth_client
     producto, cliente = _producto(sf), _cliente_tienda(sf)
     vendedor = _login_token(client, "vendedor1", "ventas123")
-    admin = _login_token(client, "angelly_admin", "cambiame123")
+    admin = _login_token(client, "angelly_superadmin", "supersecure123")
     venta_id = _vender_fiado_tienda(client, vendedor, producto, cliente).json()["venta_id"]
 
     respuesta = client.patch(
@@ -128,7 +128,7 @@ def test_pasar_una_venta_fiada_a_contado_libera_la_deuda(auth_client) -> None:
     client, sf = auth_client
     producto, cliente = _producto(sf), _cliente_tienda(sf)
     vendedor = _login_token(client, "vendedor1", "ventas123")
-    admin = _login_token(client, "angelly_admin", "cambiame123")
+    admin = _login_token(client, "angelly_superadmin", "supersecure123")
     venta_id = _vender_fiado_tienda(client, vendedor, producto, cliente).json()["venta_id"]
 
     client.patch(f"/api/ventas/{venta_id}", headers=_h(admin), json={"es_fiado": False})
@@ -145,7 +145,7 @@ def test_cambiar_el_cliente_de_una_venta_fiada_mueve_la_deuda(auth_client) -> No
         db.commit()
         cliente_b = otro.id
     vendedor = _login_token(client, "vendedor1", "ventas123")
-    admin = _login_token(client, "angelly_admin", "cambiame123")
+    admin = _login_token(client, "angelly_superadmin", "supersecure123")
     venta_id = _vender_fiado_tienda(client, vendedor, producto, cliente_a).json()["venta_id"]
 
     client.patch(f"/api/ventas/{venta_id}", headers=_h(admin), json={"cliente_tienda_id": cliente_b})
@@ -169,7 +169,7 @@ def test_anular_un_abono_restituye_la_deuda(auth_client) -> None:
     client, sf = auth_client
     cliente = _cliente_cartera(sf, deuda=4000)
     abono = _abono(sf, cliente, 1500)
-    admin = _login_token(client, "angelly_admin", "cambiame123")
+    admin = _login_token(client, "angelly_superadmin", "supersecure123")
 
     assert client.delete(f"/api/cartera/abonos/{abono}", headers=_h(admin), params={"motivo": "Se anoto mal"}).status_code == 204
 
@@ -180,7 +180,7 @@ def test_editar_el_monto_de_un_abono_reajusta_la_deuda(auth_client) -> None:
     client, sf = auth_client
     cliente = _cliente_cartera(sf, deuda=4000)
     abono = _abono(sf, cliente, 1500)
-    admin = _login_token(client, "angelly_admin", "cambiame123")
+    admin = _login_token(client, "angelly_superadmin", "supersecure123")
 
     # Abono baja de 1500 a 1000: el cliente debe 500 mas.
     respuesta = client.patch(f"/api/cartera/abonos/{abono}", headers=_h(admin), json={"monto": 1000, "motivo": "Se digito mal"})
@@ -193,7 +193,7 @@ def test_no_se_puede_subir_un_abono_por_encima_de_la_deuda(auth_client) -> None:
     client, sf = auth_client
     cliente = _cliente_cartera(sf, deuda=100)
     abono = _abono(sf, cliente, 500)
-    admin = _login_token(client, "angelly_admin", "cambiame123")
+    admin = _login_token(client, "angelly_superadmin", "supersecure123")
 
     respuesta = client.patch(f"/api/cartera/abonos/{abono}", headers=_h(admin), json={"monto": 900, "motivo": "Se digito mal"})
 
@@ -222,7 +222,7 @@ def _fiado_cartera(client, token, producto_id, cliente_id, abono=0.0, cantidad=3
 def test_fiado_de_cartera_no_puede_superar_el_cupo(auth_client) -> None:
     client, sf = auth_client
     producto, cliente = _producto(sf), _cliente_cartera(sf, limite=2000)
-    admin = _login_token(client, "angelly_admin", "cambiame123")
+    admin = _login_token(client, "angelly_superadmin", "supersecure123")
 
     respuesta = _fiado_cartera(client, admin, producto, cliente)
 
@@ -234,7 +234,7 @@ def test_fiado_de_cartera_no_puede_superar_el_cupo(auth_client) -> None:
 def test_fiado_de_cartera_dentro_del_cupo_registra_el_abono_inicial(auth_client) -> None:
     client, sf = auth_client
     producto, cliente = _producto(sf), _cliente_cartera(sf, limite=5000)
-    admin = _login_token(client, "angelly_admin", "cambiame123")
+    admin = _login_token(client, "angelly_superadmin", "supersecure123")
 
     respuesta = _fiado_cartera(client, admin, producto, cliente, abono=1000)
 
@@ -330,7 +330,7 @@ def test_cobrar_abono_inicial_de_cartera_entra_a_caja_una_sola_vez(auth_client) 
     client, sf = auth_client
     producto, cliente = _producto(sf), _cliente_cartera(sf, limite=50000)
     vendedor = _login_token(client, "vendedor1", "ventas123")
-    admin = _login_token(client, "angelly_admin", "cambiame123")
+    admin = _login_token(client, "angelly_superadmin", "supersecure123")
     _abrir_caja(client, vendedor, 0)
 
     _fiado_cartera(client, admin, producto, cliente, abono=1000)

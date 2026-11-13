@@ -149,7 +149,7 @@ def _to_factura_response(
 
 @router.get("/api/facturas-compra/config")
 def get_facturas_config(
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> dict[str, float]:
     """Parametros que el frontend necesita para previsualizar totales (fuente unica: backend)."""
     return {"iva_rate": IVA_RATE}
@@ -160,7 +160,7 @@ def list_facturas_compra(
     db: Session = Depends(get_db),
     fecha_desde: date | None = Query(default=None),
     fecha_hasta: date | None = Query(default=None),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> list[FacturaCompraResponse]:
     query = select(FacturaCompraModel)
     if fecha_desde:
@@ -211,7 +211,7 @@ def list_facturas_compra_paginadas(
     medio_pago: MedioPagoCompra | None = Query(default=None),
     estado: Literal["todas", "vigentes", "anuladas"] = Query(default="todas"),
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> FacturaCompraPageResponse:
     query = select(FacturaCompraModel).join(ProveedorModel, ProveedorModel.id == FacturaCompraModel.proveedor_id)
     if proveedor_id is not None:
@@ -284,7 +284,7 @@ def _validar_numero(db: Session, proveedor_id: int, numero: str | None) -> str |
 def create_factura_compra(
     payload: FacturaCompraCreateRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> FacturaCompraResponse:
     for i, item in enumerate(payload.items):
         if not item.producto_id or item.producto_id <= 0:
@@ -447,7 +447,7 @@ def update_factura_compra(
     factura_id: int,
     payload: FacturaCompraUpdateRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> FacturaCompraResponse:
     factura = db.execute(
         select(FacturaCompraModel).where(FacturaCompraModel.id == factura_id),
@@ -495,7 +495,7 @@ def update_factura_compra(
 def delete_factura_compra(
     factura_id: int,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> None:
     factura = db.execute(
         select(FacturaCompraModel).where(FacturaCompraModel.id == factura_id),
@@ -549,7 +549,7 @@ def anular_factura_endpoint(
     factura_id: int,
     payload: AnularRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> FacturaCompraResponse:
     """Anula una factura con motivo y autorizacion: devuelve el stock y deja de restar de la caja."""
     with db.begin():

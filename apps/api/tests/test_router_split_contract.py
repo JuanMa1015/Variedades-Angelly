@@ -225,7 +225,7 @@ def test_fidelizacion_admin_crud_y_vendedor_sin_alta(
 ) -> None:
     client, _ = split_router_client
 
-    admin_token = _login_token(client, "angelly_admin", "cambiame123")
+    admin_token = _login_token(client, "root_owner", "supersecure123")
     vendedor_token = _login_token(client, "vendedor1", "ventas123")
 
     # El vendedor ya puede inscribir clientes, pero no fijar puntos iniciales.

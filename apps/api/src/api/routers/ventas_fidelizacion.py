@@ -142,7 +142,7 @@ def _respuesta_venta(
 def create_venta(
     payload: VentaCreateRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> VentaResponse:
     total = 0.0
     detalle_payload: list[VentaDetalleResponse] = []
@@ -174,7 +174,7 @@ def create_venta(
         with db.begin():
             exigir_caja_abierta(db)
             if payload.es_fiado and fiado_origen == FIADO_ORIGEN_CARTERA:
-                if current_user.role != "admin":
+                if current_user.role not in {"admin", "superadmin"}:
                     raise HTTPException(
                         status_code=403,
                         detail="Solo admin puede registrar fiados de cartera",
@@ -371,7 +371,7 @@ def list_ventas(
     db: Session = Depends(get_db),
     fecha_desde: datetime | None = Query(default=None),
     fecha_hasta: datetime | None = Query(default=None),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> list[VentaResponse]:
     query = _solo_las_del_rol(select(VentaModel), current_user)
     if fecha_desde:
@@ -392,7 +392,7 @@ def list_ventas_paginadas(
     fecha_desde: datetime | None = Query(default=None),
     fecha_hasta: datetime | None = Query(default=None),
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> VentaPageResponse:
     """Lista paginada de ventas del rol: el vendedor ve las de la tienda y el admin las del modulo de cartera."""
     query = _solo_las_del_rol(select(VentaModel), current_user)
@@ -467,7 +467,7 @@ def update_venta(
     venta_id: int,
     payload: VentaUpdateRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> VentaResponse:
     campos = payload.model_fields_set
     if not campos:
@@ -605,7 +605,7 @@ def anular_venta_endpoint(
     venta_id: int,
     payload: AnularVentaRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> VentaResponse:
     """Anula una venta del turno abierto: devuelve stock, deuda y puntos, y conserva el registro."""
     with db.begin():
@@ -637,7 +637,7 @@ def anular_venta_endpoint(
 def delete_venta(
     venta_id: int,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> Response:
     with db.begin():
         venta = db.execute(

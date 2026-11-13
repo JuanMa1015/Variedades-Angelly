@@ -74,7 +74,7 @@ def test_los_turnos_cerrados_no_cuentan_y_se_puede_abrir_otro_despues(auth_clien
 def test_dos_usuarios_distintos_no_pueden_abrir_cajas_a_la_vez(auth_client) -> None:
     client, _ = auth_client
     vendedor = _login_token(client, "vendedor1", "ventas123")
-    admin = _login_token(client, "angelly_admin", "cambiame123")
+    admin = _login_token(client, "angelly_superadmin", "supersecure123")
 
     primera = client.post("/api/caja/apertura", headers=_h(vendedor), json={"monto_inicial": 1000})
     segunda = client.post("/api/caja/apertura", headers=_h(admin), json={"monto_inicial": 5000})

@@ -186,7 +186,7 @@ def list_gastos(
     db: Session = Depends(get_db),
     fecha_desde: date | None = Query(default=None),
     fecha_hasta: date | None = Query(default=None),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> list[GastoResponse]:
     query = _filtrar_por_fecha(select(GastoModel), fecha_desde, fecha_hasta)
     gastos = db.execute(query.order_by(GastoModel.fecha.desc())).scalars().all()
@@ -205,7 +205,7 @@ def list_gastos_paginados(
     estado: Literal["todos", "vigentes", "anulados"] = Query(default="todos"),
     q: str | None = Query(default=None, max_length=100),
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> GastoPageResponse:
     query = _filtrar_por_fecha(select(GastoModel), fecha_desde, fecha_hasta)
     if _validar_mes(mes):
@@ -228,7 +228,7 @@ def list_gastos_paginados(
 def resumen_gastos(
     mes: str | None = Query(default=None, description="AAAA-MM, con la hora de Bogota; por defecto el mes actual"),
     db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    _: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> GastoResumenResponse:
     """Totales del mes sobre TODOS los gastos (no solo la pagina visible). Los anulados no cuentan."""
     mes = _validar_mes(mes) or _mes_actual()
@@ -283,7 +283,7 @@ def resumen_gastos(
 def create_gasto(
     payload: GastoCreateRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> GastoResponse:
     categoria = _normalizar_categoria(payload.categoria)
     descripcion = _normalizar_descripcion(payload.descripcion)
@@ -321,7 +321,7 @@ def update_gasto(
     gasto_id: int,
     payload: GastoUpdateRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> GastoResponse:
     gasto = db.execute(
         select(GastoModel).where(GastoModel.id == gasto_id).with_for_update(),
@@ -373,7 +373,7 @@ def anular_gasto_endpoint(
     gasto_id: int,
     payload: AnularRequest,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> GastoResponse:
     """Anula un gasto con motivo y autorizacion: deja de restar de la caja y queda el registro."""
     with db.begin():
@@ -398,7 +398,7 @@ def anular_gasto_endpoint(
 def delete_gasto(
     gasto_id: int,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
+    current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
 ) -> Response:
     gasto = db.execute(
         select(GastoModel).where(GastoModel.id == gasto_id).with_for_update(),
