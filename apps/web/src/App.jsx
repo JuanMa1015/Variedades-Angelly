@@ -25,6 +25,7 @@ const Facturas = lazy(() => import('./pages/Facturas'));
 const Fidelizacion = lazy(() => import('./pages/Fidelizacion'));
 const ClientesTienda = lazy(() => import('./pages/ClientesTienda'));
 const Admin = lazy(() => import('./pages/Admin'));
+const Gerencia = lazy(() => import('./pages/admin/Gerencia'));
 const Privacidad = lazy(() => import('./pages/Privacidad'));
 const Terminos = lazy(() => import('./pages/Terminos'));
 const Gracias = lazy(() => import('./pages/Gracias'));
@@ -121,7 +122,7 @@ function App() {
               <Route element={<PrivateRoute />}>
                 <Route element={<MainLayout />}>
                   <Route element={<PrivateRoute allowedRoles={['superadmin']} />}>
-                    <Route path="/admin" element={<Navigate to="/admin/vendedores" replace />} />
+                    <Route path="/admin" element={<Gerencia />} />
                     <Route path="/admin/:moduleKey" element={<Admin />} />
                   </Route>
 

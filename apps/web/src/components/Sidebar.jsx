@@ -55,34 +55,17 @@ const Sidebar = ({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMobile })
     if (user?.role === 'superadmin') {
       return [
         {
-          title: 'Vendedor',
+          title: 'Gerencia',
           items: [
-            { label: 'Productos', path: '/admin/productos', icon: Package, description: 'CRUD de productos' },
-            { label: 'Proveedores', path: '/admin/proveedores', icon: Truck, description: 'CRUD de proveedores' },
-            { label: 'Gastos', path: '/admin/gastos', icon: Receipt, description: 'Gastos operativos' },
-            { label: 'Pedidos proveedor', path: '/admin/pedidos-proveedor', icon: Receipt, description: 'Pedidos enviados' },
-          ],
-        },
-        {
-          title: 'Cartera',
-          items: [
-            { label: 'Ventas', path: '/admin/ventas', icon: ShoppingCart, description: 'Historial de ventas' },
-            { label: 'Clientes cartera', path: '/admin/clientes-cartera', icon: Users, description: 'Clientes con cupo' },
-            { label: 'Abonos cartera', path: '/admin/abonos-cartera', icon: Wallet, description: 'Abonos registrados' },
-          ],
-        },
-        {
-          title: 'SuperAdmin',
-          items: [
-            { label: 'Admins', path: '/admin/admins', icon: Shield, description: 'CRUD de usuarios admin' },
-            { label: 'Vendedores', path: '/admin/vendedores', icon: Shield, description: 'CRUD de usuarios vendedores' },
-            { label: 'Clientes tienda', path: '/admin/clientes-tienda', icon: Users, description: 'Clientes de tienda' },
-            { label: 'Clientes fidelización', path: '/admin/clientes-fidelizacion', icon: Gift, description: 'Programa de puntos' },
-            { label: 'Facturas compra', path: '/admin/facturas-compra', icon: Receipt, description: 'Facturas de compra' },
+            { label: 'Panel', path: '/admin', icon: LayoutDashboard, description: 'Accesos de gerencia', exact: true },
+            { label: 'Vendedores', path: '/admin/vendedores', icon: Users, description: 'Usuarios de la tienda' },
+            { label: 'Admins', path: '/admin/admins', icon: Shield, description: 'Usuarios de cartera' },
             { label: 'Auditorías', path: '/admin/auditorias', icon: Shield, description: 'Historial de acciones' },
             { label: 'Informes', path: '/admin/informes', icon: BarChart3, description: 'Ventas y rankings' },
           ],
         },
+        { title: 'Tienda', items: vendedorItems },
+        { title: 'Cartera', items: adminItems },
       ];
     }
 
@@ -97,7 +80,7 @@ const Sidebar = ({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMobile })
     return [];
   })();
 
-  const isActive = (path) => location.pathname === path || location.pathname.startsWith(`${path}/`);
+  const isActive = (path, exact = false) => location.pathname === path || (!exact && location.pathname.startsWith(`${path}/`));
 
   const handleLogout = () => {
     logout();
@@ -153,7 +136,7 @@ const Sidebar = ({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMobile })
               <div className="space-y-2">
                 {section.items.map((item) => {
                   const Icon = item.icon;
-                  const active = isActive(item.path);
+                  const active = isActive(item.path, item.exact);
                   return (
                     <Link
                       key={item.path}

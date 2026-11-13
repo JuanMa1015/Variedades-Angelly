@@ -6,13 +6,12 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from src.api.services.caja_calculos import efectivo_esperado
-from src.api.services.stock import mover_stock
 from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.services import usuarios as servicio_usuarios
 from src.api.routers.facturas_compra import (
@@ -25,8 +24,6 @@ from src.infrastructure.database.models import (
     DetalleVentaModel,
     FacturaCompraDetalleModel,
     FacturaCompraModel,
-    MovimientoStockModel,
-    ProductoModel,
     ProveedorModel,
     VentaModel,
 )
@@ -49,47 +46,6 @@ class UsuarioCreate(BaseModel):
 class UsuarioUpdate(BaseModel):
     username: Annotated[str | None, Field(min_length=3, max_length=50)] = None
     password: Annotated[str | None, Field(min_length=8, max_length=128)] = None
-
-
-class ProductoSchema(BaseModel):
-    id: int
-    nombre: str
-    codigo_barras: str | None
-    precio_costo: float
-    precio_venta: float
-    catalogo: str
-    stock_actual: int
-    stock_minimo: int
-    imagen_url: str | None = None
-    activo: bool = True
-    proveedor_id: int | None = None
-    proveedor_nombre: str | None = None
-
-
-class ProductoCreateUpdate(BaseModel):
-    nombre: Annotated[str, Field(min_length=1, max_length=120)]
-    codigo_barras: str | None = None
-    precio_costo: Annotated[float, Field(ge=0)] = 0.0
-    precio_venta: Annotated[float, Field(ge=0)] = 0.0
-    catalogo: str = "tienda"
-    stock_actual: Annotated[int, Field(ge=0)] = 0
-    stock_minimo: Annotated[int, Field(ge=0)] = 0
-    imagen_url: str | None = None
-
-
-class ProveedorSchema(BaseModel):
-    id: int
-    nombre: str
-    contacto: str | None
-    telefono: str | None
-    activo: bool
-
-
-class ProveedorCreateUpdate(BaseModel):
-    nombre: Annotated[str, Field(min_length=1, max_length=120)]
-    contacto: str | None = None
-    telefono: str | None = None
-    activo: bool = True
 
 
 class RankingVentaSchema(BaseModel):
@@ -171,179 +127,7 @@ _rutas_de_usuarios("vendedores", "vendedor")
 _rutas_de_usuarios("admins", "admin")
 
 
-# --- Productos ---
-@router.get("/api/superadmin/productos", response_model=list[ProductoSchema])
-def list_productos(
-    page: int = Query(default=1, ge=1),
-    limit: int = Query(default=200, ge=1, le=500),
-    db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("superadmin")),
-):
-    offset = (page - 1) * limit
-    rows = db.execute(
-        select(ProductoModel, ProveedorModel.nombre)
-        .outerjoin(ProveedorModel, ProductoModel.proveedor_id == ProveedorModel.id)
-        .where(ProductoModel.activo == True)
-        .order_by(ProductoModel.nombre.asc())
-        .offset(offset)
-        .limit(limit),
-    ).all()
-    return [ProductoSchema(
-        id=r.ProductoModel.id,
-        nombre=r.ProductoModel.nombre,
-        codigo_barras=r.ProductoModel.codigo_barras,
-        precio_costo=r.ProductoModel.precio_costo,
-        precio_venta=r.ProductoModel.precio_venta,
-        catalogo=r.ProductoModel.catalogo,
-        stock_actual=r.ProductoModel.stock_actual,
-        stock_minimo=r.ProductoModel.stock_minimo,
-        imagen_url=r.ProductoModel.imagen_url,
-        activo=r.ProductoModel.activo,
-        proveedor_id=r.ProductoModel.proveedor_id,
-        proveedor_nombre=r.nombre,
-    ) for r in rows]
-
-
-@router.post("/api/superadmin/productos", response_model=ProductoSchema, status_code=201)
-def create_producto(payload: ProductoCreateUpdate, db: Session = Depends(get_db), current_user: AuthenticatedUser = Depends(require_roles("superadmin"))):
-    producto = ProductoModel(
-        nombre=payload.nombre.strip(),
-        codigo_barras=payload.codigo_barras,
-        precio_costo=payload.precio_costo,
-        precio_venta=payload.precio_venta,
-        catalogo=payload.catalogo,
-        stock_actual=payload.stock_actual,
-        stock_minimo=payload.stock_minimo,
-        imagen_url=payload.imagen_url,
-    )
-    db.add(producto)
-    db.flush()
-    if payload.stock_actual > 0:
-        db.add(MovimientoStockModel(
-            producto_id=producto.id, tipo="stock_inicial", delta=payload.stock_actual, stock_resultante=payload.stock_actual,
-            motivo="Stock inicial al crear el producto", usuario=current_user.username,
-        ))
-    db.commit()
-    db.refresh(producto)
-    return ProductoSchema(
-        id=producto.id,
-        nombre=producto.nombre,
-        codigo_barras=producto.codigo_barras,
-        precio_costo=producto.precio_costo,
-        precio_venta=producto.precio_venta,
-        catalogo=producto.catalogo,
-        stock_actual=producto.stock_actual,
-        stock_minimo=producto.stock_minimo,
-        imagen_url=producto.imagen_url,
-    )
-
-
-@router.patch("/api/superadmin/productos/{producto_id}", response_model=ProductoSchema)
-def update_producto(
-    producto_id: int,
-    payload: ProductoCreateUpdate,
-    db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_roles("superadmin")),
-):
-    producto = db.execute(select(ProductoModel).where(ProductoModel.id == producto_id).with_for_update()).scalar_one_or_none()
-    if producto is None:
-        raise HTTPException(status_code=404, detail="Producto no encontrado")
-    producto.nombre = payload.nombre.strip()
-    producto.codigo_barras = payload.codigo_barras
-    producto.precio_costo = payload.precio_costo
-    producto.precio_venta = payload.precio_venta
-    producto.catalogo = payload.catalogo
-    if payload.stock_actual != producto.stock_actual:
-        mover_stock(
-            db, producto, payload.stock_actual - int(producto.stock_actual), tipo="ajuste",
-            usuario=current_user.username, motivo="Edicion administrativa del producto",
-        )
-    producto.stock_minimo = payload.stock_minimo
-    if payload.imagen_url is not None:
-        producto.imagen_url = payload.imagen_url
-    db.commit()
-    db.refresh(producto)
-    return ProductoSchema(
-        id=producto.id, nombre=producto.nombre, codigo_barras=producto.codigo_barras,
-        precio_costo=producto.precio_costo, precio_venta=producto.precio_venta,
-        catalogo=producto.catalogo, stock_actual=producto.stock_actual, stock_minimo=producto.stock_minimo,
-        imagen_url=producto.imagen_url,
-    )
-
-
-@router.delete("/api/superadmin/productos/{producto_id}", status_code=204)
-def delete_producto(
-    producto_id: int,
-    db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("superadmin")),
-):
-    producto = db.execute(select(ProductoModel).where(ProductoModel.id == producto_id)).scalar_one_or_none()
-    if producto is None:
-        raise HTTPException(status_code=404, detail="Producto no encontrado")
-    db.delete(producto)
-    db.commit()
-
-
-# --- Proveedores ---
-@router.get("/api/superadmin/proveedores", response_model=list[ProveedorSchema])
-def list_proveedores(
-    page: int = Query(default=1, ge=1),
-    limit: int = Query(default=200, ge=1, le=500),
-    db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("superadmin")),
-):
-    offset = (page - 1) * limit
-    rows = db.execute(
-        select(ProveedorModel).order_by(ProveedorModel.nombre.asc()).offset(offset).limit(limit),
-    ).scalars().all()
-    return [ProveedorSchema(id=r.id, nombre=r.nombre, contacto=r.contacto, telefono=r.telefono, activo=r.activo) for r in rows]
-
-
-@router.post("/api/superadmin/proveedores", response_model=ProveedorSchema, status_code=201)
-def create_proveedor(payload: ProveedorCreateUpdate, db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_roles("superadmin"))):
-    existente = db.execute(select(ProveedorModel).where(ProveedorModel.nombre == payload.nombre.strip())).scalar_one_or_none()
-    if existente is not None:
-        raise HTTPException(status_code=409, detail="Proveedor ya existe")
-    prov = ProveedorModel(nombre=payload.nombre.strip(), contacto=payload.contacto, telefono=payload.telefono, activo=payload.activo)
-    db.add(prov)
-    db.commit()
-    db.refresh(prov)
-    return ProveedorSchema(id=prov.id, nombre=prov.nombre, contacto=prov.contacto, telefono=prov.telefono, activo=prov.activo)
-
-
-@router.patch("/api/superadmin/proveedores/{proveedor_id}", response_model=ProveedorSchema)
-def update_proveedor(
-    proveedor_id: int,
-    payload: ProveedorCreateUpdate,
-    db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("superadmin")),
-):
-    prov = db.execute(select(ProveedorModel).where(ProveedorModel.id == proveedor_id)).scalar_one_or_none()
-    if prov is None:
-        raise HTTPException(status_code=404, detail="Proveedor no encontrado")
-    prov.nombre = payload.nombre.strip()
-    prov.contacto = payload.contacto
-    prov.telefono = payload.telefono
-    prov.activo = payload.activo
-    db.commit()
-    db.refresh(prov)
-    return ProveedorSchema(id=prov.id, nombre=prov.nombre, contacto=prov.contacto, telefono=prov.telefono, activo=prov.activo)
-
-
-@router.delete("/api/superadmin/proveedores/{proveedor_id}", status_code=204)
-def delete_proveedor(
-    proveedor_id: int,
-    db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_roles("superadmin")),
-):
-    prov = db.execute(select(ProveedorModel).where(ProveedorModel.id == proveedor_id)).scalar_one_or_none()
-    if prov is None:
-        raise HTTPException(status_code=404, detail="Proveedor no encontrado")
-    db.delete(prov)
-    db.commit()
-
-
-# --- Auditorias ---
+# --- Informes ---
 @router.get("/api/superadmin/informes", response_model=InformesSuperadminResponse)
 def informes_superadmin(
     db: Session = Depends(get_db),
