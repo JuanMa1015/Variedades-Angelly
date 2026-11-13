@@ -242,7 +242,7 @@ curl -X POST http://127.0.0.1:8000/api/productos \
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
 | POST | `/api/ventas` | Registrar venta (POS) |
-| GET | `/api/dashboard/resumen` | Resumen de ventas del día |
+| GET | `/api/dashboard/vendedor` | Dashboard de la tienda (ventas, cobrado, caja, gastos, fiado, stock) |
 | GET | `/api/clientes/tienda-fiado` | Clientes tienda-fiado |
 | POST | `/api/clientes/tienda-fiado` | Crear cliente tienda-fiado |
 | GET | `/api/fidelizacion/clientes` | Clientes fidelización |

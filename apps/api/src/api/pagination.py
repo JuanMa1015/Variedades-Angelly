@@ -40,7 +40,7 @@ def build_page(
     offset = (page - 1) * limit
 
     if order_by is not None:
-        query = query.order_by(order_by)
+        query = query.order_by(*order_by) if isinstance(order_by, (list, tuple)) else query.order_by(order_by)
 
     items = db.execute(query.offset(offset).limit(limit)).scalars().all()
     return items, PageInfo(

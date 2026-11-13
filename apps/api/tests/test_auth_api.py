@@ -431,7 +431,7 @@ def test_vendedor_puede_registrar_y_listar_gastos(
     assert any(item["descripcion"] == "Pago de internet del local" for item in payload)
 
 
-def test_dashboard_resumen_disponible_para_vendedor(
+def test_dashboard_de_la_tienda_disponible_para_vendedor(
     auth_client: tuple[TestClient, sessionmaker[Session]],
 ) -> None:
     """Confirma que dashboard responde estructura base para vendedor."""
@@ -439,15 +439,14 @@ def test_dashboard_resumen_disponible_para_vendedor(
     vendedor_token = _login_token(client, "vendedor1", "ventas123")
 
     response = client.get(
-        "/api/dashboard/resumen",
+        "/api/dashboard/vendedor",
         headers={"Authorization": f"Bearer {vendedor_token}"},
     )
 
     assert response.status_code == 200
     payload = response.json()
-    assert "ventas_diarias" in payload
-    assert "ventas_semanales" in payload
-    assert "ventas_mensuales" in payload
+    assert set(payload["ventas"]) == {"hoy", "semana", "mes"}
+    assert set(payload["cobrado"]) == {"hoy", "semana", "mes"}
 
 
 def test_refresh_token_no_autoriza_como_access_token(

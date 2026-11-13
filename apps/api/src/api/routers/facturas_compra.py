@@ -169,7 +169,7 @@ def list_facturas_compra(
         # Hasta el final de ese dia: comparar contra la medianoche dejaba fuera todo el dia final.
         query = query.where(FacturaCompraModel.fecha_creacion < fecha_hasta + timedelta(days=1))
     facturas = db.execute(
-        query.order_by(FacturaCompraModel.fecha_creacion.desc()),
+        query.order_by(FacturaCompraModel.fecha_creacion.desc(), FacturaCompraModel.id.desc()),
     ).scalars().all()
 
     if not facturas:
@@ -228,7 +228,7 @@ def list_facturas_compra_paginadas(
     if fecha_hasta:
         # Hasta el final de ese dia: comparar contra la medianoche dejaba fuera todo el dia final.
         query = query.where(FacturaCompraModel.fecha_creacion < fecha_hasta + timedelta(days=1))
-    items, page_info = build_page(db, query, page, limit, FacturaCompraModel.fecha_creacion.desc())
+    items, page_info = build_page(db, query, page, limit, (FacturaCompraModel.fecha_creacion.desc(), FacturaCompraModel.id.desc()))
 
     if not items:
         return FacturaCompraPageResponse(data=[], page=page_info)

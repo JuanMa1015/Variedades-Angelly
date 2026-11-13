@@ -88,7 +88,7 @@ def list_pedidos_proveedor(
     _: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> list[PedidoProveedorResponse]:
     pedidos = db.execute(
-        select(PedidoProveedorModel).order_by(PedidoProveedorModel.fecha_creacion.desc()),
+        select(PedidoProveedorModel).order_by(PedidoProveedorModel.fecha_creacion.desc(), PedidoProveedorModel.id.desc()),
     ).scalars().all()
 
     proveedor_ids = {pedido.proveedor_id for pedido in pedidos}
@@ -126,7 +126,7 @@ def list_pedidos_proveedor_paginados(
     termino = (q or "").strip()
     if termino:
         query = query.where(or_(*search_filter(termino, ProveedorModel.nombre, PedidoProveedorModel.descripcion)))
-    items, page_info = build_page(db, query, page, limit, PedidoProveedorModel.fecha_creacion.desc())
+    items, page_info = build_page(db, query, page, limit, (PedidoProveedorModel.fecha_creacion.desc(), PedidoProveedorModel.id.desc()))
 
     proveedor_ids = {pedido.proveedor_id for pedido in items}
     proveedores_map: dict[int, str] = {}
