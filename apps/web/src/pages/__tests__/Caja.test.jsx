@@ -128,14 +128,42 @@ describe('Caja', () => {
     expect(apiMocks.cerrarCaja).not.toHaveBeenCalled();
   });
 
-  it('permite abrir la caja con base cero', async () => {
+  it('no deja abrir la caja sin declarar el efectivo inicial', async () => {
+    apiMocks.fetchCajaEstado.mockResolvedValue({ abierta: false, caja_actual: null, ultimo_cierre: null });
+    renderCaja();
+
+    const abrir = await screen.findByRole('button', { name: 'Abrir caja' });
+    expect(abrir).toBeDisabled();
+    expect(screen.getByText(/Escribe cuánto efectivo hay, o marca que empiezas sin efectivo/)).toBeInTheDocument();
+    fireEvent.click(abrir);
+
+    expect(apiMocks.abrirCaja).not.toHaveBeenCalled();
+  });
+
+  it('permite abrir la caja con base cero si se marca que se empieza sin efectivo', async () => {
     apiMocks.fetchCajaEstado.mockResolvedValue({ abierta: false, caja_actual: null, ultimo_cierre: null });
     apiMocks.abrirCaja.mockResolvedValue({});
     renderCaja();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Abrir caja' }));
+    fireEvent.click(await screen.findByLabelText(/Empiezo sin efectivo en el cajón/));
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir caja' }));
 
     await waitFor(() => expect(apiMocks.abrirCaja).toHaveBeenCalledWith({ monto_inicial: 0 }));
+  });
+
+  it('escribir un monto desmarca «sin efectivo» y marcarlo borra el monto', async () => {
+    apiMocks.fetchCajaEstado.mockResolvedValue({ abierta: false, caja_actual: null, ultimo_cierre: null });
+    renderCaja();
+    const input = await screen.findByLabelText('Efectivo inicial en el cajón');
+    const sinEfectivo = screen.getByLabelText(/Empiezo sin efectivo en el cajón/);
+
+    fireEvent.click(sinEfectivo);
+    fireEvent.change(input, { target: { value: '20000' } });
+    expect(sinEfectivo).not.toBeChecked();
+    expect(screen.getByRole('button', { name: 'Abrir caja' })).toBeEnabled();
+
+    fireEvent.click(sinEfectivo);
+    expect(input).toHaveValue('');
   });
 
   it('el monto inicial se escribe con puntos de miles', async () => {

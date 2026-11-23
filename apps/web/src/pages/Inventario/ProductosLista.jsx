@@ -26,7 +26,7 @@ const Miniatura = ({ producto, tamano = 'h-10 w-10' }) => (
 
 const BOTON = 'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition';
 
-const Acciones = ({ producto, canDeactivate, onEditar, onHistorial, onEliminar, onReactivar }) => {
+const Acciones = ({ producto, canDeactivate, puedeEliminar = canDeactivate, etiquetaEliminar = 'Desactivar', onEditar, onHistorial, onEliminar, onReactivar }) => {
   if (!producto.activo) {
     return canDeactivate && (
       <button type="button" onClick={() => onReactivar(producto)} className={`${BOTON} border-emerald-300 text-emerald-700 hover:bg-emerald-50`}>
@@ -42,9 +42,9 @@ const Acciones = ({ producto, canDeactivate, onEditar, onHistorial, onEliminar, 
       <button type="button" onClick={() => onHistorial(producto)} title="Historial de stock" className={`${BOTON} border-gray-300 text-gray-700 hover:bg-gray-50`}>
         <History className="h-3.5 w-3.5" aria-hidden="true" /> Historial
       </button>
-      {canDeactivate && (
-        <button type="button" onClick={() => onEliminar(producto)} title="Desactivar producto" className={`${BOTON} border-red-200 text-red-600 hover:bg-red-50`}>
-          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Desactivar
+      {puedeEliminar && (
+        <button type="button" onClick={() => onEliminar(producto)} title={`${etiquetaEliminar} producto`} className={`${BOTON} border-red-200 text-red-600 hover:bg-red-50`}>
+          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> {etiquetaEliminar}
         </button>
       )}
     </div>

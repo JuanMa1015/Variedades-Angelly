@@ -49,6 +49,7 @@ from src.api.routers.upload import router as upload_router
 from src.api.routers.ventas_fidelizacion import router as ventas_fidelizacion_router
 from src.infrastructure.database.connection import engine, get_db
 from src.infrastructure.database.migraciones import estado_migraciones
+from src.api.routers.upload import almacenamiento_de_imagenes
 from src.infrastructure.database.models import Base
 
 
@@ -218,6 +219,13 @@ def _run_startup_tasks():
             "Ejecuta `alembic upgrade head`; hasta entonces fallaran las operaciones que usen columnas nuevas.",
             estado["actual"],
             estado["esperada"],
+        )
+
+    if not almacenamiento_de_imagenes()["listo"]:
+        logger.error(
+            "IMAGENES SIN ALMACENAMIENTO PERMANENTE: falta BLOB_READ_WRITE_TOKEN. Las imagenes subidas se rechazan "
+            "(el disco del servidor se borra en cada despliegue). Configura Vercel Blob o, si hay un volumen "
+            "persistente, IMAGENES_DISCO_LOCAL=true.",
         )
 
     # Usuarios semilla (auto-guardados por AUTH_BOOTSTRAP_ENABLED).
@@ -506,10 +514,12 @@ def health_check():
         logger.warning("Health check — DB error: %s", e)
     migraciones = _estado_migraciones() if db_ok else None
     pendientes = migraciones is not None and not migraciones["al_dia"]
+    imagenes = almacenamiento_de_imagenes()
     return {
-        "status": "degraded" if pendientes else "ok",
+        "status": "degraded" if (pendientes or not imagenes["listo"]) else "ok",
         "database": "connected" if db_ok else "unavailable",
         "migraciones": migraciones,
+        "imagenes": imagenes,
     }
 
 

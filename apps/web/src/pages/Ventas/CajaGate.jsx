@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { Lock } from 'lucide-react';
 import { abrirCaja } from '../../api/cajaApi';
-import MoneyInput from './MoneyInput';
+import MontoInicialCampo from '../Caja/MontoInicialCampo';
+import { montoInicialListo } from '../Caja/cajaHelpers';
 
 // Sin turno abierto el dinero no entra a ningun cuadre: el POS pide abrir la caja antes de vender.
 const CajaGate = ({ onOpened }) => {
   const [monto, setMonto] = useState(0);
+  const [sinEfectivo, setSinEfectivo] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -44,12 +46,12 @@ const CajaGate = ({ onOpened }) => {
       </div>
       <div>
         <p className="mb-1 text-sm font-semibold text-gray-700">Efectivo inicial en el cajón</p>
-        <MoneyInput id="caja-monto-inicial" label="Efectivo inicial" value={monto} onChange={setMonto} placeholder="0" large />
+        <MontoInicialCampo id="caja-monto-inicial" label="Efectivo inicial" monto={monto} onMonto={setMonto} sinEfectivo={sinEfectivo} onSinEfectivo={setSinEfectivo} />
       </div>
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
       <button
         type="submit"
-        disabled={saving}
+        disabled={saving || !montoInicialListo(monto, sinEfectivo)}
         className="h-11 w-full rounded-xl bg-rosewood text-sm font-bold text-white transition hover:bg-rosewood/90 disabled:opacity-50"
       >
         {saving ? 'Abriendo…' : 'Abrir caja y vender'}

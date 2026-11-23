@@ -121,12 +121,12 @@ def test_post_desde_origen_permitido_funciona(auth_client) -> None:
 # ── S5: permisos del vendedor ──
 
 
-def test_vendedor_no_puede_desactivar_productos_ni_borrar_facturas(auth_client) -> None:
+def test_vendedor_elimina_productos_pero_no_los_reactiva_ni_borra_facturas(auth_client) -> None:
     client, session_factory = auth_client
     producto_id = _crear_producto(session_factory)
     token = _login_token(client, "vendedor1", "ventas123")
 
-    assert client.delete(f"/api/productos/{producto_id}", headers=_auth(token)).status_code == 403
+    assert client.delete(f"/api/productos/{producto_id}", headers=_auth(token)).status_code == 204  # se desactiva, no se borra
     assert client.put(f"/api/productos/{producto_id}/reactivar", headers=_auth(token)).status_code == 403
     assert client.delete("/api/facturas-compra/1", headers=_auth(token)).status_code == 403
     assert client.patch("/api/facturas-compra/1", headers=_auth(token), json={"total_factura": 1}).status_code == 403

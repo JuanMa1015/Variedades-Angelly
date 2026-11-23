@@ -13,8 +13,10 @@ import { useInventario } from './Inventario/useInventario';
 
 const Inventario = () => {
   const { token, user } = useAuth();
-  // Desactivar y reactivar productos es solo de admin/superadmin (el backend responde 403 al vendedor).
+  // Ver los desactivados y reactivarlos es de admin/superadmin. El vendedor puede eliminar productos de su
+  // tienda (se desactivan: sus ventas y su historial se conservan), pero no verlos ni reactivarlos.
   const canDeactivate = user?.role === 'admin' || user?.role === 'superadmin';
+  const esVendedor = user?.role === 'vendedor';
   const { filtros, setFiltro, setPagina, texto, setTexto, lista, resumen, loading, error, setError, reload } = useInventario(token);
   const { confirm, ConfirmModal } = useConfirm();
   const recargar = useCallback(() => reload({ silent: true }), [reload]);
@@ -23,7 +25,14 @@ const Inventario = () => {
     recargar,
     setError,
     confirm,
-    textoDesactivar: (producto) => ({ message: `¿Desactivar "${producto.nombre}"? Podrás verlo y reactivarlo en «Desactivados».` }),
+    textoDesactivar: (producto) => (esVendedor
+      ? {
+        title: 'Eliminar producto',
+        confirmLabel: 'Eliminar',
+        message: `¿Eliminar "${producto.nombre}"? Dejará de aparecer en el inventario y en las ventas${Number(producto.stock_actual) > 0 ? ` (todavía tiene ${producto.stock_actual} en stock)` : ''}. Las ventas que ya se hicieron se conservan.`,
+      }
+      : { message: `¿Desactivar "${producto.nombre}"? Podrás verlo y reactivarlo en «Desactivados».` }),
+    palabraExito: esVendedor ? 'eliminado' : 'desactivado',
   });
   const { success, setSuccess } = acciones;
 
@@ -79,6 +88,8 @@ const Inventario = () => {
         confirm={confirm}
         proveedores={proveedores}
         canDeactivate={canDeactivate}
+        puedeEliminar={canDeactivate || esVendedor}
+        etiquetaEliminar={esVendedor ? 'Eliminar' : 'Desactivar'}
         titulo="Productos de tienda"
         vacio="No hay productos registrados en el catálogo de tienda"
         tituloCrear="Agregar producto al inventario"

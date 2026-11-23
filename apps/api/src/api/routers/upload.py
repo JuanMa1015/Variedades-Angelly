@@ -42,6 +42,22 @@ MAX_DIMENSION = 1600
 JPEG_QUALITY = 82
 WEBP_QUALITY = 82
 
+
+
+def almacenamiento_de_imagenes() -> dict[str, object]:
+    """Donde se guardan las imagenes y si ese lugar conserva lo guardado.
+
+    En un servidor con disco efimero (Render) lo que se guarda en ``/uploads`` se borra en cada despliegue o reinicio:
+    por eso, en produccion, sin Vercel Blob (ni ``IMAGENES_DISCO_LOCAL=true`` para un servidor con volumen propio)
+    las imagenes NO se aceptan, en lugar de aceptarlas y perderlas en silencio.
+    """
+    en_blob = bool(BLOB_TOKEN)
+    es_produccion = os.getenv("APP_ENV", "development").strip().lower() == "production"
+    disco_permitido = os.getenv("IMAGENES_DISCO_LOCAL", "").strip().lower() in {"1", "true", "si", "yes"}
+    listo = en_blob or disco_permitido or not es_produccion
+    return {"almacenamiento": "blob" if en_blob else "disco_local", "listo": listo}
+
+
 MAGIC_BYTES: dict[bytes, set[str]] = {
     b"\xff\xd8\xff": {".jpg", ".jpeg"},
     b"\x89PNG\r\n\x1a\n": {".png"},
@@ -148,6 +164,15 @@ async def _guardar_imagen(contents: bytes, ext: str) -> str:
 
     if BLOB_TOKEN:
         return await _upload_to_blob(filename, contents, content_type)
+    if not almacenamiento_de_imagenes()["listo"]:
+        logger.error("Imagen rechazada: produccion sin BLOB_READ_WRITE_TOKEN (el disco del servidor no es permanente)")
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "No se puede guardar la imagen: el servidor no tiene configurado el almacenamiento permanente de "
+                "imagenes (falta BLOB_READ_WRITE_TOKEN). Avisa a quien administra el sistema."
+            ),
+        )
     return await _upload_local(filename, contents)
 
 

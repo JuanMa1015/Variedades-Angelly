@@ -145,6 +145,7 @@ class VentaResponse(BaseModel):
     anulada_por: str | None = None
     autorizada_por: str | None = None
     motivo_anulacion: str | None = None
+    vendedor: str | None = None
 
 
 class CarteraVentaHistorialItemResponse(BaseModel):

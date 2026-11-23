@@ -42,8 +42,9 @@ export const groupCartItems = (items) => {
 const findStockError = (grouped, productos) => {
   for (const [productoId, cantidad] of grouped) {
     const producto = productos.find((p) => Number(p.id) === productoId);
-    const stock = Number(producto?.stock_actual || 0);
-    if (producto && cantidad > stock) {
+    if (!producto) return `No se pudo confirmar el producto #${productoId} en el catálogo de tienda.`;
+    const stock = Number(producto.stock_actual || 0);
+    if (cantidad > stock) {
       return `Stock insuficiente para "${producto.nombre}": solicitaste ${cantidad}, hay ${stock} disponibles.`;
     }
   }

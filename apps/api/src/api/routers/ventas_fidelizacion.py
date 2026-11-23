@@ -135,6 +135,7 @@ def _respuesta_venta(
         anulada_por=venta.anulada_por,
         autorizada_por=venta.autorizada_por,
         motivo_anulacion=venta.motivo_anulacion,
+        vendedor=venta.creado_por,
     )
 
 
@@ -220,24 +221,29 @@ def create_venta(
                 exigir_cliente_activo(cliente_tienda)
                 cliente_nombre = cliente_tienda.nombre
 
+            # Lineas repetidas se juntan y los productos se bloquean siempre en el mismo orden (por id): dos ventas
+            # a la vez con los mismos productos en distinto orden no se bloquean entre si.
+            cantidades: dict[int, int] = {}
             for item in payload.items:
+                cantidades[item.producto_id] = cantidades.get(item.producto_id, 0) + item.cantidad
+            for producto_id, cantidad in sorted(cantidades.items()):
                 producto = db.execute(
                     select(ProductoModel)
-                    .where(ProductoModel.id == item.producto_id)
+                    .where(ProductoModel.id == producto_id)
                     .with_for_update(),
                 ).scalar_one_or_none()
 
                 if producto is None:
                     raise HTTPException(
                         status_code=404,
-                        detail=f"Producto {item.producto_id} no encontrado",
+                        detail=f"Producto {producto_id} no encontrado",
                     )
 
                 exigir_producto_vendible(producto)
                 if producto.catalogo != "tienda":
                     raise HTTPException(status_code=400, detail=f"'{producto.nombre}' no es un producto de la tienda")
 
-                if producto.stock_actual < item.cantidad:
+                if producto.stock_actual < cantidad:
                     raise HTTPException(
                         status_code=400,
                         detail=(
@@ -247,16 +253,16 @@ def create_venta(
                     )
 
                 movimientos_stock.append(
-                    mover_stock(db, producto, -item.cantidad, tipo="venta", usuario=current_user.username, referencia_tipo="venta"),
+                    mover_stock(db, producto, -cantidad, tipo="venta", usuario=current_user.username, referencia_tipo="venta"),
                 )
-                subtotal = float(item.cantidad * producto.precio_venta)
+                subtotal = float(cantidad * producto.precio_venta)
                 total += subtotal
 
                 detalle_payload.append(
                     VentaDetalleResponse(
                         producto_id=producto.id,
                         nombre_producto=producto.nombre,
-                        cantidad=item.cantidad,
+                        cantidad=cantidad,
                         precio_unitario=producto.precio_venta,
                         subtotal=subtotal,
                     ),
@@ -264,6 +270,14 @@ def create_venta(
 
             descuento = _aplicar_canje(db, payload, total, current_user.username, movimientos_puntos)
             total = total - descuento
+
+            cobrado_ahora = abono_inicial if payload.es_fiado else total
+            if (
+                payload.metodo_pago == "efectivo"
+                and payload.monto_recibido is not None
+                and round(float(payload.monto_recibido), 2) < round(float(cobrado_ahora), 2)
+            ):
+                raise HTTPException(status_code=400, detail="El dinero recibido no cubre lo que se cobra")
 
             if payload.es_fiado:
                 if abono_inicial > total:
@@ -460,6 +474,19 @@ def _build_venta_responses(
         payload.append(_respuesta_venta(venta, detalles, cliente_nombre))
 
     return payload
+
+
+@router.get("/api/ventas/{venta_id}", response_model=VentaResponse)
+def get_venta(
+    venta_id: int,
+    db: Session = Depends(get_db),
+    current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
+) -> VentaResponse:
+    """Detalle de una venta (productos, cobro, cliente y quien la hizo), solo de las que el rol puede ver."""
+    venta = db.execute(_solo_las_del_rol(select(VentaModel).where(VentaModel.id == venta_id), current_user)).scalar_one_or_none()
+    if venta is None:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+    return _build_venta_responses([venta], db)[0]
 
 
 @router.patch("/api/ventas/{venta_id}", response_model=VentaResponse)

@@ -18,6 +18,8 @@ import { buildReceiptHtml } from './Ventas/receiptHtml';
 import { useAvailableHeight } from './Ventas/useAvailableHeight';
 import { useVentasData } from './Ventas/useVentasData';
 import { useHeldTickets } from './Ventas/useHeldTickets';
+import { useProductosFaltantes } from './Ventas/useProductosFaltantes';
+import { useStoredState } from './Ventas/useStoredState';
 import { usePosPreferences } from './Ventas/usePosPreferences';
 import { useVentasShortcuts } from './Ventas/useVentasShortcuts';
 import {
@@ -36,7 +38,14 @@ import { CONTACTO, SITE } from '../config/site';
 
 const EMPTY_LOYALTY_FORM = { nombre: '', telefono: '', aceptaDatos: false };
 const TICKET_FIELDS = Object.keys(emptyTicket());
-const pickTicketFields = (source) => Object.fromEntries(TICKET_FIELDS.map((field) => [field, source[field]]));
+const DRAFT_KEY = 'angelly.pos.borrador.v1';
+
+// Ticket seguro a partir de lo guardado: campos que faltan con su valor por defecto y lineas siempre en lista.
+const normalizeTicket = (raw) => {
+  const guardado = Object.fromEntries(TICKET_FIELDS.filter((field) => raw?.[field] !== undefined).map((field) => [field, raw[field]]));
+  const ticket = { ...emptyTicket(), ...guardado };
+  return { ...ticket, items: Array.isArray(ticket.items) ? ticket.items : [] };
+};
 
 const Ventas = () => {
   const { token, user } = useAuth();
@@ -46,7 +55,9 @@ const Ventas = () => {
   const heldTickets = useHeldTickets();
   const preferences = usePosPreferences();
 
-  const [ticket, setTicket] = useState(emptyTicket);
+  // El ticket en curso se guarda en este equipo: al cambiar de modulo y volver no se pierde.
+  const [borrador, setTicket] = useStoredState(`${DRAFT_KEY}.${user?.username ?? ''}`, emptyTicket());
+  const ticket = useMemo(() => normalizeTicket(borrador), [borrador]);
   const [productSearch, setProductSearch] = useState('');
   const [success, setSuccess] = useState('');
   const [submittingVenta, setSubmittingVenta] = useState(false);
@@ -62,12 +73,21 @@ const Ventas = () => {
   const searchInputRef = useRef(null);
   const rootRef = useRef(null);
   useAvailableHeight(rootRef);
-  const patchTicket = useCallback((patch) => setTicket((current) => ({ ...current, ...patch })), []);
+  const patchTicket = useCallback((patch) => setTicket((current) => ({ ...current, ...patch })), [setTicket]);
 
   const productosById = useMemo(
     () => new Map(productos.map((producto) => [Number(producto.id), producto])),
     [productos],
   );
+
+  useProductosFaltantes({
+    items: ticket.items,
+    productosById,
+    listo: Boolean(token) && !data.loading,
+    onEncontrados: data.addFetchedProductos,
+    onAusentes: (ids) => setError(`${ids.length === 1 ? 'Un producto del ticket ya no está' : `${ids.length} productos del ticket ya no están`} disponible${ids.length === 1 ? '' : 's'} en la tienda. Quítalo${ids.length === 1 ? '' : 's'} del ticket para poder cobrar.`),
+    onError: () => setError('No se pudo consultar el catálogo para confirmar los precios del ticket. Revisa tu conexión e inténtalo de nuevo.'),
+  });
 
   const cartItems = useMemo(
     () => ticket.items.filter((item) => Number(item.producto_id) > 0 && Number(item.cantidad || 0) > 0),
@@ -146,6 +166,12 @@ const Ventas = () => {
   };
 
   const handleChangeQty = (index, delta) => {
+    const linea = ticket.items[index];
+    const producto = linea ? productosById.get(Number(linea.producto_id)) : null;
+    if (delta > 0 && producto && Number(linea.cantidad || 0) + delta > Number(producto.stock_actual || 0)) {
+      setError(`"${producto.nombre}" solo tiene ${Number(producto.stock_actual || 0)} en stock.`);
+      return;
+    }
     setTicket((current) => ({
       ...current,
       items: current.items
@@ -296,21 +322,33 @@ const Ventas = () => {
 
   const handleHold = () => {
     if (cartItems.length === 0) return;
-    const numero = heldTickets.hold(ticket);
+    const preciosPendientes = cartItems.some((item) => !productosById.has(Number(item.producto_id)));
+    const numero = heldTickets.hold({ ...ticket, total: preciosPendientes ? null : totalEstimado });
     setTicket(emptyTicket());
     setProductSearch('');
     cleanMessages();
-    setSuccess(`Ticket ${numero} en espera. Recupéralo desde la barra "En espera".`);
+    setSuccess(`Ticket ${numero} en espera. Para seguir con él, toca «Abrir» en el recuadro «En espera».`);
   };
 
   const handleResumeTicket = (id) => {
-    if (cartItems.length > 0) heldTickets.hold(ticket);
+    if (cartItems.length > 0) heldTickets.hold({ ...ticket, total: totalEstimado });
     const held = heldTickets.take(id);
-    if (held) {
-      setTicket({ ...emptyTicket(), ...pickTicketFields(held) });
-      setVentaCompletada(null);
-      cleanMessages();
-    }
+    if (!held) return;
+    setTicket(normalizeTicket(held));
+    setVentaCompletada(null);
+    cleanMessages();
+  };
+
+  const handleDiscardTicket = async (id) => {
+    const descartado = heldTickets.tickets.find((item) => item.id === id);
+    if (!descartado) return;
+    const unidades = (descartado.items ?? []).reduce((acc, item) => acc + Number(item.cantidad || 0), 0);
+    const ok = await confirm({
+      title: 'Descartar ticket en espera',
+      message: `¿Descartar el ticket ${descartado.numero} (${unidades} ${unidades === 1 ? 'producto' : 'productos'})? No se puede recuperar.`,
+      confirmLabel: 'Descartar',
+    });
+    if (ok) heldTickets.discard(id);
   };
 
   const handleClear = async () => {
@@ -477,7 +515,7 @@ const Ventas = () => {
               onHold={handleHold}
               onClear={handleClear}
               onResumeTicket={handleResumeTicket}
-              onDiscardTicket={heldTickets.discard}
+              onDiscardTicket={handleDiscardTicket}
             />
           )}
         </div>

@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { fetchCajaMovimientos } from '../../api/cajaApi';
 import PaymentBadge from '../../components/PaymentBadge';
 import Skeleton from '../../components/Skeleton';
 import { formatDateTime, formatMoney } from '../../utils/format';
+import DetalleVentaMovimiento from './DetalleVentaMovimiento';
 import { TIPOS_MOVIMIENTO } from './cajaHelpers';
 
 const Monto = ({ movimiento }) => {
@@ -19,20 +21,41 @@ const Monto = ({ movimiento }) => {
 };
 
 const FilaMovimiento = ({ movimiento }) => {
+  const [abierta, setAbierta] = useState(false);
   const tipo = TIPOS_MOVIMIENTO[movimiento.tipo] ?? { etiqueta: movimiento.tipo, clase: 'bg-gray-100 text-gray-600' };
+  const esVenta = movimiento.tipo === 'venta';
   return (
-    <tr className="border-b border-gray-100 last:border-0">
-      <td className="whitespace-nowrap px-3 py-2 text-gray-500">{formatDateTime(movimiento.fecha)}</td>
-      <td className="px-3 py-2">
-        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${tipo.clase}`}>{tipo.etiqueta}</span>
-      </td>
-      <td className="px-3 py-2 text-gray-800">
-        {movimiento.descripcion}
-        {movimiento.anulada && <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-bold text-red-700">Anulada</span>}
-      </td>
-      <td className="px-3 py-2">{movimiento.metodo_pago ? <PaymentBadge method={movimiento.metodo_pago} compact /> : <span className="text-gray-300">—</span>}</td>
-      <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums"><Monto movimiento={movimiento} /></td>
-    </tr>
+    <>
+      <tr className={`border-b border-gray-100 ${abierta ? 'bg-gray-50/70' : ''}`}>
+        <td className="whitespace-nowrap px-3 py-2 text-gray-500">{formatDateTime(movimiento.fecha)}</td>
+        <td className="px-3 py-2">
+          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${tipo.clase}`}>{tipo.etiqueta}</span>
+        </td>
+        <td className="px-3 py-2 text-gray-800">
+          {movimiento.descripcion}
+          {movimiento.anulada && <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-bold text-red-700">Anulada</span>}
+          {esVenta && (
+            <button
+              type="button"
+              onClick={() => setAbierta((actual) => !actual)}
+              aria-expanded={abierta}
+              aria-label={`${abierta ? 'Ocultar' : 'Ver'} los productos de la venta ${movimiento.id}`}
+              className="ml-2 inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-xs font-semibold text-rosewood transition hover:bg-rosewood/10"
+            >
+              {abierta ? <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" /> : <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />}
+              {abierta ? 'Ocultar' : 'Ver productos'}
+            </button>
+          )}
+        </td>
+        <td className="px-3 py-2">{movimiento.metodo_pago ? <PaymentBadge method={movimiento.metodo_pago} compact /> : <span className="text-gray-300">—</span>}</td>
+        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums"><Monto movimiento={movimiento} /></td>
+      </tr>
+      {abierta && (
+        <tr className="border-b border-gray-100 bg-gray-50/70">
+          <td colSpan={5} className="px-3 pb-3 pt-1"><DetalleVentaMovimiento ventaId={movimiento.id} /></td>
+        </tr>
+      )}
+    </>
   );
 };
 

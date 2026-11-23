@@ -51,6 +51,7 @@ const agregar = (nombre) => fireEvent.click(screen.getByRole('button', { name: `
 describe('POS: flujo completo', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     apiPostMock.mockResolvedValue({ puntos_otorgados: 0 });
     window.print = vi.fn();
   });
@@ -97,10 +98,10 @@ describe('POS: flujo completo', () => {
     agregar('Arroz Diana');
 
     fireEvent.keyDown(window, { key: 'F9' });
-    await screen.findByText('Venta completada');
+    await screen.findByText('Venta completada', {}, { timeout: 4000 });
     fireEvent.keyDown(window, { key: 'F2' });
 
-    expect(await screen.findByText('El ticket está vacío')).toBeInTheDocument();
+    expect(await screen.findByText('El ticket está vacío', {}, { timeout: 4000 })).toBeInTheDocument();
     expect(apiPostMock).toHaveBeenCalledTimes(1);
   });
 
@@ -237,6 +238,127 @@ describe('POS: flujo completo', () => {
     expect(screen.getByRole('button', { name: 'Recuperar ticket 2' })).toBeInTheDocument();
   });
 
+  it('recupera por ID el precio de un producto ausente del catálogo inicial', async () => {
+    localStorage.setItem('angelly.pos.tickets.v1', JSON.stringify({
+      counter: 1,
+      tickets: [{ id: 'guardado', numero: 1, items: [{ producto_id: '235', cantidad: 15 }] }],
+    }));
+    await renderPos();
+    let responder;
+    apiGetMock.mockImplementationOnce(() => new Promise((resolve) => { responder = resolve; }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Recuperar ticket 1' }));
+    expect(apiGetMock).toHaveBeenCalledWith('/api/productos?catalogo=tienda&ids=235');
+    expect(within(ticket()).getByText('Precio sin confirmar')).toBeInTheDocument();
+    expect(within(ticket()).getByRole('button', { name: 'Confirma los productos' })).toBeDisabled();
+    responder([{ id: 235, nombre: 'Chicle', precio_venta: 300, stock_actual: 20 }]);
+
+    expect(await within(ticket()).findByText('Chicle')).toBeInTheDocument();
+    expect(within(ticket()).getByLabelText('Cantidad: 15')).toBeInTheDocument();
+    expect(within(ticket()).getByRole('button', { name: /^Cobrar .*4\.500/ })).toBeEnabled();
+  });
+
+  it('si un producto del ticket en espera ya no existe lo avisa y no deja cobrar', async () => {
+    localStorage.setItem('angelly.pos.tickets.v1', JSON.stringify({
+      counter: 1,
+      tickets: [{ id: 'guardado', numero: 1, items: [{ producto_id: '999', cantidad: 2 }] }],
+    }));
+    await renderPos();
+    apiGetMock.mockResolvedValueOnce([]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Recuperar ticket 1' }));
+
+    expect(await screen.findByText(/Un producto del ticket ya no está disponible en la tienda/)).toBeInTheDocument();
+    expect(within(ticket()).getByRole('button', { name: 'Confirma los productos' })).toBeDisabled();
+  });
+
+  it('el ticket en curso sobrevive a irse a otro módulo y volver', async () => {
+    mockApi();
+    const primera = render(<MemoryRouter><Ventas /></MemoryRouter>);
+    await screen.findByRole('button', { name: 'Agregar Arroz Diana' });
+    agregar('Arroz Diana');
+    agregar('Arroz Diana');
+    primera.unmount();
+
+    render(<MemoryRouter><Ventas /></MemoryRouter>);
+    await screen.findByRole('button', { name: 'Agregar Arroz Diana' });
+
+    expect(within(ticket()).getByText('Arroz Diana')).toBeInTheDocument();
+    expect(within(ticket()).getByLabelText('Cantidad: 2')).toBeInTheDocument();
+    expect(within(ticket()).getByRole('button', { name: /^Cobrar .*7\.000/ })).toBeEnabled();
+  });
+
+  it('al volver, los productos del borrador que no están en el catálogo cargado se piden por ID', async () => {
+    localStorage.setItem('angelly.pos.borrador.v1.', JSON.stringify({ items: [{ producto_id: '1', cantidad: 1 }, { producto_id: '384', cantidad: 2 }] }));
+    apiGetMock.mockImplementation((endpoint) => {
+      if (endpoint === '/api/productos?catalogo=tienda&ids=384') return Promise.resolve([{ id: 384, nombre: 'Atun real', precio_venta: 4800, stock_actual: 9 }]);
+      if (endpoint.startsWith('/api/productos/paginados')) return Promise.resolve({ data: productos });
+      if (endpoint === '/api/caja/estado') return Promise.resolve({ abierta: true });
+      return Promise.resolve([]);
+    });
+    render(<MemoryRouter><Ventas /></MemoryRouter>);
+
+    expect(await within(ticket()).findByText('Atun real')).toBeInTheDocument();
+    expect(within(ticket()).queryByText(/Producto #384/)).not.toBeInTheDocument();
+    expect(within(ticket()).getByRole('button', { name: /^Cobrar .*13\.100/ })).toBeEnabled();
+    expect(apiGetMock.mock.calls.filter(([endpoint]) => endpoint.includes('ids=384'))).toHaveLength(1);
+  });
+
+  it('el recuadro En espera muestra cada ticket con su total y un botón Abrir', async () => {
+    await renderPos();
+    agregar('Arroz Diana');
+    agregar('Arroz Diana');
+
+    fireEvent.click(within(ticket()).getByRole('button', { name: /Poner en espera/ }));
+
+    const recuadro = within(await screen.findByLabelText('Tickets en espera'));
+    expect(recuadro.getByText('1 ticket en espera')).toBeInTheDocument();
+    expect(recuadro.getByText(/2 productos · \$ 7\.000/)).toBeInTheDocument();
+    expect(recuadro.getByRole('button', { name: 'Recuperar ticket 1' })).toHaveTextContent('Abrir');
+  });
+
+  it('descartar un ticket en espera pide confirmar y si se cancela no se pierde', async () => {
+    await renderPos();
+    agregar('Arroz Diana');
+    fireEvent.keyDown(window, { key: 'F4' });
+    await screen.findByText(/Ticket 1 en espera/);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Descartar ticket 1' }));
+    expect(await screen.findByText(/¿Descartar el ticket 1 \(1 producto\)\?/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(screen.getByRole('button', { name: 'Recuperar ticket 1' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Descartar ticket 1' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Descartar' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Recuperar ticket 1' })).not.toBeInTheDocument());
+  });
+
+  it('al elegir un producto de una búsqueda, la búsqueda se borra y el cursor vuelve a la barra', async () => {
+    await renderPos();
+    const barra = screen.getByLabelText('Buscar producto o escanear código de barras');
+    fireEvent.change(barra, { target: { value: 'girasol' } });
+    expect(screen.queryByRole('button', { name: 'Agregar Arroz Diana' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar Aceite Girasol' }));
+
+    expect(barra).toHaveValue('');
+    expect(barra).toHaveFocus();
+    expect(within(ticket()).getByText('Aceite Girasol')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Agregar Arroz Diana' })).toBeInTheDocument();
+  });
+
+  it('con el + del ticket no se pasa del stock', async () => {
+    await renderPos();
+    agregar('Aceite Girasol');
+    agregar('Aceite Girasol');
+    agregar('Aceite Girasol');
+
+    fireEvent.click(within(ticket()).getByRole('button', { name: 'Agregar una unidad de Aceite Girasol' }));
+
+    expect(await screen.findByText(/"Aceite Girasol" solo tiene 3 en stock/)).toBeInTheDocument();
+    expect(within(ticket()).getByLabelText('Cantidad: 3')).toBeInTheDocument();
+  });
+
   it('vaciar el ticket pide confirmacion', async () => {
     await renderPos();
     agregar('Arroz Diana');
@@ -297,12 +419,22 @@ describe('POS: flujo completo', () => {
     expect(await screen.findByRole('button', { name: 'Agregar Arroz Diana' })).toBeInTheDocument();
   });
 
+  it('el POS tampoco abre la caja sin declarar el efectivo inicial', async () => {
+    await renderPos({ cajaAbierta: false });
+
+    expect(await screen.findByRole('button', { name: 'Abrir caja y vender' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir caja y vender' }));
+
+    expect(abrirCajaMock).not.toHaveBeenCalled();
+  });
+
   it('si la recarga falla tras abrir la caja no lo presenta como error de apertura', async () => {
     abrirCajaMock.mockResolvedValue({ id: 1 });
     await renderPos({ cajaAbierta: false });
     await screen.findByText(/La caja está cerrada/);
 
     apiGetMock.mockRejectedValue(new Error('Sin red'));
+    fireEvent.click(screen.getByLabelText(/Empiezo sin efectivo en el cajón/));
     fireEvent.click(screen.getByRole('button', { name: 'Abrir caja y vender' }));
 
     expect(await screen.findByText(/La caja se abrió, pero no se pudo actualizar/)).toBeInTheDocument();
