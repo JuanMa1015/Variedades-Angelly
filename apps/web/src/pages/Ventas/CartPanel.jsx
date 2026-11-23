@@ -140,6 +140,7 @@ const CartPanel = (props) => {
     onDiscardTicket = () => {},
   } = props;
   const unidades = cart.reduce((acc, item) => acc + Number(item.cantidad || 0), 0);
+  const preciosPendientes = cart.some((item) => !productosById.has(Number(item.producto_id)));
 
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm" aria-label="Ticket de venta">
@@ -189,16 +190,16 @@ const CartPanel = (props) => {
               <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Total a cobrar</p>
               <p className="text-xs text-gray-500">{unidades} {unidades === 1 ? 'artículo' : 'artículos'}</p>
             </div>
-            <p className="text-3xl font-black tabular-nums text-rosewood">{formatMoney(totalEstimado)}</p>
+            <p className="text-3xl font-black tabular-nums text-rosewood">{preciosPendientes ? '—' : formatMoney(totalEstimado)}</p>
           </div>
 
           <button
             type="submit"
-            disabled={submittingVenta || cart.length === 0}
+            disabled={submittingVenta || preciosPendientes || cart.length === 0}
             className="flex h-14 w-full items-center justify-center gap-3 rounded-xl bg-rosewood px-4 text-base font-bold text-white shadow-soft transition hover:opacity-95 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
           >
-            {submittingVenta ? 'Confirmando...' : `Cobrar ${formatMoney(totalEstimado)}`}
-            {!submittingVenta && <Kbd light>F9</Kbd>}
+            {submittingVenta ? 'Confirmando...' : preciosPendientes ? 'Confirma los productos' : `Cobrar ${formatMoney(totalEstimado)}`}
+            {!submittingVenta && !preciosPendientes && <Kbd light>F9</Kbd>}
           </button>
         </div>
       </form>

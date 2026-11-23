@@ -41,7 +41,7 @@ const CartLine = ({ item, index, producto, onChangeQty, onRemoveItem, formatMone
     <li className="flex items-center gap-2 px-4 py-2.5">
       <div className="min-w-0 flex-1">
         <p className="line-clamp-2 text-sm font-semibold leading-snug text-gray-900">{nombre}</p>
-        <p className="text-xs text-gray-500">{formatMoney(precio)} c/u</p>
+        <p className="text-xs text-gray-500">{producto ? `${formatMoney(precio)} c/u` : 'Precio sin confirmar'}</p>
       </div>
       <QuantityStepper
         nombre={nombre}
@@ -50,7 +50,7 @@ const CartLine = ({ item, index, producto, onChangeQty, onRemoveItem, formatMone
         onIncrease={() => onChangeQty(index, 1)}
       />
       <span className="w-[4.5rem] shrink-0 text-right text-sm font-bold tabular-nums text-gray-900">
-        {formatMoney(precio * cantidad)}
+        {producto ? formatMoney(precio * cantidad) : '—'}
       </span>
       <button
         type="button"

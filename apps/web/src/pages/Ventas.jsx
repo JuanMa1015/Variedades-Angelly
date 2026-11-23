@@ -303,13 +303,33 @@ const Ventas = () => {
     setSuccess(`Ticket ${numero} en espera. Recupéralo desde la barra "En espera".`);
   };
 
-  const handleResumeTicket = (id) => {
+  const handleResumeTicket = async (id) => {
     if (cartItems.length > 0) heldTickets.hold(ticket);
     const held = heldTickets.take(id);
     if (held) {
       setTicket({ ...emptyTicket(), ...pickTicketFields(held) });
       setVentaCompletada(null);
       cleanMessages();
+      const ids = [...groupCartItems(held.items).keys()].filter((productoId) => !productosById.has(productoId));
+      if (ids.length === 0) return;
+
+      try {
+        const requests = [];
+        for (let offset = 0; offset < ids.length; offset += 200) {
+          const params = new URLSearchParams({ catalogo: 'tienda' });
+          ids.slice(offset, offset + 200).forEach((productoId) => params.append('ids', productoId));
+          requests.push(apiGet(`/api/productos?${params}`));
+        }
+        const encontrados = (await Promise.all(requests)).flatMap(extractProductos);
+        data.addFetchedProductos(encontrados);
+        const hallados = new Set(encontrados.map((producto) => Number(producto.id)));
+        const ausentes = ids.filter((productoId) => !hallados.has(productoId));
+        if (ausentes.length > 0) {
+          setError(`${ausentes.length === 1 ? 'Un producto del ticket ya no está' : `${ausentes.length} productos del ticket ya no están`} disponible${ausentes.length === 1 ? '' : 's'} en la tienda. Quítalo${ausentes.length === 1 ? '' : 's'} del ticket para poder cobrar.`);
+        }
+      } catch {
+        setError('No se pudo consultar el catálogo. Vuelve a dejar el ticket en espera y ábrelo para reintentar.');
+      }
     }
   };
 

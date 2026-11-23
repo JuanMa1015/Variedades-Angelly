@@ -201,3 +201,40 @@ def test_el_punto_de_venta_no_vende_productos_de_cartera(auth_client) -> None:
     assert propia.status_code == 201, propia.text
     with sf() as db:
         assert db.get(ProductoModel, cartera).stock_actual == 5
+
+
+# -- Pedir productos por ID (recuperar un ticket en espera) --
+
+
+def test_filtrar_por_ids_trae_solo_esos_productos(auth_client) -> None:
+    client, sf = auth_client
+    a, b = _producto(sf, "Arroz", "tienda"), _producto(sf, "Sal", "tienda")
+    _producto(sf, "Azucar", "tienda")
+
+    respuesta = client.get(f"/api/productos?ids={a}&ids={b}", headers=_h(client, "vendedor"))
+
+    assert respuesta.status_code == 200
+    assert _nombres(respuesta) == ["Arroz", "Sal"]
+
+
+def test_filtrar_por_ids_respeta_el_catalogo_del_rol_y_no_trae_desactivados(auth_client) -> None:
+    client, sf = auth_client
+    tienda, cartera = _dos(sf)
+    apagado = _producto(sf, "Descontinuado", "tienda", activo=False)
+    ids = f"ids={tienda}&ids={cartera}&ids={apagado}"
+
+    assert _nombres(client.get(f"/api/productos?{ids}", headers=_h(client, "vendedor"))) == ["Arroz tienda"]
+    assert _nombres(client.get(f"/api/productos?{ids}", headers=_h(client, "admin"))) == ["Bolso cartera"]
+    assert _nombres(client.get(f"/api/productos?{ids}", headers=_h(client, "super"))) == ["Arroz tienda", "Bolso cartera"]
+
+
+def test_filtrar_por_ids_inexistentes_da_lista_vacia_y_los_ids_invalidos_se_rechazan(auth_client) -> None:
+    client, sf = auth_client
+    _dos(sf)
+    vendedor = _h(client, "vendedor")
+
+    assert client.get("/api/productos?ids=99999", headers=vendedor).json() == []
+    assert client.get("/api/productos?ids=0", headers=vendedor).status_code == 422
+    assert client.get("/api/productos?ids=abc", headers=vendedor).status_code == 422
+    demasiados = "&".join(f"ids={n}" for n in range(1, 202))
+    assert client.get(f"/api/productos?{demasiados}", headers=vendedor).status_code == 422

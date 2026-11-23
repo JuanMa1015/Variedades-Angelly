@@ -51,6 +51,7 @@ const agregar = (nombre) => fireEvent.click(screen.getByRole('button', { name: `
 describe('POS: flujo completo', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.removeItem('angelly.pos.tickets.v1');
     apiPostMock.mockResolvedValue({ puntos_otorgados: 0 });
     window.print = vi.fn();
   });
@@ -235,6 +236,40 @@ describe('POS: flujo completo', () => {
     expect(within(ticket()).getByText('Arroz Diana')).toBeInTheDocument();
     expect(within(ticket()).getByLabelText('Cantidad: 2')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Recuperar ticket 2' })).toBeInTheDocument();
+  });
+
+  it('recupera por ID el precio de un producto ausente del catálogo inicial', async () => {
+    localStorage.setItem('angelly.pos.tickets.v1', JSON.stringify({
+      counter: 1,
+      tickets: [{ id: 'guardado', numero: 1, items: [{ producto_id: '235', cantidad: 15 }] }],
+    }));
+    await renderPos();
+    let responder;
+    apiGetMock.mockImplementationOnce(() => new Promise((resolve) => { responder = resolve; }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Recuperar ticket 1' }));
+    expect(apiGetMock).toHaveBeenCalledWith('/api/productos?catalogo=tienda&ids=235');
+    expect(within(ticket()).getByText('Precio sin confirmar')).toBeInTheDocument();
+    expect(within(ticket()).getByRole('button', { name: 'Confirma los productos' })).toBeDisabled();
+    responder([{ id: 235, nombre: 'Chicle', precio_venta: 300, stock_actual: 20 }]);
+
+    expect(await within(ticket()).findByText('Chicle')).toBeInTheDocument();
+    expect(within(ticket()).getByLabelText('Cantidad: 15')).toBeInTheDocument();
+    expect(within(ticket()).getByRole('button', { name: /^Cobrar .*4\.500/ })).toBeEnabled();
+  });
+
+  it('si un producto del ticket en espera ya no existe lo avisa y no deja cobrar', async () => {
+    localStorage.setItem('angelly.pos.tickets.v1', JSON.stringify({
+      counter: 1,
+      tickets: [{ id: 'guardado', numero: 1, items: [{ producto_id: '999', cantidad: 2 }] }],
+    }));
+    await renderPos();
+    apiGetMock.mockResolvedValueOnce([]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Recuperar ticket 1' }));
+
+    expect(await screen.findByText(/Un producto del ticket ya no está disponible en la tienda/)).toBeInTheDocument();
+    expect(within(ticket()).getByRole('button', { name: 'Confirma los productos' })).toBeDisabled();
   });
 
   it('vaciar el ticket pide confirmacion', async () => {

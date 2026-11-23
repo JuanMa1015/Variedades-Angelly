@@ -187,6 +187,7 @@ def list_productos(
     catalogo: str = Query("todos", pattern="^(todos|tienda|cartera)$"),
     q: str | None = Query(default=None, min_length=1, max_length=100),
     include_inactivos: bool = Query(default=False),
+    ids: Annotated[list[Annotated[int, Field(gt=0)]] | None, Query(max_length=200)] = None,
     current_user: AuthenticatedUser = Depends(require_roles("admin", "vendedor", "superadmin")),
 ) -> list[ProductoResponse]:
     """Lista los productos del catalogo del rol. Opcionalmente filtra por texto en nombre o código de barras."""
@@ -197,6 +198,8 @@ def list_productos(
     if catalogo != "todos":
         query = query.where(ProductoModel.catalogo == catalogo)
     query = _producto_search_filter(query, q)
+    if ids is not None:
+        query = query.where(ProductoModel.id.in_(ids))
 
     items = db.execute(query.order_by(ProductoModel.nombre.asc())).scalars().all()
     return [_to_producto_response_from_model(p) for p in items]
