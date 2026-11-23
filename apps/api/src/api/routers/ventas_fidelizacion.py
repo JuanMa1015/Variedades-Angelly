@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field
@@ -14,7 +15,14 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.api.schemas.anulacion import AnularRequest as AnularVentaRequest
-from src.api.schemas.cartera import MetodoPago, VentaItemCreateRequest, VentaDetalleResponse, VentaResponse
+from src.api.schemas.cartera import (
+    DevolucionLineaResponse,
+    DevolucionResponse,
+    MetodoPago,
+    VentaDetalleResponse,
+    VentaItemCreateRequest,
+    VentaResponse,
+)
 from src.api.limiter import limiter, login_rate_limit
 from src.api.services.anulacion import anular_venta, quien_autoriza
 from src.api.services.auditoria import registrar_auditoria
@@ -39,6 +47,8 @@ from src.infrastructure.database.models import (
     ClienteFiadoTiendaModel,
     ClienteModel,
     DetalleVentaModel,
+    DevolucionVentaDetalleModel,
+    DevolucionVentaModel,
     ProductoModel,
     VentaModel,
 )
@@ -47,6 +57,14 @@ router = APIRouter(tags=["ventas-fidelizacion"])
 
 FIADO_ORIGEN_CARTERA = "cartera"
 FIADO_ORIGEN_TIENDA = "tienda"
+
+
+class DescuentoManualRequest(BaseModel):
+    """Descuento que el vendedor aplica al total: en porcentaje o en pesos, siempre con motivo."""
+
+    tipo: Literal["porcentaje", "monto"]
+    valor: Annotated[float, Field(gt=0)]
+    motivo: Annotated[str, Field(min_length=3, max_length=200)]
 
 
 class VentaCreateRequest(BaseModel):
@@ -64,6 +82,10 @@ class VentaCreateRequest(BaseModel):
     puntos_a_canjear: Annotated[int, Field(ge=0)] = 0
     # Clave del cobro (la genera el navegador): si el servidor ya registro esa venta, devuelve la misma en vez de otra.
     clave_idempotencia: Annotated[str | None, Field(min_length=8, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")] = None
+    descuento_manual: DescuentoManualRequest | None = None
+    # Solo cuando el descuento pasa el limite del vendedor: la clave de un administrador.
+    autorizador_usuario: Annotated[str | None, Field(max_length=50)] = None
+    autorizador_password: Annotated[str | None, Field(max_length=128)] = None
 
 
 class VentaUpdateRequest(BaseModel):
@@ -91,6 +113,7 @@ def _to_detalle_response(detalle: DetalleVentaModel) -> VentaDetalleResponse:
         cantidad=detalle.cantidad,
         precio_unitario=detalle.precio_unitario,
         subtotal=detalle.subtotal,
+        cantidad_devuelta=int(detalle.cantidad_devuelta or 0),
     )
 
 
@@ -106,9 +129,44 @@ def _aplicar_canje(db: Session, payload: VentaCreateRequest, total: float, usuar
     return descuento
 
 
+DESCUENTO_MAX_POR_DEFECTO = 5.0
+
+
+def descuento_max_sin_autorizacion() -> float:
+    """Porcentaje de descuento que el vendedor aplica solo (``DESCUENTO_MAX_SIN_AUTORIZACION_PCT``, 5 por defecto)."""
+    crudo = os.getenv("DESCUENTO_MAX_SIN_AUTORIZACION_PCT", "").strip()
+    try:
+        valor = float(crudo) if crudo else DESCUENTO_MAX_POR_DEFECTO
+    except ValueError:
+        valor = DESCUENTO_MAX_POR_DEFECTO
+    return max(0.0, min(100.0, valor))
+
+
+def _aplicar_descuento_manual(
+    db: Session, payload: VentaCreateRequest, *, subtotal: float, costo: float, solicitante: AuthenticatedUser,
+) -> tuple[float, str | None]:
+    """Pesos de descuento manual y quien lo autorizo (solo si pasa el limite del vendedor)."""
+    descuento = payload.descuento_manual
+    if descuento is None:
+        return 0.0, None
+    monto = round(subtotal * descuento.valor / 100, 2) if descuento.tipo == "porcentaje" else round(descuento.valor, 2)
+    if monto <= 0 or monto >= subtotal:
+        raise HTTPException(status_code=400, detail="El descuento debe ser mayor que cero y menor que el total de la venta")
+    if round(subtotal - monto, 2) < round(costo, 2):
+        raise HTTPException(status_code=400, detail="El descuento deja la venta por debajo del costo de los productos")
+    limite = descuento_max_sin_autorizacion()
+    if monto / subtotal * 100 > limite + 1e-9:
+        autorizado = quien_autoriza(
+            db, solicitante, payload.autorizador_usuario, payload.autorizador_password,
+            accion=f"Un descuento de mas de {limite:g} %",
+        )
+        return monto, autorizado
+    return monto, None
+
+
 def _huella(payload: VentaCreateRequest) -> str:
     """Resumen del contenido de la venta (sin la clave): la misma clave con otro contenido no es un reintento."""
-    contenido = payload.model_dump(exclude={"clave_idempotencia"}, mode="json")
+    contenido = payload.model_dump(exclude={"clave_idempotencia", "autorizador_usuario", "autorizador_password"}, mode="json")
     contenido["items"] = sorted(contenido["items"], key=lambda item: (item["producto_id"], item["cantidad"]))
     return hashlib.sha256(json.dumps(contenido, sort_keys=True).encode("utf-8")).hexdigest()
 
@@ -132,6 +190,7 @@ def _respuesta_venta(
     venta: VentaModel,
     detalles: list[VentaDetalleResponse],
     cliente_nombre: str | None,
+    devoluciones: list[DevolucionResponse] | None = None,
 ) -> VentaResponse:
     return VentaResponse(
         venta_id=venta.id,
@@ -162,6 +221,11 @@ def _respuesta_venta(
         autorizada_por=venta.autorizada_por,
         motivo_anulacion=venta.motivo_anulacion,
         vendedor=venta.creado_por,
+        total_devuelto=float(venta.total_devuelto or 0),
+        devoluciones=devoluciones or [],
+        descuento_manual=float(venta.descuento_manual or 0),
+        descuento_manual_motivo=venta.descuento_manual_motivo,
+        descuento_autorizado_por=venta.descuento_autorizado_por,
     )
 
 
@@ -173,6 +237,7 @@ def create_venta(
     current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> VentaResponse:
     total = 0.0
+    costo_total = 0.0
     detalle_payload: list[VentaDetalleResponse] = []
     movimientos_stock = []
     movimientos_puntos = []
@@ -291,6 +356,7 @@ def create_venta(
                 )
                 subtotal = float(cantidad * producto.precio_venta)
                 total += subtotal
+                costo_total += float(cantidad * producto.precio_costo)
 
                 detalle_payload.append(
                     VentaDetalleResponse(
@@ -301,6 +367,11 @@ def create_venta(
                         subtotal=subtotal,
                     ),
                 )
+
+            descuento_manual, descuento_autorizado_por = _aplicar_descuento_manual(
+                db, payload, subtotal=total, costo=costo_total, solicitante=current_user,
+            )
+            total = round(total - descuento_manual, 2)
 
             descuento = _aplicar_canje(db, payload, total, current_user.username, movimientos_puntos)
             total = total - descuento
@@ -356,6 +427,9 @@ def create_venta(
                 monto_recibido=payload.monto_recibido,
                 puntos_canjeados=payload.puntos_a_canjear if descuento else 0,
                 descuento_puntos=descuento,
+                descuento_manual=descuento_manual,
+                descuento_manual_motivo=payload.descuento_manual.motivo.strip() if descuento_manual else None,
+                descuento_autorizado_por=descuento_autorizado_por,
             )
             if payload.cliente_fidelizacion_id is not None:
                 # Los puntos salen del dinero realmente cobrado (un fiado solo cuenta su abono).
@@ -367,6 +441,20 @@ def create_venta(
 
             db.add(venta)
             db.flush()
+            if descuento_manual:
+                registrar_auditoria(
+                    db,
+                    usuario=current_user.username,
+                    modulo="ventas",
+                    entidad="venta",
+                    accion="descuento_manual",
+                    entidad_id=venta.id,
+                    detalle=(
+                        f"Venta #{venta.id}: descuento {descuento_manual} sobre {round(total + descuento_manual + descuento, 2)}. "
+                        f"Motivo: {payload.descuento_manual.motivo.strip()}."
+                        f"{f' Autorizo: {descuento_autorizado_por}.' if descuento_autorizado_por else ''}"
+                    ),
+                )
             for movimiento in movimientos_stock:
                 movimiento.referencia_id = venta.id
             for movimiento in movimientos_puntos:
@@ -463,6 +551,39 @@ def list_ventas_paginadas(
     )
 
 
+def _devoluciones_de(db: Session, venta_ids: list[int]) -> dict[int, list[DevolucionResponse]]:
+    """Devoluciones de las ventas pedidas (con sus lineas), de la mas antigua a la mas reciente."""
+    if not venta_ids:
+        return {}
+    devoluciones = db.execute(
+        select(DevolucionVentaModel).where(DevolucionVentaModel.venta_id.in_(venta_ids)).order_by(DevolucionVentaModel.id),
+    ).scalars().all()
+    if not devoluciones:
+        return {}
+    lineas = db.execute(
+        select(DevolucionVentaDetalleModel)
+        .where(DevolucionVentaDetalleModel.devolucion_id.in_([d.id for d in devoluciones]))
+        .order_by(DevolucionVentaDetalleModel.id),
+    ).scalars().all()
+    lineas_por_devolucion: dict[int, list[DevolucionLineaResponse]] = {}
+    for linea in lineas:
+        lineas_por_devolucion.setdefault(linea.devolucion_id, []).append(
+            DevolucionLineaResponse(
+                producto_id=linea.producto_id, nombre_producto=linea.nombre_producto, cantidad=linea.cantidad, valor=float(linea.valor),
+            ),
+        )
+    resultado: dict[int, list[DevolucionResponse]] = {}
+    for d in devoluciones:
+        resultado.setdefault(d.venta_id, []).append(
+            DevolucionResponse(
+                id=d.id, fecha=d.fecha, registrado_por=d.registrado_por, autorizado_por=d.autorizado_por, motivo=d.motivo,
+                total_devuelto=float(d.total_devuelto), monto_reembolsado=float(d.monto_reembolsado),
+                deuda_reducida=float(d.deuda_reducida), metodo_pago=d.metodo_pago, lineas=lineas_por_devolucion.get(d.id, []),
+            ),
+        )
+    return resultado
+
+
 def _build_venta_responses(
     ventas: list[VentaModel],
     db: Session,
@@ -502,6 +623,8 @@ def _build_venta_responses(
             _to_detalle_response(detalle),
         )
 
+    devoluciones_por_venta = _devoluciones_de(db, venta_ids)
+
     payload: list[VentaResponse] = []
     for venta in ventas:
         detalles = detalles_por_venta.get(venta.id, [])
@@ -512,9 +635,17 @@ def _build_venta_responses(
         else:
             cliente_nombre = None
 
-        payload.append(_respuesta_venta(venta, detalles, cliente_nombre))
+        payload.append(_respuesta_venta(venta, detalles, cliente_nombre, devoluciones_por_venta.get(venta.id)))
 
     return payload
+
+
+@router.get("/api/ventas/config")
+def get_ventas_config(
+    _: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
+) -> dict[str, float]:
+    """Reglas del punto de venta que la pantalla necesita conocer."""
+    return {"descuento_max_sin_autorizacion_pct": descuento_max_sin_autorizacion()}
 
 
 @router.get("/api/ventas/{venta_id}", response_model=VentaResponse)
@@ -553,6 +684,9 @@ def update_venta(
 
         if venta.anulada:
             raise HTTPException(status_code=409, detail="La venta esta anulada y ya no se puede modificar")
+
+        if float(venta.total_devuelto or 0) > 0:
+            raise HTTPException(status_code=409, detail="La venta ya tiene devoluciones: no se puede modificar")
 
         if venta.tipo_fiado == FIADO_ORIGEN_CARTERA:
             raise HTTPException(
@@ -719,6 +853,9 @@ def delete_venta(
 
         if venta.anulada:
             raise HTTPException(status_code=409, detail="La venta esta anulada y ya no se puede modificar")
+
+        if float(venta.total_devuelto or 0) > 0:
+            raise HTTPException(status_code=409, detail="La venta ya tiene devoluciones: no se puede eliminar")
 
         if venta.tipo_fiado == FIADO_ORIGEN_CARTERA:
             raise HTTPException(

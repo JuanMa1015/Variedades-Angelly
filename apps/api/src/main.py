@@ -45,6 +45,7 @@ from src.api.routers.productos import router as productos_router
 from src.api.routers.productos_stock import router as productos_stock_router
 from src.api.routers.proveedores import router as proveedores_router
 from src.api.routers.superadmin import router as superadmin_router
+from src.api.routers.ventas_devoluciones import router as ventas_devoluciones_router
 from src.api.routers.upload import router as upload_router
 from src.api.routers.ventas_fidelizacion import router as ventas_fidelizacion_router
 from src.infrastructure.database.connection import engine, get_db
@@ -526,6 +527,7 @@ def health_check():
 # ─── Routers ───
 app.include_router(auth_router)
 app.include_router(productos_router)
+app.include_router(ventas_devoluciones_router)
 app.include_router(productos_stock_router)
 app.include_router(dashboard_vendedor_router)
 app.include_router(superadmin_router)

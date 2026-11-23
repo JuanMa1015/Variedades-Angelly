@@ -14,6 +14,7 @@ from src.infrastructure.database.models import (
     CierreCajaModel,
     ClienteFiadoTiendaModel,
     ClienteModel,
+    DevolucionVentaModel,
     FacturaCompraModel,
     GastoModel,
     ProveedorModel,
@@ -106,6 +107,23 @@ def _gastos(db: Session, caja: CierreCajaModel, hasta: datetime) -> list[Movimie
     ]
 
 
+def _devoluciones(db: Session, caja: CierreCajaModel) -> list[MovimientoCajaResponse]:
+    """Dinero devuelto a clientes en este turno (solo lo que realmente salio; lo que bajo una deuda no mueve la caja)."""
+    devoluciones = db.execute(select(DevolucionVentaModel).where(DevolucionVentaModel.caja_id == caja.id)).scalars().all()
+    return [
+        MovimientoCajaResponse(
+            tipo="devolucion",
+            id=d.id,
+            fecha=d.fecha,
+            descripcion=f"Devolución · venta #{d.venta_id}",
+            metodo_pago=d.metodo_pago,
+            monto=float(d.monto_reembolsado),
+            total=float(d.total_devuelto),
+        )
+        for d in devoluciones
+    ]
+
+
 def _compras(db: Session, caja: CierreCajaModel) -> list[MovimientoCajaResponse]:
     """Facturas de compra del turno (solo las que quedaron en esta caja; no hay turnos viejos que reconstruir)."""
     facturas = db.execute(select(FacturaCompraModel).where(FacturaCompraModel.caja_id == caja.id)).scalars().all()
@@ -128,5 +146,5 @@ def _compras(db: Session, caja: CierreCajaModel) -> list[MovimientoCajaResponse]
 def movimientos_de_turno(db: Session, caja: CierreCajaModel) -> list[MovimientoCajaResponse]:
     """Ventas (lo cobrado), abonos y gastos del turno, del mas reciente al mas antiguo."""
     hasta = caja.fecha_cierre or datetime.now(UTC).replace(tzinfo=None)
-    todos = [*_ventas(db, caja, hasta), *_abonos(db, caja, hasta), *_gastos(db, caja, hasta), *_compras(db, caja)]
+    todos = [*_ventas(db, caja, hasta), *_abonos(db, caja, hasta), *_gastos(db, caja, hasta), *_compras(db, caja), *_devoluciones(db, caja)]
     return sorted(todos, key=lambda m: m.fecha, reverse=True)
