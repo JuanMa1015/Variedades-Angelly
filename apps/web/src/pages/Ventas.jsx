@@ -29,9 +29,11 @@ import {
   emptyTicket,
   extractProductos,
   groupCartItems,
+  calcularDescuentoManual,
   looksLikeBarcode,
   loyaltyRedemption,
   resolvePayment,
+  validarDescuento,
   validateSale,
 } from './Ventas/posHelpers';
 import { formatMoney } from '../utils/format';
@@ -64,6 +66,8 @@ const Ventas = () => {
   const [submittingVenta, setSubmittingVenta] = useState(false);
   const enviandoRef = useRef(false); // un segundo clic o F9 antes de que se pinte el bloqueo no envia otro cobro
   const [ventaCompletada, setVentaCompletada] = useState(null);
+  // Usuario y clave del administrador que autoriza un descuento grande: solo en pantalla, nunca se guardan.
+  const [autorizacion, setAutorizacion] = useState({ usuario: '', password: '' });
   const [historialAbierto, setHistorialAbierto] = useState(false);
 
   const [newClient, setNewClient] = useState({ nombre: '', telefono: '' });
@@ -109,17 +113,18 @@ const Ventas = () => {
     () => clientesFidelizacion.find((cliente) => String(cliente.id) === String(ticket.clienteFidelizacionId)),
     [clientesFidelizacion, ticket.clienteFidelizacionId],
   );
+  const descuentoManual = useMemo(() => calcularDescuentoManual(subtotalEstimado, ticket.descuento), [subtotalEstimado, ticket.descuento]);
   const redencion = useMemo(
     () => loyaltyRedemption({
       cliente: clienteFidelizacion,
       config: fidelizacionConfig,
-      subtotal: subtotalEstimado,
+      subtotal: subtotalEstimado - descuentoManual,
       usar: ticket.usarPuntos,
     }),
-    [clienteFidelizacion, fidelizacionConfig, subtotalEstimado, ticket.usarPuntos],
+    [clienteFidelizacion, fidelizacionConfig, subtotalEstimado, descuentoManual, ticket.usarPuntos],
   );
-  // Lo que realmente se cobra: el subtotal menos el descuento por puntos.
-  const totalEstimado = subtotalEstimado - redencion.descuento;
+  // Lo que realmente se cobra: el subtotal menos el descuento manual y el de puntos.
+  const totalEstimado = subtotalEstimado - descuentoManual - redencion.descuento;
 
   const cambioContado = useMemo(() => {
     if (ticket.metodoPago !== 'efectivo') return 0;
@@ -257,7 +262,13 @@ const Ventas = () => {
     cleanMessages();
 
     const grouped = groupCartItems(ticket.items);
-    const validationError = validateSale({ grouped, productos, ticket, total: totalEstimado });
+    const validationError = validarDescuento({
+      subtotal: subtotalEstimado,
+      descuento: ticket.descuento,
+      limitePct: data.descuentoMaxPct,
+      esVendedor: user?.role === 'vendedor',
+      autorizacion,
+    }) || validateSale({ grouped, productos, ticket, total: totalEstimado });
     if (validationError) {
       setError(validationError);
       return;
@@ -275,6 +286,8 @@ const Ventas = () => {
         ticket,
         puntosCanjeados: redencion.puntos,
         montoRecibido: ticket.esFiado || ticket.metodoPago !== 'efectivo' ? null : pago,
+        descuentoManual,
+        autorizacion,
       });
       // Si la conexion falla, reintentar el mismo ticket reutiliza la clave: el servidor no duplica la venta.
       const ventaCreada = await apiPost('/api/ventas', { ...cuerpo, clave_idempotencia: claveParaCobro(cuerpo) });
@@ -294,6 +307,7 @@ const Ventas = () => {
         items: receiptItems,
         total: totalEstimado,
         descuento: redencion.descuento,
+        descuentoManual,
         puntosCanjeados: redencion.puntos,
         metodoPago: ticket.metodoPago,
         pago,
@@ -305,6 +319,7 @@ const Ventas = () => {
         timestamp: new Date().toLocaleString('es-CO'),
       });
       setTicket(emptyTicket());
+      setAutorizacion({ usuario: '', password: '' });
 
       // La venta ya quedo registrada: si la recarga falla no debe presentarse como
       // un error de venta (el cajero la repetiria y se duplicaria el cobro).
@@ -519,6 +534,14 @@ const Ventas = () => {
               usarPuntos={ticket.usarPuntos}
               onSetUsarPuntos={(usarPuntos) => patchTicket({ usarPuntos })}
               puntosEstimados={puntosEstimados}
+              descuento={ticket.descuento}
+              onSetDescuento={(descuento) => patchTicket({ descuento })}
+              descuentoMonto={descuentoManual}
+              subtotal={subtotalEstimado}
+              limiteDescuentoPct={data.descuentoMaxPct}
+              esVendedor={user?.role === 'vendedor'}
+              autorizacion={autorizacion}
+              onSetAutorizacion={setAutorizacion}
               heldTickets={heldTickets.tickets}
               onHold={handleHold}
               onClear={handleClear}

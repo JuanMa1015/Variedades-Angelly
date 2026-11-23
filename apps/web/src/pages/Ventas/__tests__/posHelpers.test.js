@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildSalePayload as armarPayload,
+  calcularDescuentoManual,
+  descuentoRequiereAdmin,
+  validarDescuento,
   buildSalePayload,
   emptyTicket,
   extractProductos,
@@ -126,5 +130,55 @@ describe('suggestedPayments', () => {
     expect(suggestedPayments(12300)).toEqual([15000, 20000, 50000]);
     expect(suggestedPayments(4000)).toEqual([5000, 10000, 20000]);
     expect(suggestedPayments(100000)).toEqual([]);
+  });
+});
+
+
+describe('descuento manual', () => {
+  const pct = (valor, motivo = 'Cliente frecuente') => ({ tipo: 'porcentaje', valor, motivo });
+  const pesos = (valor, motivo = 'Cliente frecuente') => ({ tipo: 'monto', valor, motivo });
+
+  it('calcula los pesos en porcentaje o en monto y sin descuento da cero', () => {
+    expect(calcularDescuentoManual(10000, pct(5))).toBe(500);
+    expect(calcularDescuentoManual(10000, pct(2.5))).toBe(250);
+    expect(calcularDescuentoManual(10000, pesos(700))).toBe(700);
+    expect(calcularDescuentoManual(10000, null)).toBe(0);
+    expect(calcularDescuentoManual(10000, pct(0))).toBe(0);
+    expect(calcularDescuentoManual(0, pct(5))).toBe(0);
+  });
+
+  it('pasado el limite del vendedor pide a un administrador', () => {
+    expect(descuentoRequiereAdmin(10000, 500, 5)).toBe(false); // justo el 5 %
+    expect(descuentoRequiereAdmin(10000, 501, 5)).toBe(true);
+    expect(descuentoRequiereAdmin(10000, 1500, 20)).toBe(false);
+  });
+
+  it('valida motivo, tope y autorizacion', () => {
+    const base = { subtotal: 10000, limitePct: 5, esVendedor: true, autorizacion: { usuario: '', password: '' } };
+
+    expect(validarDescuento({ ...base, descuento: null })).toBeNull();
+    expect(validarDescuento({ ...base, descuento: pct(0) })).toBeNull(); // sin valor es como no tener descuento
+    expect(validarDescuento({ ...base, descuento: pct(3, '') })).toBe('Escribe el motivo del descuento');
+    expect(validarDescuento({ ...base, descuento: pct(100) })).toBe('El descuento debe ser menor que el total de la venta');
+    expect(validarDescuento({ ...base, descuento: pct(3) })).toBeNull();
+    expect(validarDescuento({ ...base, descuento: pct(10) })).toMatch(/más de 5 % necesita usuario y clave de un administrador/);
+    expect(validarDescuento({ ...base, descuento: pct(10), autorizacion: { usuario: 'angelly_admin', password: 'x' } })).toBeNull();
+    expect(validarDescuento({ ...base, esVendedor: false, descuento: pct(10) })).toBeNull(); // un admin se autoriza solo
+  });
+
+  it('el pedido lleva el descuento y la autorizacion solo si hace falta', () => {
+    const grouped = new Map([[1, 2]]);
+    const ticket = { ...emptyTicket(), descuento: { tipo: 'porcentaje', valor: 10, motivo: ' Cliente frecuente ' } };
+
+    const con = armarPayload({ grouped, ticket, descuentoManual: 1000, autorizacion: { usuario: ' angelly_admin ', password: 'secreta' } });
+    const sin = armarPayload({ grouped, ticket, descuentoManual: 1000, autorizacion: { usuario: '', password: '' } });
+    const ninguno = armarPayload({ grouped, ticket: emptyTicket(), descuentoManual: 0 });
+
+    expect(con.descuento_manual).toEqual({ tipo: 'porcentaje', valor: 10, motivo: 'Cliente frecuente' });
+    expect(con.autorizador_usuario).toBe('angelly_admin');
+    expect(con.autorizador_password).toBe('secreta');
+    expect(sin.descuento_manual).toBeDefined();
+    expect(sin).not.toHaveProperty('autorizador_usuario');
+    expect(ninguno).not.toHaveProperty('descuento_manual');
   });
 });

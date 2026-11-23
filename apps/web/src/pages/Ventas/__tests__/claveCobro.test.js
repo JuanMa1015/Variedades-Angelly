@@ -27,4 +27,15 @@ describe('claveParaCobro', () => {
 
     expect(claveParaCobro(cobro)).not.toBe(clave);
   });
+
+  it('la clave del administrador que autoriza un descuento nunca queda guardada en el navegador', () => {
+    const cobro = { items: [{ producto_id: 7, cantidad: 1 }], descuento_manual: { tipo: 'monto', valor: 500, motivo: 'x' } };
+    const conClave = { ...cobro, autorizador_usuario: 'angelly_admin', autorizador_password: 'secreta-123' };
+
+    const clave = claveParaCobro(conClave);
+
+    expect(window.localStorage.getItem('angelly.pos.cobro.v1')).not.toContain('secreta-123');
+    expect(window.localStorage.getItem('angelly.pos.cobro.v1')).not.toContain('angelly_admin');
+    expect(claveParaCobro(cobro)).toBe(clave); // con o sin la clave es el mismo cobro
+  });
 });

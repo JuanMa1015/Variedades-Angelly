@@ -19,6 +19,7 @@ export const receiptFromVenta = (venta) => {
     pago,
     cambio: esFiado ? 0 : Math.max(0, pago - total),
     descuento: Number(venta.descuento_puntos || 0),
+    descuentoManual: Number(venta.descuento_manual || 0),
     puntosCanjeados: Number(venta.puntos_canjeados || 0),
     esFiado,
     abono,
@@ -28,5 +29,38 @@ export const receiptFromVenta = (venta) => {
   };
 };
 
-// Una venta de cartera se gestiona desde el modulo de cartera, no desde el punto de venta.
-export const sePuedeAnular = (venta) => !venta.anulada && !venta.cliente_id;
+const redondear = (valor) => Math.round(valor * 100) / 100;
+
+// Productos de la venta con lo que todavia se puede devolver (las lineas repetidas de un producto se suman).
+export const productosPorDevolver = (venta) => {
+  const porProducto = new Map();
+  (venta.detalles ?? []).forEach((detalle) => {
+    const restante = Number(detalle.cantidad || 0) - Number(detalle.cantidad_devuelta || 0);
+    const actual = porProducto.get(detalle.producto_id) ?? { producto_id: detalle.producto_id, nombre: detalle.nombre_producto, precio: Number(detalle.precio_unitario || 0), restante: 0 };
+    actual.restante += restante;
+    porProducto.set(detalle.producto_id, actual);
+  });
+  return [...porProducto.values()].filter((producto) => producto.restante > 0);
+};
+
+export const unidadesPorDevolver = (venta) => productosPorDevolver(venta).reduce((acc, producto) => acc + producto.restante, 0);
+
+// Una venta de cartera se gestiona desde el modulo de cartera; una anulada ya no tiene nada que devolver.
+export const sePuedeDevolver = (venta) => !venta.anulada && !venta.cliente_id && unidadesPorDevolver(venta) > 0;
+
+// Cuanto se devolveria: el precio de cada producto con los descuentos de la venta repartidos (igual que el servidor).
+export const valorDeDevolucion = (venta, cantidades) => {
+  const detalles = venta.detalles ?? [];
+  const sumaLineas = detalles.reduce((acc, detalle) => acc + Number(detalle.subtotal || 0), 0);
+  const factor = sumaLineas > 0 ? Math.min(1, Number(venta.total || 0) / sumaLineas) : 1;
+  const productos = productosPorDevolver(venta);
+  const seleccion = productos.filter((producto) => (cantidades[producto.producto_id] ?? 0) > 0);
+  if (seleccion.length === 0) return 0;
+  const todo = productos.every((producto) => (cantidades[producto.producto_id] ?? 0) >= producto.restante);
+  // Al devolver todo lo que queda, se devuelve exactamente lo que falta de la venta (sin centavos de redondeo).
+  if (todo) return redondear(Number(venta.total || 0) - Number(venta.total_devuelto || 0));
+  return redondear(seleccion.reduce((acc, producto) => acc + (cantidades[producto.producto_id] * producto.precio * factor), 0));
+};
+
+// Anular o corregir una venta con devoluciones descuadraria la caja: se bloquea.
+export const sePuedeAnular = (venta) => !venta.anulada && !venta.cliente_id && !(Number(venta.total_devuelto) > 0);

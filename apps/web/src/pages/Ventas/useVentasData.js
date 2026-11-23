@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiGet } from '../../api/httpClient';
-import { CATALOGO_ENDPOINT, extractProductos, mergeProductos } from './posHelpers';
+import { CATALOGO_ENDPOINT, LIMITE_DESCUENTO_POR_DEFECTO, extractProductos, mergeProductos } from './posHelpers';
 
 const fetchJson = async ({ endpoint, signal, errorMessage }) => {
   try {
@@ -20,19 +20,21 @@ export const useVentasData = (token) => {
   const [fidelizacionConfig, setFidelizacionConfig] = useState({ pesos_por_punto: 1000, valor_punto: 20, umbral_bono: 100 });
   const [cajaAbierta, setCajaAbierta] = useState(null);
   const [catalogoTotal, setCatalogoTotal] = useState(null);
+  const [descuentoMaxPct, setDescuentoMaxPct] = useState(LIMITE_DESCUENTO_POR_DEFECTO);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   const reload = useCallback(async (signal) => {
     if (!token) return;
 
-    const [productosPayload, tiendaPayload, fidelizacionPayload, configPayload, cajaPayload] = await Promise.all([
+    const [productosPayload, tiendaPayload, fidelizacionPayload, configPayload, cajaPayload, ventasConfig] = await Promise.all([
       fetchJson({ endpoint: `${CATALOGO_ENDPOINT}&limit=200`, signal, errorMessage: 'No fue posible cargar productos' }),
       fetchJson({ endpoint: '/api/clientes/tienda-fiado', signal, errorMessage: 'No fue posible cargar clientes de fiado tienda' }),
       // Extras: si fallan, la venta sigue funcionando.
       fetchJson({ endpoint: '/api/fidelizacion/clientes', signal, errorMessage: '' }).catch(() => []),
       fetchJson({ endpoint: '/api/fidelizacion/config', signal, errorMessage: '' }).catch(() => null),
       fetchJson({ endpoint: '/api/caja/estado', signal, errorMessage: '' }).catch(() => null),
+      fetchJson({ endpoint: '/api/ventas/config', signal, errorMessage: '' }).catch(() => null),
     ]);
 
     if (signal?.aborted) return;
@@ -43,6 +45,8 @@ export const useVentasData = (token) => {
     setClientesFidelizacion(asList(fidelizacionPayload));
     if (configPayload?.pesos_por_punto > 0) setFidelizacionConfig(configPayload);
     setCajaAbierta(typeof cajaPayload?.abierta === 'boolean' ? cajaPayload.abierta : null);
+    const limite = Number(ventasConfig?.descuento_max_sin_autorizacion_pct);
+    if (Number.isFinite(limite)) setDescuentoMaxPct(limite);
   }, [token]);
 
   useEffect(() => {
@@ -82,6 +86,7 @@ export const useVentasData = (token) => {
     fidelizacionConfig,
     cajaAbierta,
     catalogoTotal,
+    descuentoMaxPct,
     loading,
     error,
     setError,

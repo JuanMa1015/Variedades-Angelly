@@ -25,7 +25,9 @@ const nuevaClave = () => {
 };
 
 export const claveParaCobro = (payload) => {
-  const firma = JSON.stringify(payload);
+  // La clave del administrador que autoriza un descuento no se guarda en el navegador.
+  const { autorizador_usuario: _usuario, autorizador_password: _clave, ...sinAutorizacion } = payload;
+  const firma = JSON.stringify(sinAutorizacion);
   const guardada = leer();
   if (guardada?.firma === firma && guardada?.clave) return guardada.clave;
   const clave = nuevaClave();

@@ -24,7 +24,34 @@ export const emptyTicket = () => ({
   montoPago: '0',
   abonoInicialFiado: '0',
   metodoPago: 'efectivo',
+  descuento: null, // descuento manual: { tipo: 'porcentaje' | 'monto', valor, motivo }
 });
+
+export const LIMITE_DESCUENTO_POR_DEFECTO = 5;
+
+// Pesos de descuento manual sobre el subtotal (igual que el servidor: a centavos).
+export const calcularDescuentoManual = (subtotal, descuento) => {
+  const valor = Number(descuento?.valor);
+  if (!descuento || !(valor > 0) || !(subtotal > 0)) return 0;
+  return descuento.tipo === 'porcentaje' ? Math.round(subtotal * valor) / 100 : Math.round(valor * 100) / 100;
+};
+
+// Un descuento que pasa del limite del vendedor necesita la clave de un administrador.
+export const descuentoRequiereAdmin = (subtotal, monto, limitePct) => (
+  subtotal > 0 && monto > 0 && (monto / subtotal) * 100 > Number(limitePct) + 1e-9
+);
+
+export const validarDescuento = ({ subtotal, descuento, limitePct, esVendedor, autorizacion }) => {
+  if (!descuento) return null;
+  const monto = calcularDescuentoManual(subtotal, descuento);
+  if (!(monto > 0)) return null;
+  if (String(descuento.motivo ?? '').trim().length < 3) return 'Escribe el motivo del descuento';
+  if (monto >= subtotal) return 'El descuento debe ser menor que el total de la venta';
+  if (esVendedor && descuentoRequiereAdmin(subtotal, monto, limitePct) && !(autorizacion?.usuario?.trim() && autorizacion?.password)) {
+    return `Un descuento de más de ${limitePct} % necesita usuario y clave de un administrador`;
+  }
+  return null;
+};
 
 // Agrupa lineas repetidas del carrito y descarta las invalidas.
 export const groupCartItems = (items) => {
@@ -87,7 +114,7 @@ export const loyaltyRedemption = ({ cliente, config, subtotal, usar }) => {
   return { maxPuntos, puntos, descuento: puntos * valor };
 };
 
-export const buildSalePayload = ({ grouped, ticket, puntosCanjeados = 0, montoRecibido = null }) => {
+export const buildSalePayload = ({ grouped, ticket, puntosCanjeados = 0, montoRecibido = null, descuentoManual = 0, autorizacion = null }) => {
   const payload = {
     items: Array.from(grouped.entries()).map(([producto_id, cantidad]) => ({ producto_id, cantidad })),
     es_fiado: ticket.esFiado,
@@ -96,6 +123,13 @@ export const buildSalePayload = ({ grouped, ticket, puntosCanjeados = 0, montoRe
   };
   if (ticket.clienteFidelizacionId) payload.cliente_fidelizacion_id = Number(ticket.clienteFidelizacionId);
   if (puntosCanjeados > 0) payload.puntos_a_canjear = puntosCanjeados;
+  if (descuentoManual > 0 && ticket.descuento) {
+    payload.descuento_manual = { tipo: ticket.descuento.tipo, valor: Number(ticket.descuento.valor), motivo: String(ticket.descuento.motivo).trim() };
+    if (autorizacion?.usuario?.trim() && autorizacion?.password) {
+      payload.autorizador_usuario = autorizacion.usuario.trim();
+      payload.autorizador_password = autorizacion.password;
+    }
+  }
   if (montoRecibido != null && !ticket.esFiado) payload.monto_recibido = montoRecibido;
   if (ticket.esFiado) {
     payload.fiado_origen = 'tienda';

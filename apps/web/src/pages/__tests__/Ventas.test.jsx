@@ -208,6 +208,7 @@ describe('Ventas page', () => {
         es_fiado: false,
         metodo_pago: 'efectivo',
         monto_recibido: 10000,
+        clave_idempotencia: expect.any(String),
       });
     });
 
@@ -246,6 +247,7 @@ describe('Ventas page', () => {
         fiado_origen: 'tienda',
         cliente_tienda_id: 10,
         abono_inicial: 0,
+        clave_idempotencia: expect.any(String),
       });
     });
 
