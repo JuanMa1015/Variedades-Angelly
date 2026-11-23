@@ -32,7 +32,7 @@ const PanelHeader = ({ cart, onHold, onClear }) => {
           disabled={empty}
           className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          <Pause className="h-3.5 w-3.5" /> En espera <Kbd>F4</Kbd>
+          <Pause className="h-3.5 w-3.5" /> Poner en espera <Kbd>F4</Kbd>
         </button>
         <button
           type="button"
@@ -145,7 +145,7 @@ const CartPanel = (props) => {
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm" aria-label="Ticket de venta">
       <PanelHeader cart={cart} onHold={onHold} onClear={onClear} />
-      <HeldTicketsBar tickets={heldTickets} onResume={onResumeTicket} onDiscard={onDiscardTicket} />
+      <HeldTicketsBar tickets={heldTickets} onResume={onResumeTicket} onDiscard={onDiscardTicket} formatMoney={formatMoney} />
 
       <div className="min-h-[4.5rem] flex-[1_1_8rem] overflow-y-auto">
         <CartLines

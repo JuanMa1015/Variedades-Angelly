@@ -5,6 +5,9 @@ export const fetchVentasRecientes = ({ limit = 30, signal } = {}) => (
   apiGet(`/api/ventas/paginadas?page=1&limit=${limit}`, { signal }).then((payload) => payload?.data ?? [])
 );
 
+// Una venta con sus productos, el cobro y quien la hizo.
+export const fetchVenta = (ventaId, { signal } = {}) => apiGet(`/api/ventas/${ventaId}`, { signal });
+
 // Anular no borra la venta: queda marcada con motivo y quien la autorizo.
 export const anularVenta = (ventaId, { motivo, autorizadorUsuario, autorizadorPassword }) => (
   apiPost(`/api/ventas/${ventaId}/anular`, {

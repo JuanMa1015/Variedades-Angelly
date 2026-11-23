@@ -195,7 +195,7 @@ describe('CartPanel', () => {
     const onClear = vi.fn();
     render(<CartPanel {...baseProps} onHold={onHold} onClear={onClear} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /En espera/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Poner en espera/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Vaciar ticket' }));
 
     expect(onHold).toHaveBeenCalled();
@@ -204,7 +204,7 @@ describe('CartPanel', () => {
 });
 
 describe('HeldTicketsBar', () => {
-  const tickets = [{ id: 'a', numero: 3, items: [{ cantidad: 2 }, { cantidad: 1 }] }];
+  const tickets = [{ id: 'a', numero: 3, total: 9200, items: [{ cantidad: 2 }, { cantidad: 1 }] }];
 
   it('no se muestra sin tickets', () => {
     const { container } = render(<HeldTicketsBar tickets={[]} onResume={vi.fn()} onDiscard={vi.fn()} />);
@@ -214,9 +214,11 @@ describe('HeldTicketsBar', () => {
   it('recupera y descarta', () => {
     const onResume = vi.fn();
     const onDiscard = vi.fn();
-    render(<HeldTicketsBar tickets={tickets} onResume={onResume} onDiscard={onDiscard} />);
+    render(<HeldTicketsBar tickets={tickets} onResume={onResume} onDiscard={onDiscard} formatMoney={(valor) => `$${valor}`} />);
 
-    expect(screen.getByText('Ticket 3 · 3 uds')).toBeInTheDocument();
+    expect(screen.getByText('Ticket 3')).toBeInTheDocument();
+    expect(screen.getByText('3 productos · $9200')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Recuperar ticket 3' })).toHaveTextContent('Abrir');
     fireEvent.click(screen.getByRole('button', { name: 'Recuperar ticket 3' }));
     fireEvent.click(screen.getByRole('button', { name: 'Descartar ticket 3' }));
 

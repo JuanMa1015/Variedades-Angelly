@@ -116,6 +116,14 @@ const ProductSelectionView = ({
     [cart],
   );
 
+  // Al elegir un producto desde una busqueda, la busqueda se borra y el cursor vuelve a la barra: listo para el siguiente.
+  const handleAdd = (productoId, productoConocido) => {
+    onAddItem(productoId, productoConocido);
+    if (!isSearching) return;
+    onSearchChange('');
+    searchInputRef?.current?.focus();
+  };
+
   const handleSubmit = async (value) => {
     const added = await onScanCode?.(value);
     if (added) onSearchChange('');
@@ -132,7 +140,7 @@ const ProductSelectionView = ({
         </p>
       </div>
 
-      {!isSearching && <QuickPickRow productos={quickPickProductos} onAdd={onAddItem} formatMoney={formatMoney} />}
+      {!isSearching && <QuickPickRow productos={quickPickProductos} onAdd={handleAdd} formatMoney={formatMoney} />}
       {!isSearching && categories.length > 0 && (
         <CategoryChips categories={['Todas', ...categories]} active={activeCategory} onChange={setActiveCategory} />
       )}
@@ -164,7 +172,7 @@ const ProductSelectionView = ({
                 <ProductCard
                   producto={producto}
                   qtyInCart={cartMap.get(Number(producto.id)) || 0}
-                  onAdd={onAddItem}
+                  onAdd={handleAdd}
                   formatMoney={formatMoney}
                   isFavorite={favorites.has(Number(producto.id))}
                   onToggleFavorite={onToggleFavorite}

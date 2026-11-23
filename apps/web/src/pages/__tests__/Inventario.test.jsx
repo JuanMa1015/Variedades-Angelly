@@ -168,16 +168,36 @@ describe('Inventario', () => {
     });
   });
 
-  it('oculta el boton de desactivar para el vendedor (el backend lo prohibe)', async () => {
+  it('el vendedor ve «Eliminar» (no «Desactivar») y pide confirmación antes de eliminar', async () => {
     useAuthMock.mockReturnValue({ token: 'test-token', user: { username: 'vendedor1', role: 'vendedor' } });
-
     const Inventario = (await import('../Inventario')).default;
     render(<Inventario />);
+    await waitFor(() => { aparece('Arroz Diana'); });
 
-    await waitFor(() => {
-      aparece('Arroz Diana');
-    });
     expect(screen.queryAllByTitle('Desactivar producto')).toHaveLength(0);
+    const eliminar = screen.getAllByTitle('Eliminar producto');
+    fireEvent.click(eliminar[0]);
+
+    expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Eliminar producto',
+      confirmLabel: 'Eliminar',
+      message: expect.stringContaining('Las ventas que ya se hicieron se conservan'),
+    }));
+    await waitFor(() => expect(apiDeleteMock).toHaveBeenCalledWith(`/api/productos/${mockProductos[0].id}`));
+    expect(await screen.findByText(/Producto "Arroz Diana" eliminado/)).toBeInTheDocument();
+  });
+
+  it('si el vendedor no confirma no se elimina nada', async () => {
+    useAuthMock.mockReturnValue({ token: 'test-token', user: { username: 'vendedor1', role: 'vendedor' } });
+    confirmMock.mockResolvedValueOnce(false);
+    const Inventario = (await import('../Inventario')).default;
+    render(<Inventario />);
+    await waitFor(() => { aparece('Arroz Diana'); });
+
+    fireEvent.click(screen.getAllByTitle('Eliminar producto')[0]);
+
+    await waitFor(() => expect(confirmMock).toHaveBeenCalled());
+    expect(apiDeleteMock).not.toHaveBeenCalled();
   });
 
   it('muestra skeletons mientras carga', async () => {

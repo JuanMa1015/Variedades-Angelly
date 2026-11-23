@@ -10,7 +10,7 @@ import ProductosLista from './ProductosLista';
 // La comparten el inventario de la tienda y los productos de cartera; sin `proveedores` se ocultan los proveedores.
 // `inventario` viene de useInventario y `acciones` de useAccionesProducto.
 const GestionProductos = ({
-  inventario, acciones, confirm, catalogo = 'tienda', proveedores, canDeactivate, titulo, placeholder, vacio, tituloCrear, onRecargar,
+  inventario, acciones, confirm, catalogo = 'tienda', proveedores, canDeactivate, puedeEliminar = canDeactivate, etiquetaEliminar = 'Desactivar', titulo, placeholder, vacio, tituloCrear, onRecargar,
 }) => {
   const { filtros, setFiltro, setPagina, texto, setTexto, lista, loading } = inventario;
   const hayFiltro = Boolean(texto || filtros.estado !== 'todos' || filtros.soloInactivos || filtros.proveedorId);
@@ -34,6 +34,8 @@ const GestionProductos = ({
           loading={loading}
           vacio={hayFiltro ? 'No se encontraron productos con ese criterio' : vacio}
           canDeactivate={canDeactivate}
+          puedeEliminar={puedeEliminar}
+          etiquetaEliminar={etiquetaEliminar}
           conProveedor={Boolean(proveedores)}
           onEditar={acciones.abrirEditar}
           onHistorial={acciones.abrirHistorial}
