@@ -419,12 +419,22 @@ describe('POS: flujo completo', () => {
     expect(await screen.findByRole('button', { name: 'Agregar Arroz Diana' })).toBeInTheDocument();
   });
 
+  it('el POS tampoco abre la caja sin declarar el efectivo inicial', async () => {
+    await renderPos({ cajaAbierta: false });
+
+    expect(await screen.findByRole('button', { name: 'Abrir caja y vender' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir caja y vender' }));
+
+    expect(abrirCajaMock).not.toHaveBeenCalled();
+  });
+
   it('si la recarga falla tras abrir la caja no lo presenta como error de apertura', async () => {
     abrirCajaMock.mockResolvedValue({ id: 1 });
     await renderPos({ cajaAbierta: false });
     await screen.findByText(/La caja está cerrada/);
 
     apiGetMock.mockRejectedValue(new Error('Sin red'));
+    fireEvent.click(screen.getByLabelText(/Empiezo sin efectivo en el cajón/));
     fireEvent.click(screen.getByRole('button', { name: 'Abrir caja y vender' }));
 
     expect(await screen.findByText(/La caja se abrió, pero no se pudo actualizar/)).toBeInTheDocument();

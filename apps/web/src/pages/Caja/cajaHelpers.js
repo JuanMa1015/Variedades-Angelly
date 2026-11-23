@@ -3,6 +3,10 @@ import { escapeHtml } from '../Ventas/receiptHtml';
 
 const CERO = 0.01;
 
+// Abrir la caja exige declarar el efectivo del cajon: un monto, o marcar que se empieza sin efectivo.
+// Dejar el campo vacio NO cuenta: asi un descuido no deja el cajon en $0 ni inventa un descuadre al cerrar.
+export const montoInicialListo = (monto, sinEfectivo) => Number(monto) > 0 || Boolean(sinEfectivo);
+
 export const estaCuadrada = (descuadre) => !Number.isFinite(Number(descuadre)) || Math.abs(Number(descuadre)) < CERO;
 
 // Mensaje al cerrar: aqui el cajero conoce por primera vez cuanto esperaba el sistema.
