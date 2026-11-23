@@ -161,9 +161,14 @@ class VentaModel(Base):
     """Representacion persistente de una venta."""
 
     __tablename__ = "ventas"
+    # Un mismo cobro repetido (reintento tras perder la conexion) no crea otra venta: la clave es unica por quien vende.
+    __table_args__ = (Index("ux_ventas_clave_idempotencia", "creado_por", "clave_idempotencia", unique=True),)
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     creado_por: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    clave_idempotencia: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Huella del contenido de la venta: la misma clave con otro contenido es un error, no un reintento.
+    huella_idempotencia: Mapped[str | None] = mapped_column(String(64), nullable=True)
     cliente_id: Mapped[int | None] = mapped_column(ForeignKey("clientes.id"), nullable=True)
     cliente_tienda_id: Mapped[int | None] = mapped_column(
         ForeignKey("clientes_fiado_tienda.id"),

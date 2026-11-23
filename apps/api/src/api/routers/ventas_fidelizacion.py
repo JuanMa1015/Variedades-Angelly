@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import datetime
 from typing import Annotated
 
@@ -60,6 +62,8 @@ class VentaCreateRequest(BaseModel):
     metodo_pago: MetodoPago | None = None
     monto_recibido: Annotated[float | None, Field(ge=0)] = None
     puntos_a_canjear: Annotated[int, Field(ge=0)] = 0
+    # Clave del cobro (la genera el navegador): si el servidor ya registro esa venta, devuelve la misma en vez de otra.
+    clave_idempotencia: Annotated[str | None, Field(min_length=8, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")] = None
 
 
 class VentaUpdateRequest(BaseModel):
@@ -102,6 +106,28 @@ def _aplicar_canje(db: Session, payload: VentaCreateRequest, total: float, usuar
     return descuento
 
 
+def _huella(payload: VentaCreateRequest) -> str:
+    """Resumen del contenido de la venta (sin la clave): la misma clave con otro contenido no es un reintento."""
+    contenido = payload.model_dump(exclude={"clave_idempotencia"}, mode="json")
+    contenido["items"] = sorted(contenido["items"], key=lambda item: (item["producto_id"], item["cantidad"]))
+    return hashlib.sha256(json.dumps(contenido, sort_keys=True).encode("utf-8")).hexdigest()
+
+
+def _venta_de_la_clave(db: Session, usuario: str, clave: str) -> VentaModel | None:
+    return db.execute(
+        select(VentaModel).where(VentaModel.creado_por == usuario, VentaModel.clave_idempotencia == clave),
+    ).scalar_one_or_none()
+
+
+def _repetir_cobro(venta: VentaModel, huella: str, db: Session, response: Response) -> VentaResponse:
+    """El cobro ya estaba registrado: se devuelve esa misma venta (200) en lugar de crear otra."""
+    if venta.huella_idempotencia and venta.huella_idempotencia != huella:
+        raise HTTPException(status_code=409, detail="Esa clave de cobro ya se uso para una venta distinta")
+    response.status_code = 200
+    response.headers["Idempotent-Replay"] = "true"
+    return _build_venta_responses([venta], db)[0]
+
+
 def _respuesta_venta(
     venta: VentaModel,
     detalles: list[VentaDetalleResponse],
@@ -142,6 +168,7 @@ def _respuesta_venta(
 @router.post("/api/ventas", response_model=VentaResponse, status_code=201)
 def create_venta(
     payload: VentaCreateRequest,
+    response: Response,
     db: Session = Depends(get_db),
     current_user: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
 ) -> VentaResponse:
@@ -171,8 +198,15 @@ def create_venta(
         hay_cobro=(not payload.es_fiado) or abono_inicial > 0,
     )
 
+    clave = payload.clave_idempotencia
+    huella = _huella(payload) if clave else None
+
     try:
         with db.begin():
+            if clave:
+                previa = _venta_de_la_clave(db, current_user.username, clave)
+                if previa is not None:
+                    return _repetir_cobro(previa, huella, db, response)
             exigir_caja_abierta(db)
             if payload.es_fiado and fiado_origen == FIADO_ORIGEN_CARTERA:
                 if current_user.role not in {"admin", "superadmin"}:
@@ -310,6 +344,8 @@ def create_venta(
 
             venta = VentaModel(
                 creado_por=current_user.username,
+                clave_idempotencia=clave,
+                huella_idempotencia=huella,
                 cliente_id=cliente.id if cliente is not None else None,
                 cliente_tienda_id=cliente_tienda.id if cliente_tienda is not None else None,
                 tipo_fiado=fiado_origen,
@@ -362,6 +398,11 @@ def create_venta(
 
     except IntegrityError as exc:
         db.rollback()
+        if clave:
+            # Dos envios del mismo cobro a la vez: el segundo choca con la clave unica y recibe la venta del primero.
+            ganadora = _venta_de_la_clave(db, current_user.username, clave)
+            if ganadora is not None:
+                return _repetir_cobro(ganadora, huella, db, response)
         raise HTTPException(
             status_code=409,
             detail="No fue posible registrar la venta por conflicto de datos",

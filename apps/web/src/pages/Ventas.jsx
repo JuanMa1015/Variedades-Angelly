@@ -20,6 +20,7 @@ import { useVentasData } from './Ventas/useVentasData';
 import { useHeldTickets } from './Ventas/useHeldTickets';
 import { useProductosFaltantes } from './Ventas/useProductosFaltantes';
 import { useStoredState } from './Ventas/useStoredState';
+import { claveParaCobro, olvidarClaveCobro } from './Ventas/claveCobro';
 import { usePosPreferences } from './Ventas/usePosPreferences';
 import { useVentasShortcuts } from './Ventas/useVentasShortcuts';
 import {
@@ -61,6 +62,7 @@ const Ventas = () => {
   const [productSearch, setProductSearch] = useState('');
   const [success, setSuccess] = useState('');
   const [submittingVenta, setSubmittingVenta] = useState(false);
+  const enviandoRef = useRef(false); // un segundo clic o F9 antes de que se pinte el bloqueo no envia otro cobro
   const [ventaCompletada, setVentaCompletada] = useState(null);
   const [historialAbierto, setHistorialAbierto] = useState(false);
 
@@ -264,14 +266,19 @@ const Ventas = () => {
     const pago = resolvePayment({ metodoPago: ticket.metodoPago, montoPago: ticket.montoPago, total: totalEstimado });
     const abono = Number(ticket.abonoInicialFiado || 0);
 
+    if (enviandoRef.current) return;
+    enviandoRef.current = true;
     try {
       setSubmittingVenta(true);
-      const ventaCreada = await apiPost('/api/ventas', buildSalePayload({
+      const cuerpo = buildSalePayload({
         grouped,
         ticket,
         puntosCanjeados: redencion.puntos,
         montoRecibido: ticket.esFiado || ticket.metodoPago !== 'efectivo' ? null : pago,
-      }));
+      });
+      // Si la conexion falla, reintentar el mismo ticket reutiliza la clave: el servidor no duplica la venta.
+      const ventaCreada = await apiPost('/api/ventas', { ...cuerpo, clave_idempotencia: claveParaCobro(cuerpo) });
+      olvidarClaveCobro();
 
       const selectedCliente = ticket.esFiado
         ? clientesTienda.find((cliente) => String(cliente.id) === String(ticket.clienteTiendaId))
@@ -309,6 +316,7 @@ const Ventas = () => {
       // Otra pestaña pudo cerrar la caja: se vuelve a consultar para mostrar la apertura.
       if (err.status === 409 && /caja/i.test(err.message || '')) data.reload().catch(() => {});
     } finally {
+      enviandoRef.current = false;
       setSubmittingVenta(false);
     }
   };

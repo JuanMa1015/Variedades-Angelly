@@ -87,6 +87,7 @@ describe('POS: flujo completo', () => {
       es_fiado: false,
       metodo_pago: 'efectivo',
       monto_recibido: 3500,
+      clave_idempotencia: expect.stringMatching(/^[A-Za-z0-9_-]{8,64}$/),
     }));
     expect(await screen.findByText('Venta completada')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Nueva venta/ }));
@@ -357,6 +358,49 @@ describe('POS: flujo completo', () => {
 
     expect(await screen.findByText(/"Aceite Girasol" solo tiene 3 en stock/)).toBeInTheDocument();
     expect(within(ticket()).getByLabelText('Cantidad: 3')).toBeInTheDocument();
+  });
+
+  it('si el cobro falla por la conexión, reintentar el mismo ticket reutiliza la clave y no duplica la venta', async () => {
+    await renderPos();
+    agregar('Arroz Diana');
+    apiPostMock.mockRejectedValueOnce(new Error('Failed to fetch')).mockResolvedValueOnce({ puntos_otorgados: 0 });
+
+    fireEvent.click(within(ticket()).getByRole('button', { name: /^Cobrar/ }));
+    expect(await screen.findByText('Failed to fetch')).toBeInTheDocument();
+    fireEvent.click(within(ticket()).getByRole('button', { name: /^Cobrar/ }));
+    expect(await screen.findByText('Venta completada', {}, { timeout: 4000 })).toBeInTheDocument();
+
+    const [primera, segunda] = apiPostMock.mock.calls.filter(([endpoint]) => endpoint === '/api/ventas').map(([, cuerpo]) => cuerpo);
+    expect(segunda.clave_idempotencia).toBe(primera.clave_idempotencia);
+  });
+
+  it('si el ticket cambia entre intentos, el cobro usa una clave nueva', async () => {
+    await renderPos();
+    agregar('Arroz Diana');
+    apiPostMock.mockRejectedValueOnce(new Error('Failed to fetch')).mockResolvedValueOnce({ puntos_otorgados: 0 });
+
+    fireEvent.click(within(ticket()).getByRole('button', { name: /^Cobrar/ }));
+    await screen.findByText('Failed to fetch');
+    agregar('Aceite Girasol');
+    fireEvent.click(within(ticket()).getByRole('button', { name: /^Cobrar/ }));
+    await screen.findByText('Venta completada', {}, { timeout: 4000 });
+
+    const [primera, segunda] = apiPostMock.mock.calls.filter(([endpoint]) => endpoint === '/api/ventas').map(([, cuerpo]) => cuerpo);
+    expect(segunda.clave_idempotencia).not.toBe(primera.clave_idempotencia);
+  });
+
+  it('una venta nueva después de una cobrada no hereda la clave anterior', async () => {
+    await renderPos();
+    agregar('Arroz Diana');
+    fireEvent.click(within(ticket()).getByRole('button', { name: /^Cobrar/ }));
+    await screen.findByText('Venta completada');
+    fireEvent.click(screen.getByRole('button', { name: /Nueva venta/ }));
+    agregar('Arroz Diana');
+    fireEvent.click(within(ticket()).getByRole('button', { name: /^Cobrar/ }));
+    await waitFor(() => expect(apiPostMock.mock.calls.filter(([endpoint]) => endpoint === '/api/ventas')).toHaveLength(2));
+
+    const [primera, segunda] = apiPostMock.mock.calls.map(([, cuerpo]) => cuerpo);
+    expect(segunda.clave_idempotencia).not.toBe(primera.clave_idempotencia);
   });
 
   it('vaciar el ticket pide confirmacion', async () => {
