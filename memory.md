@@ -936,6 +936,13 @@ apps\api\.venv\Scripts\python.exe -m alembic -c apps\api\alembic.ini upgrade hea
 - **Agregar producto** en el celular: costo/venta y stock inicial/mínimo van de a dos columnas; nombre, código, proveedor e imagen a todo el ancho (`Campo completo`).
 - Pendiente: revisar el resto de cuadros con formularios largos para usar `PIE_FIJO`, y que el aviso de cookies (fijo abajo) no tape el botón de guardar hasta aceptarlo.
 
+## 42. App instalable en el celular (PWA)
+
+- `public/manifest.webmanifest` (nombre «Variedades Angelly», corto «Angelly», `display: standalone`, `start_url: /`, colores `#fdf1f1`), íconos en `public/icons/` (192, 512, **maskable** 512 y `apple-touch-icon` 180; generados con la marca «VA» del favicon) y metadatos en `index.html` (manifest, apple-touch-icon, `mobile-web-app-capable`, `apple-mobile-web-app-capable`, título).
+- `public/sw.js`: service worker **mínimo que no guarda nada en caché** (solo hace instalable la app); así cada visita trae la última versión de Vercel y nunca queda una pantalla vieja tras desplegar. Se registra solo en producción (`utils/serviceWorker.js`, llamado desde `main.jsx`); si el navegador no lo soporta o falla, la app sigue igual. `vercel.json` sirve el manifiesto como `application/manifest+json` y `sw.js` con `Cache-Control: no-cache`; las rutas siguen cayendo en `index.html`.
+- Cómo instalar: **Android/Chrome** ⋮ → «Instalar aplicación» (o «Agregar a la pantalla de inicio»); **iPhone/Safari** Compartir → «Agregar a pantalla de inicio». Abre a pantalla completa, sin barra del navegador.
+- Verificado: manifiesto, íconos y enlaces (pruebas + navegador). **No verificado**: el registro del service worker (el navegador del panel no lo admite); confirmar en el teléfono tras desplegar. Sin modo sin conexión a propósito (se puede sumar después, con cuidado de las versiones).
+
 ## 43. Cartera: idempotencia de cobros y detalle del cliente en el celular
 
 - **Idempotencia en cartera** (misma idea que la venta del POS, sección 39): `POST /api/cartera/ventas` (`ventas.clave_idempotencia`, índice único por quien registra) y los abonos (`POST /api/cartera/clientes/{id}/abonos` y `POST /api/cartera/abonos`; `abonos_cartera.clave_idempotencia`, índice único por clave; migración `r5a6b7c8d9e0`). Con la misma clave y el mismo contenido → **200** con el mismo registro y `Idempotent-Replay: true` (la deuda y el stock se mueven una sola vez); otro contenido → **409**; dos envíos simultáneos → el segundo choca con el índice y recibe el del primero; un cobro que falló no gasta la clave. La huella la calcula `services/idempotencia.huella_de` (también la usa ya la venta del POS) e ignora clave y credenciales.
