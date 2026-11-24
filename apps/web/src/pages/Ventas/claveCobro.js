@@ -19,9 +19,18 @@ const escribir = (valor) => {
   }
 };
 
+let contador = 0;
+
+// Clave unica del cobro. randomUUID solo existe en paginas seguras (https); si falta se usan bytes aleatorios del
+// navegador (getRandomValues) y, como ultimo recurso, la hora mas un contador (nunca Math.random).
 const nuevaClave = () => {
-  const base = globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`;
-  return base.replace(/[^A-Za-z0-9_-]/g, '');
+  const cripto = globalThis.crypto;
+  if (cripto?.randomUUID) return cripto.randomUUID().replace(/[^A-Za-z0-9_-]/g, '');
+  if (cripto?.getRandomValues) {
+    return Array.from(cripto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, '0')).join('');
+  }
+  contador += 1;
+  return `${Date.now().toString(36)}-${contador.toString(36)}-cobro`;
 };
 
 export const claveParaCobro = (payload) => {
