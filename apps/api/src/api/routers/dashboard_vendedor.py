@@ -112,9 +112,9 @@ def _ventas_desde(db: Session, inicio: datetime) -> VentasPeriodo:
     """Ventas de la tienda (no las del modulo de cartera) vigentes desde ``inicio``."""
     total, cantidad, credito = db.execute(
         select(
-            func.coalesce(func.sum(VentaModel.total), 0.0),
+            func.coalesce(func.sum(VentaModel.total - VentaModel.total_devuelto), 0.0),  # ventas netas: sin lo devuelto
             func.count(VentaModel.id),
-            func.coalesce(func.sum(case((VentaModel.es_fiado.is_(True), VentaModel.total), else_=0.0)), 0.0),
+            func.coalesce(func.sum(case((VentaModel.es_fiado.is_(True), VentaModel.total - VentaModel.total_devuelto), else_=0.0)), 0.0),
         ).where(
             VentaModel.fecha >= inicio,
             VentaModel.anulada.is_(False),
@@ -170,13 +170,19 @@ def _caja_actual(db: Session) -> CajaActual:
     )
 
 
+# Lo vendido de cada producto sin lo que el cliente devolvio.
+_UNIDADES_NETAS = DetalleVentaModel.cantidad - DetalleVentaModel.cantidad_devuelta
+_VALOR_NETO = DetalleVentaModel.subtotal * (DetalleVentaModel.cantidad - DetalleVentaModel.cantidad_devuelta) / DetalleVentaModel.cantidad
+
+
 def _mas_vendidos(db: Session, inicio: datetime) -> list[ProductoVendido]:
     filas = db.execute(
-        select(DetalleVentaModel.nombre_producto, func.sum(DetalleVentaModel.cantidad), func.sum(DetalleVentaModel.subtotal))
+        select(DetalleVentaModel.nombre_producto, func.sum(_UNIDADES_NETAS), func.sum(_VALOR_NETO))
         .join(VentaModel, VentaModel.id == DetalleVentaModel.venta_id)
         .where(VentaModel.fecha >= inicio, VentaModel.anulada.is_(False), VentaModel.fuera_de_caja.is_(False))
         .group_by(DetalleVentaModel.producto_id, DetalleVentaModel.nombre_producto)
-        .order_by(func.sum(DetalleVentaModel.cantidad).desc(), func.sum(DetalleVentaModel.subtotal).desc(), DetalleVentaModel.nombre_producto.asc())
+        .having(func.sum(_UNIDADES_NETAS) > 0)
+        .order_by(func.sum(_UNIDADES_NETAS).desc(), func.sum(_VALOR_NETO).desc(), DetalleVentaModel.nombre_producto.asc())
         .limit(CUANTOS),
     ).all()
     return [ProductoVendido(nombre=f[0], unidades=int(f[1] or 0), total=round(float(f[2] or 0), 2)) for f in filas]

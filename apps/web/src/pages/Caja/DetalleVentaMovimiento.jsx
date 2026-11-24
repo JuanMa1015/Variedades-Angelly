@@ -4,7 +4,7 @@ import { fetchVenta } from '../../api/ventasApi';
 import PaymentBadge from '../../components/PaymentBadge';
 import Skeleton from '../../components/Skeleton';
 import { CONTACTO, SITE } from '../../config/site';
-import { formatMoney } from '../../utils/format';
+import { formatDateTime, formatMoney } from '../../utils/format';
 import { printHtml } from '../Ventas/printReceipt';
 import { buildReceiptHtml } from '../Ventas/receiptHtml';
 import { receiptFromVenta } from '../Ventas/historyHelpers';
@@ -30,7 +30,10 @@ const Productos = ({ detalles }) => (
       {detalles.map((detalle) => (
         <tr key={`${detalle.producto_id}-${detalle.nombre_producto}`} className="border-t border-gray-200">
           <td className="py-1.5 pr-3 text-gray-800">{detalle.nombre_producto}</td>
-          <td className="px-3 py-1.5 text-right tabular-nums">{detalle.cantidad}</td>
+          <td className="px-3 py-1.5 text-right tabular-nums">
+            {detalle.cantidad}
+            {detalle.cantidad_devuelta > 0 && <span className="block text-[11px] font-semibold text-amber-700">{detalle.cantidad_devuelta} devuelto{detalle.cantidad_devuelta === 1 ? '' : 's'}</span>}
+          </td>
           <td className="px-3 py-1.5 text-right tabular-nums">{formatMoney(detalle.precio_unitario)}</td>
           <td className="py-1.5 pl-3 text-right font-semibold tabular-nums">{formatMoney(detalle.subtotal)}</td>
         </tr>
@@ -79,6 +82,20 @@ const DetalleVentaMovimiento = ({ ventaId }) => {
     <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-3">
       <Productos detalles={venta.detalles ?? []} />
       <Resumen venta={venta} />
+      {(venta.devoluciones ?? []).length > 0 && (
+        <div className="space-y-1.5 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
+          <p className="font-semibold uppercase tracking-wide">Devoluciones</p>
+          {venta.devoluciones.map((devolucion) => (
+            <p key={devolucion.id}>
+              {formatDateTime(devolucion.fecha)} · {devolucion.lineas.map((linea) => `${linea.cantidad}× ${linea.nombre_producto}`).join(', ')} ·{' '}
+              <strong>{formatMoney(devolucion.total_devuelto)}</strong>
+              {devolucion.monto_reembolsado > 0 && ` (${formatMoney(devolucion.monto_reembolsado)} en dinero${devolucion.metodo_pago ? `, ${devolucion.metodo_pago}` : ''})`}
+              {devolucion.deuda_reducida > 0 && ` (${formatMoney(devolucion.deuda_reducida)} menos de deuda)`}
+              {' '}· «{devolucion.motivo}» · lo hizo {devolucion.registrado_por}, autorizó {devolucion.autorizado_por}
+            </p>
+          ))}
+        </div>
+      )}
       {venta.anulada && (
         <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
           Venta anulada. Motivo: {venta.motivo_anulacion} · Anuló {venta.anulada_por}, autorizó {venta.autorizada_por}
