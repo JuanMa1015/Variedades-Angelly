@@ -9,6 +9,7 @@ const apiMocks = vi.hoisted(() => ({
   fetchCajaEstado: vi.fn(),
   fetchCajaHistorial: vi.fn(),
   fetchCajaMovimientos: vi.fn(),
+  fetchCajaResumen: vi.fn(),
   updateCaja: vi.fn(),
 }));
 const useAuthMock = vi.hoisted(() => vi.fn());
@@ -48,6 +49,11 @@ const cajaCerrada = (extra = {}) => ({
   ...extra,
 });
 
+const RESUMEN = {
+  ventas: 12, vendido: 250000, ventas_a_credito: 40000, ventas_anuladas: 1, descuentos: 5500, devoluciones: 2, devuelto_en_dinero: 8000,
+  abonos: 3, abonos_total: 30000, gastos: 2, gastos_total: 70000, compras: 1, compras_total: 120000,
+};
+
 const renderCaja = () => render(<MemoryRouter><Caja /></MemoryRouter>);
 
 describe('Caja', () => {
@@ -56,6 +62,7 @@ describe('Caja', () => {
     useAuthMock.mockReturnValue({ token: 't', user: { username: 'vendedor1', role: 'vendedor' } });
     apiMocks.fetchCajaHistorial.mockResolvedValue([]);
     apiMocks.fetchCajaMovimientos.mockResolvedValue([]);
+    apiMocks.fetchCajaResumen.mockResolvedValue(RESUMEN);
   });
 
   it('cierre ciego: sin saldo esperado el cajero solo ve la instruccion de contar', async () => {
@@ -187,8 +194,56 @@ describe('Caja', () => {
     expect(screen.getByText('Nota: Falto un vuelto')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Imprimir cierre/ }));
 
-    expect(printMock).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(printMock).toHaveBeenCalledTimes(1));
     expect(printMock.mock.calls[0][0]).toContain('CIERRE DE CAJA #2');
+    expect(printMock.mock.calls[0][0]).toContain('Resumen del turno');
+    expect(printMock.mock.calls[0][0]).toContain('12 ventas por');
+    expect(apiMocks.fetchCajaResumen).toHaveBeenCalledWith(2);
+  });
+
+  it('si no se puede traer el resumen, el cierre se imprime igual sin esas cifras', async () => {
+    apiMocks.fetchCajaEstado.mockResolvedValue({ abierta: false, caja_actual: null, ultimo_cierre: cajaCerrada() });
+    apiMocks.fetchCajaResumen.mockRejectedValue(new Error('sin red'));
+    renderCaja();
+
+    fireEvent.click(await screen.findByRole('button', { name: /Imprimir cierre/ }));
+
+    await waitFor(() => expect(printMock).toHaveBeenCalledTimes(1));
+    expect(printMock.mock.calls[0][0]).not.toContain('Resumen del turno');
+  });
+
+  it('con la caja abierta muestra el resumen del turno en palabras', async () => {
+    apiMocks.fetchCajaEstado.mockResolvedValue({ abierta: true, caja_actual: cajaAbierta(null), ultimo_cierre: null });
+    renderCaja();
+
+    const resumen = within(await screen.findByLabelText('Resumen del turno'));
+    expect(resumen.getByText(/12 ventas por/)).toBeInTheDocument();
+    expect(resumen.getByText(/A crédito \(fiado\)/)).toBeInTheDocument();
+    expect(resumen.getByText('1 venta anulada')).toBeInTheDocument();
+    expect(resumen.getByText(/2 devoluciones: .*8\.000 devueltos en dinero/)).toBeInTheDocument();
+    expect(resumen.getByText(/3 abonos de clientes/)).toBeInTheDocument();
+    expect(resumen.getByText(/1 factura de compra/)).toBeInTheDocument();
+    expect(apiMocks.fetchCajaResumen).toHaveBeenCalledWith(1, expect.anything());
+  });
+
+  it('el contador de billetes y monedas llena el efectivo contado y se manda al cerrar', async () => {
+    apiMocks.fetchCajaEstado.mockResolvedValue({ abierta: true, caja_actual: cajaAbierta(null), ultimo_cierre: null });
+    apiMocks.cerrarCaja.mockResolvedValue(cajaCerrada({ monto_cierre: 66500, descuadre: 0 }));
+    renderCaja();
+
+    fireEvent.click(await screen.findByRole('button', { name: /Contar por billetes y monedas/ }));
+    fireEvent.change(screen.getByLabelText(/Cantidad de \$ 50\.000/), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText(/Cantidad de \$ 10\.000/), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText(/Cantidad de \$ 5\.000/), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText(/Cantidad de \$ 1\.000/), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText(/Cantidad de \$ 500/), { target: { value: '1' } });
+
+    expect(screen.getByLabelText('Efectivo contado en el cajón')).toHaveValue('66.500');
+    expect(screen.getByLabelText('Contador de billetes y monedas')).toHaveTextContent('66.500');
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar caja' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirmar' }));
+
+    await waitFor(() => expect(apiMocks.cerrarCaja).toHaveBeenCalledWith({ monto_cierre: 66500, observaciones: '' }));
   });
 
   it('el historial muestra una fila por turno y su detalle se abre al tocarla', async () => {

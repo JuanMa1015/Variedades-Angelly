@@ -24,10 +24,10 @@ def exigir_cliente_activo(cliente: ClienteModel | ClienteFiadoTiendaModel) -> No
         raise HTTPException(status_code=400, detail=f"El cliente '{cliente.nombre}' esta desactivado")
 
 
-def exigir_credito_disponible(cliente: ClienteModel, nueva_deuda: float) -> None:
+def exigir_credito_disponible(cliente: ClienteModel | ClienteFiadoTiendaModel, nueva_deuda: float) -> None:
     """Rechaza fiados que dejarian la deuda del cliente por encima de su cupo.
 
-    Un cupo en 0 significa "sin cupo definido": ninguna pantalla lo fija, asi que no bloquea la venta.
+    Un cupo en 0 significa "sin cupo definido" (sin limite): no bloquea la venta.
     """
     if float(cliente.limite_credito) <= 0:
         return

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from src.api.services.auditoria import registrar_auditoria
 from src.api.services.caja_calculos import calcular_metricas, efectivo_esperado
-from src.api.services.caja_movimientos import movimientos_de_turno
+from src.api.services.caja_movimientos import movimientos_de_turno, resumen_de_turno
 from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.schemas.caja import (
     ActualizarCajaRequest,
@@ -21,6 +21,7 @@ from src.api.schemas.caja import (
     CierreCajaRequest,
     CierreCajaResponse,
     MovimientoCajaResponse,
+    ResumenTurnoResponse,
 )
 from src.infrastructure.database.connection import get_db
 from src.infrastructure.database.models import (
@@ -239,6 +240,19 @@ def caja_movimientos(
     if caja is None:
         raise HTTPException(status_code=404, detail="Registro de caja no encontrado")
     return movimientos_de_turno(db, caja)
+
+
+@router.get("/api/caja/{caja_id}/resumen", response_model=ResumenTurnoResponse)
+def caja_resumen(
+    caja_id: int,
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
+) -> ResumenTurnoResponse:
+    """Cifras del turno: cuantas ventas, cuanto se descontó, devolvió, abonó, gastó y compró."""
+    caja = db.get(CierreCajaModel, caja_id)
+    if caja is None:
+        raise HTTPException(status_code=404, detail="Registro de caja no encontrado")
+    return resumen_de_turno(db, caja)
 
 
 @router.patch("/api/caja/{caja_id}", response_model=CierreCajaResponse)

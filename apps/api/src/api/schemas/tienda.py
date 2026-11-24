@@ -39,6 +39,7 @@ class ClienteTiendaListaItem(BaseModel):
     nombre: str
     telefono_whatsapp: str | None = None
     deuda_total: float = 0.0
+    limite_credito: float = 0.0
     dias_deuda: int | None = None
     estado_deuda: EstadoDeudaTienda = "sin_deuda"
     tiene_ventas: bool = False

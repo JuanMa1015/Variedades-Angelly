@@ -139,6 +139,7 @@ def lista_clientes_tienda(
                 nombre=c.nombre,
                 telefono_whatsapp=c.telefono_whatsapp,
                 deuda_total=float(c.deuda_total or 0),
+                limite_credito=float(c.limite_credito or 0),
                 dias_deuda=d,
                 estado_deuda=e,
                 tiene_ventas=c.id in con_ventas,

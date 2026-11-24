@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Lock } from 'lucide-react';
+import { Calculator, Lock } from 'lucide-react';
 import { cerrarCaja } from '../../api/cajaApi';
 import { formatMoney } from '../../utils/format';
 import MoneyInput from '../Ventas/MoneyInput';
-import { describirCierre, etiquetaDescuadre } from './cajaHelpers';
+import { DENOMINACIONES, describirCierre, etiquetaDescuadre, totalPorDenominaciones } from './cajaHelpers';
 
 const TONOS = {
   ok: 'border-green-200 bg-green-50 text-green-800',
@@ -24,7 +24,35 @@ const Comparacion = ({ contado, esperado }) => {
   );
 };
 
+// Cuenta el cajon por billetes y monedas: el total llena el efectivo contado.
+const ContadorBilletes = ({ conteo, onChange }) => (
+  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3" aria-label="Contador de billetes y monedas">
+    <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
+      {DENOMINACIONES.map((valor) => (
+        <label key={valor} className="flex items-center justify-between gap-2 text-sm text-gray-700">
+          <span className="tabular-nums">{formatMoney(valor)}</span>
+          <input
+            type="number"
+            min="0"
+            inputMode="numeric"
+            value={conteo[valor] ?? ''}
+            onChange={(event) => onChange(valor, event.target.value)}
+            aria-label={`Cantidad de ${formatMoney(valor)}`}
+            className="h-8 w-16 rounded-md border border-gray-300 px-2 text-right text-sm tabular-nums focus:border-rosewood focus:outline-none"
+          />
+        </label>
+      ))}
+    </div>
+    <p className="mt-2 flex justify-between border-t border-gray-200 pt-2 text-sm font-semibold text-gray-800">
+      <span>Total contado</span>
+      <span className="tabular-nums">{formatMoney(totalPorDenominaciones(conteo))}</span>
+    </p>
+  </div>
+);
+
 const CerrarCajaForm = ({ saldoEsperado, confirmar, onClosed, onError }) => {
+  const [contando, setContando] = useState(false);
+  const [conteo, setConteo] = useState({});
   const [contado, setContado] = useState(0);
   const [escrito, setEscrito] = useState(false);
   const [nota, setNota] = useState('');
@@ -50,6 +78,8 @@ const CerrarCajaForm = ({ saldoEsperado, confirmar, onClosed, onError }) => {
       const cierre = await cerrarCaja({ monto_cierre: contado, observaciones: nota.trim() });
       setContado(0);
       setEscrito(false);
+      setConteo({});
+      setContando(false);
       setNota('');
       await onClosed(describirCierre(cierre));
     } catch (err) {
@@ -79,6 +109,25 @@ const CerrarCajaForm = ({ saldoEsperado, confirmar, onClosed, onError }) => {
           placeholder="Monto final en caja"
           large
         />
+        <button
+          type="button"
+          onClick={() => setContando((actual) => !actual)}
+          aria-expanded={contando}
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-rosewood hover:underline"
+        >
+          <Calculator className="h-3.5 w-3.5" aria-hidden="true" /> {contando ? 'Ocultar el contador' : 'Contar por billetes y monedas'}
+        </button>
+        {contando && (
+          <ContadorBilletes
+            conteo={conteo}
+            onChange={(valor, cantidad) => {
+              const siguiente = { ...conteo, [valor]: cantidad };
+              setConteo(siguiente);
+              setContado(totalPorDenominaciones(siguiente));
+              setEscrito(true);
+            }}
+          />
+        )}
         {escrito && saldoEsperado != null && <Comparacion contado={contado} esperado={saldoEsperado} />}
         <textarea
           value={nota}

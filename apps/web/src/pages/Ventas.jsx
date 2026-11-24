@@ -268,7 +268,13 @@ const Ventas = () => {
       limitePct: data.descuentoMaxPct,
       esVendedor: user?.role === 'vendedor',
       autorizacion,
-    }) || validateSale({ grouped, productos, ticket, total: totalEstimado });
+    }) || validateSale({
+      grouped,
+      productos,
+      ticket,
+      total: totalEstimado,
+      clienteTienda: clientesTienda.find((cliente) => String(cliente.id) === String(ticket.clienteTiendaId)) ?? null,
+    });
     if (validationError) {
       setError(validationError);
       return;

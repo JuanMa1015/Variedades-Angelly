@@ -109,6 +109,7 @@ class CarteraVentaCreateRequest(BaseModel):
     metodo_pago: MetodoPago | None = None
     fecha_venta: datetime | None = None
     referencia: Annotated[str | None, Field(max_length=255)] = None
+    clave_idempotencia: Annotated[str | None, Field(min_length=8, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")] = None
 
 
 class VentaDetalleResponse(BaseModel):
@@ -207,6 +208,7 @@ class AbonoCarteraCreateRequest(BaseModel):
     metodo_pago: MetodoPago = "efectivo"
     fecha: datetime | None = None
     referencia: Annotated[str | None, Field(max_length=255)] = None
+    clave_idempotencia: Annotated[str | None, Field(min_length=8, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")] = None
 
 
 class AbonoCarteraCreateAdminRequest(BaseModel):
@@ -217,6 +219,7 @@ class AbonoCarteraCreateAdminRequest(BaseModel):
     metodo_pago: MetodoPago = "efectivo"
     fecha: datetime | None = None
     referencia: Annotated[str | None, Field(max_length=255)] = None
+    clave_idempotencia: Annotated[str | None, Field(min_length=8, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")] = None
 
 
 class AbonoCarteraUpdateRequest(BaseModel):

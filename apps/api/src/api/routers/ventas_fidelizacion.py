@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 import os
 from datetime import datetime
 from typing import Annotated, Literal
@@ -26,6 +24,7 @@ from src.api.schemas.cartera import (
 from src.api.limiter import limiter, login_rate_limit
 from src.api.services.anulacion import anular_venta, quien_autoriza
 from src.api.services.auditoria import registrar_auditoria
+from src.api.services.idempotencia import huella_de
 from src.api.services.fidelizacion import acumular_puntos, canjear_puntos, revertir_puntos_de_venta
 from src.api.services.stock import mover_stock
 from src.api.services.deuda import SIN_DEUDA, deuda_pendiente_tienda, mover_deuda_tienda
@@ -165,10 +164,8 @@ def _aplicar_descuento_manual(
 
 
 def _huella(payload: VentaCreateRequest) -> str:
-    """Resumen del contenido de la venta (sin la clave): la misma clave con otro contenido no es un reintento."""
-    contenido = payload.model_dump(exclude={"clave_idempotencia", "autorizador_usuario", "autorizador_password"}, mode="json")
-    contenido["items"] = sorted(contenido["items"], key=lambda item: (item["producto_id"], item["cantidad"]))
-    return hashlib.sha256(json.dumps(contenido, sort_keys=True).encode("utf-8")).hexdigest()
+    """Resumen del contenido de la venta (sin la clave ni credenciales): la misma clave con otro contenido no es un reintento."""
+    return huella_de(payload)
 
 
 def _venta_de_la_clave(db: Session, usuario: str, clave: str) -> VentaModel | None:
@@ -409,7 +406,9 @@ def create_venta(
                             detail="Debes seleccionar un cliente de tienda",
                         )
 
-                    cliente_tienda.deuda_total = float(cliente_tienda.deuda_total + (total - abono_inicial))
+                    nueva_deuda = float(cliente_tienda.deuda_total + (total - abono_inicial))
+                    exigir_credito_disponible(cliente_tienda, nueva_deuda)
+                    cliente_tienda.deuda_total = nueva_deuda
                     # Saldo de ESTA venta (no la deuda total del cliente): permite revertirla y calcular caja.
                     saldo_pendiente = float(total - abono_inicial)
 

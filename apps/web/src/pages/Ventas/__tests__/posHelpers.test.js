@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildSalePayload as armarPayload,
+  cupoDisponible,
   calcularDescuentoManual,
   descuentoRequiereAdmin,
   validarDescuento,
@@ -180,5 +181,31 @@ describe('descuento manual', () => {
     expect(sin.descuento_manual).toBeDefined();
     expect(sin).not.toHaveProperty('autorizador_usuario');
     expect(ninguno).not.toHaveProperty('descuento_manual');
+  });
+});
+
+
+describe('cupo de credito de un cliente de tienda', () => {
+  const marta = { nombre: 'Marta', deuda_total: 30000, limite_credito: 50000 };
+
+  it('sin cupo (0) no hay limite', () => {
+    expect(cupoDisponible({ deuda_total: 99999, limite_credito: 0 }, 1000000)).toEqual({ tieneCupo: false, supera: false, disponible: null, limite: 0 });
+    expect(cupoDisponible(null, 5000).tieneCupo).toBe(false);
+  });
+
+  it('calcula lo disponible y si lo que se fia lo pasa', () => {
+    expect(cupoDisponible(marta, 20000)).toMatchObject({ tieneCupo: true, supera: false, disponible: 20000, limite: 50000 });
+    expect(cupoDisponible(marta, 20001).supera).toBe(true);
+    expect(cupoDisponible({ ...marta, deuda_total: 70000 }, 1).disponible).toBe(0);
+  });
+
+  it('la venta a fiado que pasa el cupo se rechaza antes de enviarla y el abono inicial cuenta', () => {
+    const ticket = { esFiado: true, clienteTiendaId: '3', abonoInicialFiado: '0' };
+    const grouped = new Map([[1, 1]]);
+    const productos = [{ id: 1, nombre: 'Arroz', stock_actual: 5 }];
+
+    expect(validateSale({ grouped, productos, ticket, total: 25000, clienteTienda: marta })).toMatch(/supera el cupo de Marta: tiene 20000 disponibles/);
+    expect(validateSale({ grouped, productos, ticket: { ...ticket, abonoInicialFiado: '6000' }, total: 25000, clienteTienda: marta })).toBeNull();
+    expect(validateSale({ grouped, productos, ticket, total: 25000, clienteTienda: { ...marta, limite_credito: 0 } })).toBeNull();
   });
 });

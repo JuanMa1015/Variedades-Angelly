@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, Edit, History, Printer, Trash2 } from 'lucid
 import Skeleton from '../../components/Skeleton';
 import { formatDateTime, formatMoney } from '../../utils/format';
 import MovimientosTurno from './MovimientosTurno';
+import ResumenDelTurno from './ResumenDelTurno';
 import { etiquetaDescuadre } from './cajaHelpers';
 
 const TONOS = {
@@ -43,6 +44,7 @@ const DetalleTurno = ({ caja, version, isSuperadmin, onPrint, onEdit, onDelete }
     {caja.observaciones && (
       <p className="rounded-lg bg-white px-3 py-2 text-sm text-gray-700"><strong>Nota:</strong> {caja.observaciones}</p>
     )}
+    <ResumenDelTurno cajaId={caja.id} version={version} />
     <MovimientosTurno cajaId={caja.id} version={version} />
     <div className="flex flex-wrap gap-2">
       {!caja.esta_abierta && (
