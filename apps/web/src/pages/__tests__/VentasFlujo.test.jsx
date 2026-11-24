@@ -518,7 +518,7 @@ describe('POS: flujo completo', () => {
     fireEvent.keyDown(barra, { key: 'Enter' });
 
     await waitFor(() => expect(within(ticket()).getByText('Aceite Girasol')).toBeInTheDocument());
-    expect(barra).toHaveValue('');
+    await waitFor(() => expect(barra).toHaveValue(''));
   });
 
   it('Enter con un codigo de barras lo agrega y Esc limpia la busqueda', async () => {
