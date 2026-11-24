@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -23,6 +23,7 @@ from src.api.schemas.cartera import (
 )
 from src.api.services.anulacion import devolver_stock_de_venta
 from src.api.services.auditoria import registrar_auditoria
+from src.api.services.idempotencia import huella_de
 from src.api.services.stock import mover_stock
 from src.api.services.venta_reglas import (
     exigir_cliente_activo,
@@ -55,18 +56,64 @@ def _fecha_de_venta(valor: datetime | None) -> datetime:
     return fecha
 
 
+def _venta_de_la_clave(db: Session, usuario: str, clave: str) -> VentaModel | None:
+    return db.execute(
+        select(VentaModel).where(VentaModel.creado_por == usuario, VentaModel.clave_idempotencia == clave),
+    ).scalar_one_or_none()
+
+
+def _repetir_venta(db: Session, venta: VentaModel, huella: str | None, response: Response) -> VentaResponse:
+    """El cobro ya estaba registrado: se devuelve esa misma venta (200) en lugar de crear otra."""
+    if venta.huella_idempotencia and venta.huella_idempotencia != huella:
+        raise HTTPException(status_code=409, detail="Esa clave de cobro ya se uso para una venta distinta")
+    detalles = [
+        VentaDetalleResponse(
+            producto_id=d.producto_id, nombre_producto=d.nombre_producto, cantidad=d.cantidad,
+            precio_unitario=d.precio_unitario, subtotal=d.subtotal,
+        )
+        for d in db.execute(select(DetalleVentaModel).where(DetalleVentaModel.venta_id == venta.id).order_by(DetalleVentaModel.id)).scalars()
+    ]
+    cliente = db.get(ClienteModel, venta.cliente_id)
+    response.status_code = 200
+    response.headers["Idempotent-Replay"] = "true"
+    return VentaResponse(
+        venta_id=venta.id,
+        cliente_id=venta.cliente_id,
+        cliente_tienda_id=None,
+        cliente_nombre=cliente.nombre if cliente else None,
+        es_fiado=venta.es_fiado,
+        fiado_origen=venta.tipo_fiado,
+        metodo_pago=venta.metodo_pago,
+        total=venta.total,
+        saldo_pendiente=venta.saldo_pendiente,
+        fecha=venta.fecha,
+        detalles=detalles,
+        resumen_recibo=build_recibo_text(
+            venta_id=venta.id, detalles=detalles, total=venta.total, saldo_pendiente=venta.saldo_pendiente,
+            cliente_nombre=cliente.nombre if cliente else None,
+        ),
+    )
+
+
 @router.post("/api/cartera/ventas", response_model=VentaResponse, status_code=201)
 def create_cartera_venta(
     payload: CarteraVentaCreateRequest,
+    response: Response,
     db: Session = Depends(get_db),
     current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> VentaResponse:
     total = 0.0
     detalle_payload: list[VentaDetalleResponse] = []
     movimientos_stock = []
+    clave = payload.clave_idempotencia
+    huella = huella_de(payload) if clave else None
 
     try:
         with db.begin():
+            if clave:
+                previa = _venta_de_la_clave(db, current_user.username, clave)
+                if previa is not None:
+                    return _repetir_venta(db, previa, huella, response)
             cliente = db.execute(
                 select(ClienteModel)
                 .where(ClienteModel.id == payload.cliente_id)
@@ -135,6 +182,8 @@ def create_cartera_venta(
 
             venta = VentaModel(
                 creado_por=current_user.username,
+                clave_idempotencia=clave,
+                huella_idempotencia=huella,
                 cliente_id=cliente.id,
                 cliente_tienda_id=None,
                 tipo_fiado=FIADO_ORIGEN_CARTERA if deuda_incremento > 0 else None,
@@ -188,6 +237,11 @@ def create_cartera_venta(
 
     except IntegrityError as exc:
         db.rollback()
+        if clave:
+            # Dos envios del mismo cobro a la vez: el segundo recibe la venta del primero.
+            ganadora = _venta_de_la_clave(db, current_user.username, clave)
+            if ganadora is not None:
+                return _repetir_venta(db, ganadora, huella, response)
         raise HTTPException(
             status_code=409,
             detail="No fue posible registrar la venta de cartera por conflicto de datos",

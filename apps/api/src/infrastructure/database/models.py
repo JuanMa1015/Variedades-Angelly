@@ -449,6 +449,7 @@ class AbonoCarteraModel(Base):
     """Abonos aplicados a clientes de cartera para disminuir deuda."""
 
     __tablename__ = "abonos_cartera"
+    __table_args__ = (Index("ux_abonos_cartera_clave_idempotencia", "clave_idempotencia", unique=True),)
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     cliente_id: Mapped[int] = mapped_column(ForeignKey("clientes.id"), nullable=False)
@@ -472,6 +473,9 @@ class AbonoCarteraModel(Base):
     fuera_de_caja: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=expression.false())
     # Venta de la que sale este abono (el abono inicial); permite devolverlo si la venta se anula.
     venta_id: Mapped[int | None] = mapped_column(ForeignKey("ventas.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Un mismo cobro repetido no crea otro abono: la clave la manda el navegador (unica).
+    clave_idempotencia: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    huella_idempotencia: Mapped[str | None] = mapped_column(String(64), nullable=True)
     # Un abono no se borra: se anula con motivo y la deuda del cliente vuelve a subir.
     anulado: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=expression.false())
     anulado_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), nullable=True)

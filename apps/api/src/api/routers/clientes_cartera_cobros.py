@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func, literal, null, or_, select, union
 from sqlalchemy.orm import Session
 
@@ -12,6 +13,7 @@ from src.api.services.antiguedad_deuda import dias_de_deuda_cartera, estado_deud
 from src.api.services.auditoria import registrar_auditoria
 from src.domain.zona_horaria import inicio_del_dia_local
 from src.api.services.deuda import reajustar_deuda_cartera
+from src.api.services.idempotencia import huella_de
 from src.api.dependencies import AuthenticatedUser, require_roles
 from src.api.pagination import search_filter
 from src.infrastructure.database.connection import get_db
@@ -270,70 +272,111 @@ def _fecha_de_abono(valor: datetime | None) -> datetime:
     return fecha
 
 
-def _registrar_abono(db: Session, usuario: str, cliente_id: int, payload) -> AbonoCarteraModel:
-    """Un abono de cartera: baja la deuda, queda fuera de la caja del vendedor y deja rastro en la auditoria."""
-    with db.begin():
-        cliente = db.execute(
-            select(ClienteModel)
-            .where(ClienteModel.id == cliente_id)
-            .with_for_update(),
-        ).scalar_one_or_none()
+def _registrar_abono(db: Session, usuario: str, cliente_id: int, payload) -> tuple[AbonoCarteraModel, bool]:
+    """Un abono de cartera: baja la deuda, queda fuera de la caja del vendedor y deja rastro en la auditoria.
 
-        if cliente is None:
-            raise HTTPException(status_code=404, detail="Cliente no encontrado")
+    Devuelve (abono, repetido). Si la clave de idempotencia ya tenia su abono, se devuelve ese y no se registra otro.
+    """
+    clave = getattr(payload, "clave_idempotencia", None)
+    huella = huella_de(payload, cliente_id=cliente_id) if clave else None
+    try:
+        with db.begin():
+            if clave:
+                previo = _abono_de_la_clave(db, clave)
+                if previo is not None:
+                    return _verificar_repeticion(previo, huella), True
+            cliente = db.execute(
+                select(ClienteModel)
+                .where(ClienteModel.id == cliente_id)
+                .with_for_update(),
+            ).scalar_one_or_none()
 
-        monto = round(float(payload.monto), 2)
-        deuda_antes = float(cliente.deuda_total)
-        if monto > deuda_antes:
-            raise HTTPException(
-                status_code=400,
-                detail="El abono supera la deuda actual del cliente",
+            if cliente is None:
+                raise HTTPException(status_code=404, detail="Cliente no encontrado")
+
+            monto = round(float(payload.monto), 2)
+            deuda_antes = float(cliente.deuda_total)
+            if monto > deuda_antes:
+                raise HTTPException(
+                    status_code=400,
+                    detail="El abono supera la deuda actual del cliente",
+                )
+            fecha = _fecha_de_abono(payload.fecha)
+
+            cliente.deuda_total = round(deuda_antes - monto, 2)
+            abono = AbonoCarteraModel(
+                cliente_id=cliente.id,
+                monto=monto,
+                metodo_pago=payload.metodo_pago,
+                saldo_cliente=cliente.deuda_total,
+                referencia=payload.referencia,
+                fecha=fecha,
+                fuera_de_caja=True,
+                clave_idempotencia=clave,
+                huella_idempotencia=huella,
             )
-        fecha = _fecha_de_abono(payload.fecha)
-
-        cliente.deuda_total = round(deuda_antes - monto, 2)
-        abono = AbonoCarteraModel(
-            cliente_id=cliente.id,
-            monto=monto,
-            metodo_pago=payload.metodo_pago,
-            saldo_cliente=cliente.deuda_total,
-            referencia=payload.referencia,
-            fecha=fecha,
-            fuera_de_caja=True,
-        )
-        db.add(abono)
-        db.flush()
-        registrar_auditoria(
-            db,
-            usuario=usuario,
-            modulo="cartera",
-            entidad="abono",
-            accion="crear",
-            entidad_id=abono.id,
-            detalle=f"{cliente.nombre}: abono {monto} ({payload.metodo_pago or 'sin metodo'}), deuda {deuda_antes} -> {cliente.deuda_total}",
-        )
+            db.add(abono)
+            db.flush()
+            registrar_auditoria(
+                db,
+                usuario=usuario,
+                modulo="cartera",
+                entidad="abono",
+                accion="crear",
+                entidad_id=abono.id,
+                detalle=f"{cliente.nombre}: abono {monto} ({payload.metodo_pago or 'sin metodo'}), deuda {deuda_antes} -> {cliente.deuda_total}",
+            )
+    except IntegrityError:
+        # Dos envios del mismo cobro a la vez: el segundo choca con la clave unica y recibe el abono del primero.
+        db.rollback()
+        if clave:
+            ganador = _abono_de_la_clave(db, clave)
+            if ganador is not None:
+                return _verificar_repeticion(ganador, huella), True
+        raise
 
     db.refresh(abono)
-    return abono
+    return abono, False
+
+
+def _abono_de_la_clave(db: Session, clave: str) -> AbonoCarteraModel | None:
+    return db.execute(select(AbonoCarteraModel).where(AbonoCarteraModel.clave_idempotencia == clave)).scalar_one_or_none()
+
+
+def _verificar_repeticion(previo: AbonoCarteraModel, huella: str | None) -> AbonoCarteraModel:
+    if previo.huella_idempotencia and previo.huella_idempotencia != huella:
+        raise HTTPException(status_code=409, detail="Esa clave de cobro ya se uso para un abono distinto")
+    return previo
+
+
+def _responder_abono(abono: AbonoCarteraModel, repetido: bool, response: Response) -> AbonoCarteraResponse:
+    if repetido:
+        response.status_code = 200
+        response.headers["Idempotent-Replay"] = "true"
+    return to_abono_response(abono)
 
 
 @router.post("/api/cartera/clientes/{cliente_id}/abonos", response_model=AbonoCarteraResponse, status_code=201)
 def create_abono_cartera(
     cliente_id: int,
     payload: AbonoCarteraCreateRequest,
+    response: Response,
     db: Session = Depends(get_db),
     current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> AbonoCarteraResponse:
-    return to_abono_response(_registrar_abono(db, current_user.username, cliente_id, payload))
+    abono, repetido = _registrar_abono(db, current_user.username, cliente_id, payload)
+    return _responder_abono(abono, repetido, response)
 
 
 @router.post("/api/cartera/abonos", response_model=AbonoCarteraResponse, status_code=201)
 def create_abono_cartera_direct(
     payload: AbonoCarteraCreateAdminRequest,
+    response: Response,
     db: Session = Depends(get_db),
     current_user: AuthenticatedUser = Depends(require_roles("admin", "superadmin")),
 ) -> AbonoCarteraResponse:
-    return to_abono_response(_registrar_abono(db, current_user.username, payload.cliente_id, payload))
+    abono, repetido = _registrar_abono(db, current_user.username, payload.cliente_id, payload)
+    return _responder_abono(abono, repetido, response)
 
 
 def _abono_vigente(db: Session, abono_id: int) -> AbonoCarteraModel:
