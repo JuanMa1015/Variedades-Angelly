@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { apiPatch } from '../../api/httpClient';
 import { resolveImageUrl } from '../../api/imagesApi';
 import Modal from '../../components/Modal';
+import { PIE_FIJO } from '../../components/modalClasses';
 import { formatMoney } from '../../utils/format';
 import MoneyInput from '../Ventas/MoneyInput';
 import ImagenCampo from './ImagenCampo';
@@ -120,7 +121,7 @@ const Formulario = ({ producto, proveedores, confirmar, onSaved, onAjustar, onCl
         </div>
       )}
       <ImagenCampo actual={producto.imagen_url} valor={imagen} onChange={setImagen} />
-      <div className="flex gap-2 pt-1">
+      <div className={`flex gap-2 ${PIE_FIJO}`}>
         <button type="button" onClick={onClose} className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancelar</button>
         <button type="submit" disabled={saving} className="flex-1 rounded-lg bg-rosewood px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300">
           {saving ? 'Guardando...' : 'Guardar cambios'}
