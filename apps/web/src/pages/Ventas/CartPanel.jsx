@@ -1,9 +1,12 @@
-import { Gift, Pause, ShoppingCart, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { Gift, Pause, Percent, ShoppingCart, Trash2 } from 'lucide-react';
 import CartLines from './CartLines';
 import ClientCombobox from './ClientCombobox';
 import CreditSection from './CreditSection';
 import HeldTicketsBar from './HeldTicketsBar';
+import MoneyInput from './MoneyInput';
 import PaymentSection from './PaymentSection';
+import { descuentoRequiereAdmin } from './posHelpers';
 
 const Kbd = ({ children, light = false }) => (
   <kbd className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold ${
@@ -82,6 +85,80 @@ const RedeemRow = ({ redencion, valorPunto, usarPuntos, onToggle, formatMoney })
   );
 };
 
+const INPUT_DESCUENTO = 'h-9 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-rosewood focus:outline-none focus:ring-2 focus:ring-rosewood/20';
+
+// Descuento manual sobre el total: en % o en pesos, con motivo. Hasta el limite lo aplica el vendedor; mas, con la clave de un admin.
+const DiscountRow = ({ descuento, monto, subtotal, limitePct, esVendedor, autorizacion, onChange, onAutorizacion, formatMoney }) => {
+  const [abierto, setAbierto] = useState(false);
+  if (!abierto && !descuento) {
+    return (
+      <button type="button" onClick={() => setAbierto(true)} className="flex w-full items-center gap-2 rounded-lg border border-dashed border-gray-300 bg-white px-3 py-1.5 text-sm font-semibold text-gray-600 transition hover:border-rosewood hover:text-rosewood">
+        <Percent className="h-4 w-4" aria-hidden="true" /> Aplicar descuento
+      </button>
+    );
+  }
+  const actual = descuento ?? { tipo: 'porcentaje', valor: 0, motivo: '' };
+  const cambiar = (cambio) => onChange({ ...actual, ...cambio });
+  const requiereAdmin = descuentoRequiereAdmin(subtotal, monto, limitePct);
+  const quitar = () => { onChange(null); onAutorizacion({ usuario: '', password: '' }); setAbierto(false); };
+
+  return (
+    <div className="space-y-2 rounded-lg border border-emerald-200 bg-emerald-50/60 p-2.5" aria-label="Descuento manual">
+      <div className="flex items-center gap-2">
+        <div className="grid grid-cols-2 gap-1 rounded-lg bg-white p-0.5 text-xs font-bold" role="radiogroup" aria-label="Tipo de descuento">
+          {[{ tipo: 'porcentaje', texto: '%' }, { tipo: 'monto', texto: '$' }].map((opcion) => (
+            <button
+              key={opcion.tipo}
+              type="button"
+              role="radio"
+              aria-checked={actual.tipo === opcion.tipo}
+              aria-label={opcion.tipo === 'porcentaje' ? 'Descuento en porcentaje' : 'Descuento en pesos'}
+              onClick={() => cambiar({ tipo: opcion.tipo, valor: 0 })}
+              className={`rounded-md px-3 py-1 transition ${actual.tipo === opcion.tipo ? 'bg-emerald-600 text-white' : 'text-gray-600'}`}
+            >
+              {opcion.texto}
+            </button>
+          ))}
+        </div>
+        <div className="min-w-0 flex-1">
+          {actual.tipo === 'monto' ? (
+            <MoneyInput id="pos-descuento-monto" label="Pesos de descuento" value={actual.valor} onChange={(valor) => cambiar({ valor })} placeholder="Pesos de descuento" />
+          ) : (
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="0.5"
+              inputMode="decimal"
+              value={actual.valor || ''}
+              onChange={(event) => cambiar({ valor: event.target.value === '' ? 0 : Number(event.target.value) })}
+              placeholder="% de descuento"
+              aria-label="Porcentaje de descuento"
+              className={INPUT_DESCUENTO}
+            />
+          )}
+        </div>
+        <button type="button" onClick={quitar} aria-label="Quitar descuento" className="shrink-0 rounded-lg p-1.5 text-gray-400 transition hover:bg-red-50 hover:text-red-600">
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
+      <input className={INPUT_DESCUENTO} value={actual.motivo} onChange={(event) => cambiar({ motivo: event.target.value })} placeholder="Motivo del descuento" aria-label="Motivo del descuento" maxLength={200} />
+      {monto > 0 && (
+        <p className="text-xs font-semibold text-emerald-800">
+          Descuento: <strong>−{formatMoney(monto)}</strong> ({Math.round((monto / subtotal) * 1000) / 10} %)
+          {requiereAdmin && (esVendedor ? ` · pasa del ${limitePct} %: necesita un administrador` : ' · lo autorizas tú')}
+        </p>
+      )}
+      {requiereAdmin && esVendedor && (
+        <div className="grid grid-cols-2 gap-2">
+          <input className={INPUT_DESCUENTO} value={autorizacion.usuario} onChange={(event) => onAutorizacion({ ...autorizacion, usuario: event.target.value })} placeholder="Usuario del administrador" aria-label="Usuario del administrador" autoComplete="off" />
+          <input className={INPUT_DESCUENTO} type="password" value={autorizacion.password} onChange={(event) => onAutorizacion({ ...autorizacion, password: event.target.value })} placeholder="Clave del administrador" aria-label="Clave del administrador" autoComplete="off" />
+        </div>
+      )}
+    </div>
+  );
+};
+
 const LoyaltyRow = ({ clientes, value, onChange, puntosEstimados, onCreate }) => {
   return (
     <div className="flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-2 py-1.5">
@@ -130,6 +207,14 @@ const CartPanel = (props) => {
     puntosEstimados = 0,
     onCreateFidelizacion = () => {},
     redencion = { maxPuntos: 0, puntos: 0, descuento: 0 },
+    descuento = null,
+    onSetDescuento = () => {},
+    descuentoMonto = 0,
+    subtotal = 0,
+    limiteDescuentoPct = 5,
+    esVendedor = true,
+    autorizacion = { usuario: '', password: '' },
+    onSetAutorizacion = () => {},
     valorPunto = 0,
     usarPuntos = false,
     onSetUsarPuntos = () => {},
@@ -169,6 +254,19 @@ const CartPanel = (props) => {
             puntosEstimados={puntosEstimados}
             onCreate={onCreateFidelizacion}
           />
+          {cart.length > 0 && (
+            <DiscountRow
+              descuento={descuento}
+              monto={descuentoMonto}
+              subtotal={subtotal}
+              limitePct={limiteDescuentoPct}
+              esVendedor={esVendedor}
+              autorizacion={autorizacion}
+              onChange={onSetDescuento}
+              onAutorizacion={onSetAutorizacion}
+              formatMoney={formatMoney}
+            />
+          )}
           <RedeemRow
             redencion={redencion}
             valorPunto={valorPunto}
@@ -179,6 +277,12 @@ const CartPanel = (props) => {
         </div>
 
         <div className="shrink-0 space-y-2 border-t border-gray-200 bg-white p-4 pt-3">
+          {descuentoMonto > 0 && (
+            <div className="flex justify-between text-sm font-semibold text-emerald-700">
+              <span>Descuento</span>
+              <span>−{formatMoney(descuentoMonto)}</span>
+            </div>
+          )}
           {redencion.descuento > 0 && (
             <div className="flex justify-between text-sm font-semibold text-violet-700">
               <span>Descuento por {redencion.puntos} puntos</span>

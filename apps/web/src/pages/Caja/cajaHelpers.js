@@ -41,6 +41,7 @@ export const TIPOS_MOVIMIENTO = {
   abono_cartera: { etiqueta: 'Abono cartera', clase: 'bg-sky-50 text-sky-700' },
   gasto: { etiqueta: 'Gasto', clase: 'bg-red-50 text-red-700' },
   compra: { etiqueta: 'Compra', clase: 'bg-orange-50 text-orange-700' },
+  devolucion: { etiqueta: 'Devolución', clase: 'bg-amber-50 text-amber-800' },
 };
 
 const fila = (etiqueta, valor, fuerte = false) => (

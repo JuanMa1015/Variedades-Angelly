@@ -49,9 +49,9 @@ def _redondear(valor: Any) -> float:
 def _ventas(db: Session, fuera_de_caja: bool, inicio: datetime, fin: datetime) -> dict[str, Any]:
     total, cantidad, credito = db.execute(
         select(
-            func.coalesce(func.sum(VentaModel.total), 0.0),
+            func.coalesce(func.sum(VentaModel.total - VentaModel.total_devuelto), 0.0),  # ventas netas: sin lo devuelto
             func.count(VentaModel.id),
-            func.coalesce(func.sum(case((VentaModel.es_fiado.is_(True), VentaModel.total), else_=0.0)), 0.0),
+            func.coalesce(func.sum(case((VentaModel.es_fiado.is_(True), VentaModel.total - VentaModel.total_devuelto), else_=0.0)), 0.0),
         ).where(
             VentaModel.fecha >= inicio,
             VentaModel.fecha < fin,
@@ -94,7 +94,7 @@ def _vendedores(db: Session, inicio: datetime, fin: datetime) -> list[dict[str, 
         select(
             VentaModel.creado_por,
             func.count(VentaModel.id),
-            func.coalesce(func.sum(VentaModel.total), 0.0),
+            func.coalesce(func.sum(VentaModel.total - VentaModel.total_devuelto), 0.0),
         ).where(
             VentaModel.creado_por.is_not(None),
             VentaModel.fecha >= inicio,
@@ -102,7 +102,7 @@ def _vendedores(db: Session, inicio: datetime, fin: datetime) -> list[dict[str, 
             VentaModel.anulada.is_(False),
             VentaModel.fuera_de_caja.is_(False),
         ).group_by(VentaModel.creado_por).order_by(
-            func.sum(VentaModel.total).desc(), func.count(VentaModel.id).desc(), VentaModel.creado_por.asc(),
+            func.sum(VentaModel.total - VentaModel.total_devuelto).desc(), func.count(VentaModel.id).desc(), VentaModel.creado_por.asc(),
         ).limit(LIMITE_RANKING),
     ).all()
     return [{"vendedor": nombre, "ventas": int(ventas or 0), "total_vendido": _redondear(total)} for nombre, ventas, total in filas]
@@ -113,8 +113,10 @@ def _unidades_vendidas(inicio: datetime, fin: datetime, fuera_de_caja: bool):
     return (
         select(
             DetalleVentaModel.producto_id.label("producto_id"),
-            func.sum(DetalleVentaModel.cantidad).label("unidades"),
-            func.sum(DetalleVentaModel.subtotal).label("total"),
+            func.sum(DetalleVentaModel.cantidad - DetalleVentaModel.cantidad_devuelta).label("unidades"),
+            func.sum(
+                DetalleVentaModel.subtotal * (DetalleVentaModel.cantidad - DetalleVentaModel.cantidad_devuelta) / DetalleVentaModel.cantidad,
+            ).label("total"),
         )
         .join(VentaModel, VentaModel.id == DetalleVentaModel.venta_id)
         .where(

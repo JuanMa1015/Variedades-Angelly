@@ -11,7 +11,7 @@ const Monto = ({ movimiento }) => {
   if (movimiento.anulada) {
     return <span className="text-gray-400 line-through">{formatMoney(movimiento.total)}</span>;
   }
-  if (movimiento.tipo === 'gasto' || movimiento.tipo === 'compra') return <span className="font-bold text-red-700">−{formatMoney(movimiento.monto)}</span>;
+  if (movimiento.tipo === 'gasto' || movimiento.tipo === 'compra' || movimiento.tipo === 'devolucion') return <span className="font-bold text-red-700">−{formatMoney(movimiento.monto)}</span>;
   return (
     <span className="font-bold text-emerald-700">
       +{formatMoney(movimiento.monto)}

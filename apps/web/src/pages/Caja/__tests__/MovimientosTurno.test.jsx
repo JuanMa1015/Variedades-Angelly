@@ -70,6 +70,28 @@ describe('MovimientosTurno: detalle de cada venta', () => {
     expect(screen.queryByRole('button', { name: /Reimprimir comprobante/ })).not.toBeInTheDocument();
   });
 
+  it('las devoluciones aparecen como salida de dinero y el detalle de la venta las explica', async () => {
+    api.fetchCajaMovimientos.mockResolvedValue([
+      ...MOVIMIENTOS,
+      { tipo: 'devolucion', id: 4, fecha: '2026-03-10T18:00:00', descripcion: 'Devolución · venta #12', metodo_pago: 'efectivo', monto: 3500, total: 3500, es_fiado: false, anulada: false },
+    ]);
+    api.fetchVenta.mockResolvedValue({
+      ...VENTA,
+      total_devuelto: 3500,
+      detalles: [{ producto_id: 1, nombre_producto: 'Arroz Diana', cantidad: 2, precio_unitario: 3500, subtotal: 7000, cantidad_devuelta: 1 }],
+      devoluciones: [{ id: 4, fecha: '2026-03-10T18:00:00', registrado_por: 'vendedor1', autorizado_por: 'angelly_admin', motivo: 'En mal estado', total_devuelto: 3500, monto_reembolsado: 3500, deuda_reducida: 0, metodo_pago: 'efectivo', lineas: [{ producto_id: 1, nombre_producto: 'Arroz Diana', cantidad: 1, valor: 3500 }] }],
+    });
+    render(<MovimientosTurno cajaId={1} />);
+
+    expect(await screen.findByText('Devolución · venta #12')).toBeInTheDocument();
+    expect(screen.getByText('Devolución')).toBeInTheDocument();
+    expect(within(screen.getByText('Devolución · venta #12').closest('tr')).getByText(/^−/)).toHaveTextContent('3.500');
+    fireEvent.click(screen.getByRole('button', { name: 'Ver los productos de la venta 12' }));
+
+    expect(await screen.findByText('1 devuelto')).toBeInTheDocument();
+    expect(screen.getByText(/En mal estado.*lo hizo vendedor1, autorizó angelly_admin/)).toBeInTheDocument();
+  });
+
   it('si el detalle falla lo dice en la misma fila', async () => {
     api.fetchVenta.mockRejectedValue(new Error('Venta no encontrada'));
     render(<MovimientosTurno cajaId={1} />);
