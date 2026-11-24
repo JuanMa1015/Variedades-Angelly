@@ -2,6 +2,7 @@ import { UserPlus } from 'lucide-react';
 import ClientCombobox from './ClientCombobox';
 import MethodSelector from './MethodSelector';
 import MoneyInput from './MoneyInput';
+import { cupoDisponible } from './posHelpers';
 
 const CreditSection = ({
   clientesTiendaFiado,
@@ -18,6 +19,7 @@ const CreditSection = ({
   const cliente = clientesTiendaFiado.find((item) => String(item.id) === String(clienteTiendaId)) ?? null;
   const abono = Number(abonoInicialFiado || 0);
   const quedaFiado = Math.max(0, totalEstimado - abono);
+  const cupo = cupoDisponible(cliente, quedaFiado);
 
   return (
     <div className="space-y-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3">
@@ -31,7 +33,7 @@ const CreditSection = ({
             onChange={onSetClienteTiendaId}
             onCreate={onCrearCliente}
             placeholder="Buscar cliente por nombre o teléfono"
-            getHint={(item) => (Number(item.deuda_total) > 0 ? `Debe ${formatMoney(Number(item.deuda_total))}` : '')}
+            getHint={(item) => [Number(item.deuda_total) > 0 ? `Debe ${formatMoney(Number(item.deuda_total))}` : '', Number(item.limite_credito) > 0 ? `cupo ${formatMoney(Number(item.limite_credito))}` : ''].filter(Boolean).join(' · ')}
           />
         </div>
         <button
@@ -59,6 +61,12 @@ const CreditSection = ({
           <p>
             Deuda actual de {cliente.nombre}:{' '}
             <span className="font-bold text-amber-700">{formatMoney(Number(cliente.deuda_total || 0))}</span>
+          </p>
+        )}
+        {cliente && cupo.tieneCupo && (
+          <p className={cupo.supera ? 'font-semibold text-red-700' : ''}>
+            Cupo de {cliente.nombre}: {formatMoney(cupo.limite)} · disponible <span className="font-bold">{formatMoney(cupo.disponible)}</span>
+            {cupo.supera && ' · esta venta lo pasa'}
           </p>
         )}
         <p>

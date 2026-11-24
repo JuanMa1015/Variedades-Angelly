@@ -19,9 +19,11 @@ const itemRows = (items, formatMoney) => items.map((item) => (
 
 const totalsBlock = (receipt, formatMoney) => {
   const lines = [];
-  if (receipt.descuento > 0) {
-    lines.push(row('Subtotal:', formatMoney(receipt.total + receipt.descuento)));
-    lines.push(row(`Descuento (${receipt.puntosCanjeados} pts):`, `-${formatMoney(receipt.descuento)}`));
+  const descuentoManual = Number(receipt.descuentoManual || 0);
+  if (receipt.descuento > 0 || descuentoManual > 0) {
+    lines.push(row('Subtotal:', formatMoney(receipt.total + receipt.descuento + descuentoManual)));
+    if (descuentoManual > 0) lines.push(row('Descuento:', `-${formatMoney(descuentoManual)}`));
+    if (receipt.descuento > 0) lines.push(row(`Descuento (${receipt.puntosCanjeados} pts):`, `-${formatMoney(receipt.descuento)}`));
   }
   lines.push(row('TOTAL:', formatMoney(receipt.total), true));
   if (receipt.esFiado) {

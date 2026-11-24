@@ -35,7 +35,7 @@ from src.infrastructure.database.models import (
 
 logger = logging.getLogger(__name__)
 ROLES_AUTORIZADORES = {"admin", "superadmin"}
-_SIN_AUTORIZACION = "Una anulacion necesita la autorizacion de un administrador"
+_SIN_AUTORIZACION = "{accion} necesita la autorizacion de un administrador"
 _AUTORIZACION_INVALIDA = "Autorizacion invalida"
 
 
@@ -87,12 +87,13 @@ def quien_autoriza(
     solicitante: AuthenticatedUser,
     usuario: str | None,
     password: str | None,
+    accion: str = "Una anulacion",
 ) -> str:
     """Administrador que respalda la anulacion: el mismo solicitante si ya lo es, o quien dio su clave."""
     if solicitante.role in ROLES_AUTORIZADORES:
         return solicitante.username
     if not usuario or not password:
-        raise HTTPException(status_code=403, detail=_SIN_AUTORIZACION)
+        raise HTTPException(status_code=403, detail=_SIN_AUTORIZACION.format(accion=accion))
 
     # Se limita por cuenta probada y por quien prueba: no sirve para adivinar la clave de un admin.
     claves = [f"destino:{usuario.strip().lower()}", f"origen:{solicitante.username}"]
@@ -116,6 +117,8 @@ def _exigir_anulable(db: Session, venta: VentaModel) -> None:
         raise HTTPException(status_code=409, detail="La venta ya esta anulada")
     if venta.cliente_id is not None or venta.tipo_fiado == "cartera":
         raise HTTPException(status_code=409, detail="Las ventas de cartera se gestionan desde el modulo de cartera")
+    if float(venta.total_devuelto or 0) > 0:
+        raise HTTPException(status_code=409, detail="La venta ya tiene devoluciones: no se puede anular (el dinero devuelto ya salio de la caja)")
     _exigir_sin_abonos_posteriores(db, venta)
     caja_abierta = caja_abierta_id(db)
     if caja_abierta is None or venta.caja_id != caja_abierta:
@@ -152,7 +155,7 @@ def devolver_stock_de_venta(db: Session, venta_id: int, usuario: str) -> None:
         ).scalar_one_or_none()
         if producto is not None:
             mover_stock(
-                db, producto, detalle.cantidad, tipo="anulacion_venta", usuario=usuario,
+                db, producto, detalle.cantidad - int(detalle.cantidad_devuelta or 0), tipo="anulacion_venta", usuario=usuario,
                 motivo="Venta anulada", referencia_tipo="venta", referencia_id=venta_id,
             )
 

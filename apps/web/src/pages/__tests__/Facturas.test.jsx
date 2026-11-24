@@ -218,11 +218,11 @@ describe('Facturas de compra', () => {
     expect(await screen.findByText(/Esa factura ya esta registrada/)).toBeTruthy();
   });
 
-  it('la encomienda se rotula como lo que es: se resta del total', async () => {
+  it('la encomienda se rotula como lo que es: el costo del envío, que se suma al total', async () => {
     await cargarPagina();
 
-    expect(screen.getByText('Encomienda (−)')).toBeTruthy();
-    expect(screen.getByText(/Encomienda \(se resta\)/)).toBeTruthy();
+    expect(screen.getByText('Encomienda (+)')).toBeTruthy();
+    expect(screen.getByText(/Encomienda \(se suma\)/)).toBeTruthy();
   });
 
   it('con la caja cerrada no deja registrar una compra en efectivo, pero si por otro medio', async () => {

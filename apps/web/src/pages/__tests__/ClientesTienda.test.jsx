@@ -184,7 +184,7 @@ describe('ClientesTienda', () => {
     expect(screen.getByText('Se guardará como 300 111 2233.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
 
-    await waitFor(() => expect(apiPostMock).toHaveBeenCalledWith('/api/clientes/tienda-fiado', { nombre: 'Pedro', telefono_whatsapp: '3001112233' }));
+    await waitFor(() => expect(apiPostMock).toHaveBeenCalledWith('/api/clientes/tienda-fiado', { nombre: 'Pedro', telefono_whatsapp: '3001112233', limite_credito: 0 }));
   });
 
   it('valida el nombre y el formato del WhatsApp antes de enviar', async () => {
@@ -216,7 +216,7 @@ describe('ClientesTienda', () => {
 
     await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: '¿Es otra persona?' })));
     expect(confirmMock.mock.calls[0][0].message).toContain('José Pérez');
-    await waitFor(() => expect(apiPostMock).toHaveBeenLastCalledWith('/api/clientes/tienda-fiado', { nombre: 'Jose Perez', telefono_whatsapp: null, confirmar_homonimo: true }));
+    await waitFor(() => expect(apiPostMock).toHaveBeenLastCalledWith('/api/clientes/tienda-fiado', { nombre: 'Jose Perez', telefono_whatsapp: null, limite_credito: 0, confirmar_homonimo: true }));
   });
 
   it('si no confirma el homonimo no se guarda y el cuadro sigue abierto', async () => {
@@ -246,8 +246,22 @@ describe('ClientesTienda', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Actualizar' }));
 
     await waitFor(() => expect(apiPatchMock).toHaveBeenCalledWith('/api/clientes/tienda-fiado/2', {
-      nombre: 'Flor Manco', telefono_whatsapp: null, deuda_total: 15000, motivo_ajuste: 'Pago no registrado',
+      nombre: 'Flor Manco', telefono_whatsapp: null, limite_credito: 0, deuda_total: 15000, motivo_ajuste: 'Pago no registrado',
     }));
+  });
+
+  it('el cupo de crédito se fija al crear, se edita y se muestra en la lista', async () => {
+    apiGetMock.mockImplementation((url) => Promise.resolve(url.includes('/resumen') ? resumen : { data: [{ ...clientes[2], nombre: 'Marta', deuda_total: 30000, limite_credito: 50000 }, { ...clientes[1], nombre: 'Luis', deuda_total: 60000, limite_credito: 50000 }], total: 2, total_pages: 1, current_page: 1 }));
+    render(<ClientesTienda />);
+
+    expect(await screen.findByText(/Cupo .*50\.000 · disponible .*20\.000/)).toBeInTheDocument();
+    expect(screen.getByText(/Cupo .*50\.000 · pasó el cupo/)).toBeInTheDocument();
+    fireEvent.click(within(fila('Marta')).getByRole('button', { name: /Editar/ }));
+    expect(screen.getByLabelText('Cupo de crédito', { selector: 'input' })).toHaveValue('50.000');
+    fireEvent.change(screen.getByLabelText('Cupo de crédito', { selector: 'input' }), { target: { value: '80000' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Actualizar' }));
+
+    await waitFor(() => expect(apiPatchMock).toHaveBeenCalledWith('/api/clientes/tienda-fiado/3', expect.objectContaining({ limite_credito: 80000 })));
   });
 
   it('un cliente de un solo nombre se puede editar sin inventarle apellido', async () => {
@@ -258,7 +272,7 @@ describe('ClientesTienda', () => {
     fireEvent.change(screen.getByLabelText('WhatsApp'), { target: { value: '3105556677' } });
     fireEvent.click(screen.getByRole('button', { name: 'Actualizar' }));
 
-    await waitFor(() => expect(apiPatchMock).toHaveBeenCalledWith('/api/clientes/tienda-fiado/3', { nombre: 'Marta', telefono_whatsapp: '3105556677' }));
+    await waitFor(() => expect(apiPatchMock).toHaveBeenCalledWith('/api/clientes/tienda-fiado/3', { nombre: 'Marta', telefono_whatsapp: '3105556677', limite_credito: 0 }));
   });
 
   // -- Abonos --

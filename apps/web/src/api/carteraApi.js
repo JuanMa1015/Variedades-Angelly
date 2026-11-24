@@ -1,3 +1,4 @@
+import { claveParaCobro, olvidarClaveCobro } from '../utils/claveCobro';
 import { apiDelete, apiGet, apiPatch, apiPost } from './httpClient';
 
 const buildSearchParams = ({ page, limit, search } = {}) => {
@@ -56,12 +57,19 @@ export const deleteCarteraProducto = (productoId) => {
   return apiDelete(`/api/productos/${productoId}`);
 };
 
+// Un cobro repetido (reintento tras perder la conexion) lleva la misma clave: el servidor no lo duplica.
+const enviarCobro = async (espacio, endpoint, payload) => {
+  const resultado = await apiPost(endpoint, { ...payload, clave_idempotencia: claveParaCobro({ endpoint, ...payload }, espacio) });
+  olvidarClaveCobro(espacio);
+  return resultado;
+};
+
 export const saveCarteraAbono = ({ clienteId, payload }) => {
-  return apiPost(`/api/cartera/clientes/${clienteId}/abonos`, payload);
+  return enviarCobro('cartera-abono', `/api/cartera/clientes/${clienteId}/abonos`, payload);
 };
 
 export const saveCarteraVenta = (payload) => {
-  return apiPost('/api/cartera/ventas', payload);
+  return enviarCobro('cartera-venta', '/api/cartera/ventas', payload);
 };
 
 export const fetchCarteraVentasHistorial = ({ limit, signal }) => {

@@ -20,6 +20,7 @@ const Formulario = ({ cliente, onSubmit, onClose }) => {
   const [nombre, setNombre] = useState(cliente?.nombre ?? '');
   const [telefono, setTelefono] = useState(cliente?.telefono_whatsapp ?? '');
   const [deuda, setDeuda] = useState(deudaOriginal);
+  const [cupo, setCupo] = useState(Number(cliente?.limite_credito || 0));
   const [motivo, setMotivo] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -34,7 +35,7 @@ const Formulario = ({ cliente, onSubmit, onClose }) => {
     if (!isValidPhone(telefono)) { setError('El WhatsApp no tiene un formato válido'); return; }
     if (deudaAjustada && motivo.trim().length < 3) { setError('Escribe el motivo del ajuste de la deuda (mínimo 3 letras)'); return; }
 
-    const payload = { nombre: nombreLimpio, telefono_whatsapp: telefono.replace(/\D/g, '') || null };
+    const payload = { nombre: nombreLimpio, telefono_whatsapp: telefono.replace(/\D/g, '') || null, limite_credito: cupo };
     if (deudaAjustada) {
       payload.deuda_total = deuda;
       payload.motivo_ajuste = motivo.trim();
@@ -60,6 +61,11 @@ const Formulario = ({ cliente, onSubmit, onClose }) => {
         <label htmlFor="cliente-telefono" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">WhatsApp</label>
         <input id="cliente-telefono" type="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} maxLength={25} placeholder="300 111 2233" className={`${INPUT} ${telefono && !isValidPhone(telefono) ? 'border-red-400' : 'border-gray-300 focus:border-rosewood'}`} />
         <PistaTelefono valor={telefono} />
+      </div>
+      <div>
+        <label htmlFor="cliente-cupo" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Cupo de crédito</label>
+        <MoneyInput id="cliente-cupo" label="Cupo de crédito" value={cupo} onChange={setCupo} placeholder="0 = sin límite" />
+        <p className="mt-1 text-xs text-gray-500">Lo máximo que puede deber. En 0 no hay límite: si lo pasa, el sistema no deja fiarle más.</p>
       </div>
       {editando && (
         <div className="space-y-2">

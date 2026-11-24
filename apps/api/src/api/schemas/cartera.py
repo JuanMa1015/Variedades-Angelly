@@ -109,6 +109,7 @@ class CarteraVentaCreateRequest(BaseModel):
     metodo_pago: MetodoPago | None = None
     fecha_venta: datetime | None = None
     referencia: Annotated[str | None, Field(max_length=255)] = None
+    clave_idempotencia: Annotated[str | None, Field(min_length=8, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")] = None
 
 
 class VentaDetalleResponse(BaseModel):
@@ -119,6 +120,29 @@ class VentaDetalleResponse(BaseModel):
     cantidad: int
     precio_unitario: float
     subtotal: float
+    cantidad_devuelta: int = 0
+
+
+class DevolucionLineaResponse(BaseModel):
+    producto_id: int
+    nombre_producto: str
+    cantidad: int
+    valor: float
+
+
+class DevolucionResponse(BaseModel):
+    """Una devolucion parcial de la venta: que se devolvio, cuanto dinero salio y quien la autorizo."""
+
+    id: int
+    fecha: datetime
+    registrado_por: str
+    autorizado_por: str
+    motivo: str
+    total_devuelto: float
+    monto_reembolsado: float
+    deuda_reducida: float
+    metodo_pago: str | None = None
+    lineas: list[DevolucionLineaResponse] = []
 
 
 class VentaResponse(BaseModel):
@@ -146,6 +170,11 @@ class VentaResponse(BaseModel):
     autorizada_por: str | None = None
     motivo_anulacion: str | None = None
     vendedor: str | None = None
+    total_devuelto: float = 0.0
+    devoluciones: list[DevolucionResponse] = []
+    descuento_manual: float = 0.0
+    descuento_manual_motivo: str | None = None
+    descuento_autorizado_por: str | None = None
 
 
 class CarteraVentaHistorialItemResponse(BaseModel):
@@ -179,6 +208,7 @@ class AbonoCarteraCreateRequest(BaseModel):
     metodo_pago: MetodoPago = "efectivo"
     fecha: datetime | None = None
     referencia: Annotated[str | None, Field(max_length=255)] = None
+    clave_idempotencia: Annotated[str | None, Field(min_length=8, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")] = None
 
 
 class AbonoCarteraCreateAdminRequest(BaseModel):
@@ -189,6 +219,7 @@ class AbonoCarteraCreateAdminRequest(BaseModel):
     metodo_pago: MetodoPago = "efectivo"
     fecha: datetime | None = None
     referencia: Annotated[str | None, Field(max_length=255)] = None
+    clave_idempotencia: Annotated[str | None, Field(min_length=8, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")] = None
 
 
 class AbonoCarteraUpdateRequest(BaseModel):

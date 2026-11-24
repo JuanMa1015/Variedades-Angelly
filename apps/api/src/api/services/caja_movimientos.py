@@ -4,16 +4,17 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import Session
 
-from src.api.schemas.caja import MovimientoCajaResponse
+from src.api.schemas.caja import MovimientoCajaResponse, ResumenTurnoResponse
 from src.infrastructure.database.models import (
     AbonoCarteraModel,
     AbonoTiendaModel,
     CierreCajaModel,
     ClienteFiadoTiendaModel,
     ClienteModel,
+    DevolucionVentaModel,
     FacturaCompraModel,
     GastoModel,
     ProveedorModel,
@@ -106,6 +107,23 @@ def _gastos(db: Session, caja: CierreCajaModel, hasta: datetime) -> list[Movimie
     ]
 
 
+def _devoluciones(db: Session, caja: CierreCajaModel) -> list[MovimientoCajaResponse]:
+    """Dinero devuelto a clientes en este turno (solo lo que realmente salio; lo que bajo una deuda no mueve la caja)."""
+    devoluciones = db.execute(select(DevolucionVentaModel).where(DevolucionVentaModel.caja_id == caja.id)).scalars().all()
+    return [
+        MovimientoCajaResponse(
+            tipo="devolucion",
+            id=d.id,
+            fecha=d.fecha,
+            descripcion=f"Devolución · venta #{d.venta_id}",
+            metodo_pago=d.metodo_pago,
+            monto=float(d.monto_reembolsado),
+            total=float(d.total_devuelto),
+        )
+        for d in devoluciones
+    ]
+
+
 def _compras(db: Session, caja: CierreCajaModel) -> list[MovimientoCajaResponse]:
     """Facturas de compra del turno (solo las que quedaron en esta caja; no hay turnos viejos que reconstruir)."""
     facturas = db.execute(select(FacturaCompraModel).where(FacturaCompraModel.caja_id == caja.id)).scalars().all()
@@ -128,5 +146,63 @@ def _compras(db: Session, caja: CierreCajaModel) -> list[MovimientoCajaResponse]
 def movimientos_de_turno(db: Session, caja: CierreCajaModel) -> list[MovimientoCajaResponse]:
     """Ventas (lo cobrado), abonos y gastos del turno, del mas reciente al mas antiguo."""
     hasta = caja.fecha_cierre or datetime.now(UTC).replace(tzinfo=None)
-    todos = [*_ventas(db, caja, hasta), *_abonos(db, caja, hasta), *_gastos(db, caja, hasta), *_compras(db, caja)]
+    todos = [*_ventas(db, caja, hasta), *_abonos(db, caja, hasta), *_gastos(db, caja, hasta), *_compras(db, caja), *_devoluciones(db, caja)]
     return sorted(todos, key=lambda m: m.fecha, reverse=True)
+
+
+def resumen_de_turno(db: Session, caja: CierreCajaModel) -> ResumenTurnoResponse:
+    """Cifras del turno (ventas, anuladas, descuentos, devoluciones, abonos, gastos y compras)."""
+    hasta = caja.fecha_cierre or datetime.now(UTC).replace(tzinfo=None)
+
+    vigentes = (_del_turno(VentaModel, caja, hasta), VentaModel.fuera_de_caja.is_(False), VentaModel.anulada.is_(False))
+    ventas, vendido, a_credito, descuentos = db.execute(
+        select(
+            func.count(VentaModel.id),
+            func.coalesce(func.sum(VentaModel.total - VentaModel.total_devuelto), 0.0),
+            func.coalesce(func.sum(case((VentaModel.es_fiado.is_(True), VentaModel.total - VentaModel.total_devuelto), else_=0.0)), 0.0),
+            func.coalesce(func.sum(VentaModel.descuento_manual + VentaModel.descuento_puntos), 0.0),
+        ).where(*vigentes),
+    ).one()
+    anuladas = db.execute(
+        select(func.count(VentaModel.id)).where(_del_turno(VentaModel, caja, hasta), VentaModel.fuera_de_caja.is_(False), VentaModel.anulada.is_(True)),
+    ).scalar_one()
+
+    devoluciones, devuelto = db.execute(
+        select(func.count(DevolucionVentaModel.id), func.coalesce(func.sum(DevolucionVentaModel.monto_reembolsado), 0.0)).where(
+            DevolucionVentaModel.caja_id == caja.id,
+        ),
+    ).one()
+
+    abonos = abonos_total = 0.0
+    for modelo in (AbonoTiendaModel, AbonoCarteraModel):
+        consulta = select(func.count(modelo.id), func.coalesce(func.sum(modelo.monto), 0.0)).where(_del_turno(modelo, caja, hasta), modelo.anulado.is_(False))
+        if modelo is AbonoCarteraModel:
+            consulta = consulta.where(AbonoCarteraModel.fuera_de_caja.is_(False))
+        cantidad, monto = db.execute(consulta).one()
+        abonos += int(cantidad or 0)
+        abonos_total += float(monto or 0)
+
+    gastos, gastos_total = db.execute(
+        select(func.count(GastoModel.id), func.coalesce(func.sum(GastoModel.monto), 0.0)).where(_del_turno(GastoModel, caja, hasta), GastoModel.anulado.is_(False)),
+    ).one()
+    compras, compras_total = db.execute(
+        select(func.count(FacturaCompraModel.id), func.coalesce(func.sum(FacturaCompraModel.total_factura), 0.0)).where(
+            FacturaCompraModel.caja_id == caja.id, FacturaCompraModel.anulada.is_(False),
+        ),
+    ).one()
+
+    return ResumenTurnoResponse(
+        ventas=int(ventas or 0),
+        vendido=round(float(vendido or 0), 2),
+        ventas_a_credito=round(float(a_credito or 0), 2),
+        ventas_anuladas=int(anuladas or 0),
+        descuentos=round(float(descuentos or 0), 2),
+        devoluciones=int(devoluciones or 0),
+        devuelto_en_dinero=round(float(devuelto or 0), 2),
+        abonos=int(abonos),
+        abonos_total=round(abonos_total, 2),
+        gastos=int(gastos or 0),
+        gastos_total=round(float(gastos_total or 0), 2),
+        compras=int(compras or 0),
+        compras_total=round(float(compras_total or 0), 2),
+    )

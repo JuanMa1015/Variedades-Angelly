@@ -81,6 +81,24 @@ class CajaHistorialItemResponse(BaseModel):
     observaciones: str | None = None
 
 
+class ResumenTurnoResponse(BaseModel):
+    """Lo que paso en un turno, en cifras: sirve para entender el cuadre y para el comprobante de cierre."""
+
+    ventas: int = 0  # ventas vigentes del turno
+    vendido: float = 0.0  # su valor, sin lo que se devolvio
+    ventas_a_credito: float = 0.0  # la parte que se fio
+    ventas_anuladas: int = 0
+    descuentos: float = 0.0  # descuentos manuales y por puntos dados en ventas vigentes
+    devoluciones: int = 0
+    devuelto_en_dinero: float = 0.0
+    abonos: int = 0
+    abonos_total: float = 0.0
+    gastos: int = 0
+    gastos_total: float = 0.0  # de todos los medios de pago
+    compras: int = 0
+    compras_total: float = 0.0  # de todos los medios de pago
+
+
 class MovimientoCajaResponse(BaseModel):
     """Una linea de lo que paso en un turno: venta, abono o gasto."""
 

@@ -54,6 +54,9 @@ const SaleReceiptPanel = ({ receipt, formatMoney, onPrint, onNewSale }) => {
             valueClass="text-amber-700"
           />
         )}
+        {receipt.descuentoManual > 0 && (
+          <SummaryRow label="Descuento" value={`-${formatMoney(receipt.descuentoManual)}`} valueClass="text-emerald-700" />
+        )}
         {receipt.descuento > 0 && (
           <SummaryRow
             label={`Descuento por ${receipt.puntosCanjeados} puntos`}

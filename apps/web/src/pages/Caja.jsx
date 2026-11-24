@@ -16,11 +16,16 @@ import HistorialCaja from './Caja/HistorialCaja';
 import MovimientosTurno from './Caja/MovimientosTurno';
 import TurnoResumen from './Caja/TurnoResumen';
 import UltimoCierre from './Caja/UltimoCierre';
+import { fetchCajaResumen } from '../api/cajaApi';
 import { buildCierreHtml, duracionAbierta } from './Caja/cajaHelpers';
 import { useCaja } from './Caja/useCaja';
 import { printHtml } from './Ventas/printReceipt';
 
-const imprimirCierre = (caja) => printHtml(buildCierreHtml(caja, { site: SITE }));
+// El comprobante lleva el resumen del turno; si no se puede traer, se imprime igual sin esas cifras.
+const imprimirCierre = async (caja) => {
+  const resumen = await fetchCajaResumen(caja.id).catch(() => null);
+  printHtml(buildCierreHtml(caja, { site: SITE, resumen }));
+};
 
 const EstadoCaja = ({ abierta, caja }) => (
   <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl border p-4 shadow-sm ${abierta ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-white'}`}>
@@ -114,7 +119,7 @@ const Caja = () => {
 
       {!loading && abierta && cajaActual && (
         <>
-          <TurnoResumen caja={cajaActual} />
+          <TurnoResumen caja={cajaActual} version={version} />
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_26rem]">
             <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
               <h2 className="mb-2 text-xl font-bold text-gray-900">Movimientos del turno</h2>

@@ -9,7 +9,8 @@ const abrirCajaMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../../api/httpClient', () => ({ apiGet: apiGetMock, apiPost: apiPostMock }));
 vi.mock('../../api/cajaApi', () => ({ abrirCaja: abrirCajaMock }));
-vi.mock('../../auth/AuthContext', () => ({ useAuth: () => ({ token: 'fake-token' }) }));
+const auth = vi.hoisted(() => ({ user: { username: 'vendedor1', role: 'vendedor' } }));
+vi.mock('../../auth/AuthContext', () => ({ useAuth: () => ({ token: 'fake-token', user: auth.user }) }));
 vi.mock('react-virtuoso', () => ({
   VirtuosoGrid: ({ totalCount, itemContent, listClassName }) => (
     <div className={listClassName}>
@@ -52,6 +53,7 @@ describe('POS: flujo completo', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    auth.user = { username: 'vendedor1', role: 'vendedor' };
     apiPostMock.mockResolvedValue({ puntos_otorgados: 0 });
     window.print = vi.fn();
   });
@@ -87,6 +89,7 @@ describe('POS: flujo completo', () => {
       es_fiado: false,
       metodo_pago: 'efectivo',
       monto_recibido: 3500,
+      clave_idempotencia: expect.stringMatching(/^[A-Za-z0-9_-]{8,64}$/),
     }));
     expect(await screen.findByText('Venta completada')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Nueva venta/ }));
@@ -289,7 +292,7 @@ describe('POS: flujo completo', () => {
   });
 
   it('al volver, los productos del borrador que no están en el catálogo cargado se piden por ID', async () => {
-    localStorage.setItem('angelly.pos.borrador.v1.', JSON.stringify({ items: [{ producto_id: '1', cantidad: 1 }, { producto_id: '384', cantidad: 2 }] }));
+    localStorage.setItem('angelly.pos.borrador.v1.vendedor1', JSON.stringify({ items: [{ producto_id: '1', cantidad: 1 }, { producto_id: '384', cantidad: 2 }] }));
     apiGetMock.mockImplementation((endpoint) => {
       if (endpoint === '/api/productos?catalogo=tienda&ids=384') return Promise.resolve([{ id: 384, nombre: 'Atun real', precio_venta: 4800, stock_actual: 9 }]);
       if (endpoint.startsWith('/api/productos/paginados')) return Promise.resolve({ data: productos });
@@ -359,6 +362,143 @@ describe('POS: flujo completo', () => {
     expect(within(ticket()).getByLabelText('Cantidad: 3')).toBeInTheDocument();
   });
 
+  it('si el cobro falla por la conexión, reintentar el mismo ticket reutiliza la clave y no duplica la venta', async () => {
+    await renderPos();
+    agregar('Arroz Diana');
+    apiPostMock.mockRejectedValueOnce(new Error('Failed to fetch')).mockResolvedValueOnce({ puntos_otorgados: 0 });
+
+    fireEvent.click(within(ticket()).getByRole('button', { name: /^Cobrar/ }));
+    expect(await screen.findByText('Failed to fetch')).toBeInTheDocument();
+    fireEvent.click(within(ticket()).getByRole('button', { name: /^Cobrar/ }));
+    expect(await screen.findByText('Venta completada', {}, { timeout: 4000 })).toBeInTheDocument();
+
+    const [primera, segunda] = apiPostMock.mock.calls.filter(([endpoint]) => endpoint === '/api/ventas').map(([, cuerpo]) => cuerpo);
+    expect(segunda.clave_idempotencia).toBe(primera.clave_idempotencia);
+  });
+
+  it('si el ticket cambia entre intentos, el cobro usa una clave nueva', async () => {
+    await renderPos();
+    agregar('Arroz Diana');
+    apiPostMock.mockRejectedValueOnce(new Error('Failed to fetch')).mockResolvedValueOnce({ puntos_otorgados: 0 });
+
+    fireEvent.click(within(ticket()).getByRole('button', { name: /^Cobrar/ }));
+    await screen.findByText('Failed to fetch');
+    agregar('Aceite Girasol');
+    fireEvent.click(within(ticket()).getByRole('button', { name: /^Cobrar/ }));
+    await screen.findByText('Venta completada', {}, { timeout: 4000 });
+
+    const [primera, segunda] = apiPostMock.mock.calls.filter(([endpoint]) => endpoint === '/api/ventas').map(([, cuerpo]) => cuerpo);
+    expect(segunda.clave_idempotencia).not.toBe(primera.clave_idempotencia);
+  });
+
+  it('una venta nueva después de una cobrada no hereda la clave anterior', async () => {
+    await renderPos();
+    agregar('Arroz Diana');
+    fireEvent.click(within(ticket()).getByRole('button', { name: /^Cobrar/ }));
+    await screen.findByText('Venta completada');
+    fireEvent.click(screen.getByRole('button', { name: /Nueva venta/ }));
+    agregar('Arroz Diana');
+    fireEvent.click(within(ticket()).getByRole('button', { name: /^Cobrar/ }));
+    await waitFor(() => expect(apiPostMock.mock.calls.filter(([endpoint]) => endpoint === '/api/ventas')).toHaveLength(2));
+
+    const [primera, segunda] = apiPostMock.mock.calls.map(([, cuerpo]) => cuerpo);
+    expect(segunda.clave_idempotencia).not.toBe(primera.clave_idempotencia);
+  });
+
+  const aplicarDescuento = (tipo, valor, motivo = 'Cliente frecuente') => {
+    fireEvent.click(within(ticket()).getByRole('button', { name: /Aplicar descuento/ }));
+    if (tipo === 'monto') fireEvent.click(within(ticket()).getByRole('radio', { name: 'Descuento en pesos' }));
+    const campo = tipo === 'monto' ? within(ticket()).getByLabelText('Pesos de descuento') : within(ticket()).getByLabelText('Porcentaje de descuento');
+    fireEvent.change(campo, { target: { value: String(valor) } });
+    fireEvent.change(within(ticket()).getByLabelText('Motivo del descuento'), { target: { value: motivo } });
+  };
+
+  it('un descuento dentro del límite baja el total y viaja en la venta sin pedir clave', async () => {
+    await renderPos();
+    agregar('Arroz Diana');
+    agregar('Arroz Diana'); // 7.000
+
+    aplicarDescuento('porcentaje', 5);
+
+    expect(within(ticket()).getByRole('button', { name: /^Cobrar .*6\.650/ })).toBeEnabled(); // 7.000 - 350
+    expect(within(ticket()).getByLabelText('Descuento manual')).toHaveTextContent(/Descuento: −.*350.*\(5 %\)/);
+    expect(within(ticket()).queryByLabelText('Usuario del administrador')).not.toBeInTheDocument();
+    fireEvent.click(within(ticket()).getByRole('button', { name: /^Cobrar/ }));
+
+    await waitFor(() => expect(apiPostMock).toHaveBeenCalledWith('/api/ventas', expect.objectContaining({
+      descuento_manual: { tipo: 'porcentaje', valor: 5, motivo: 'Cliente frecuente' },
+      monto_recibido: 6650,
+    })));
+    const cuerpo = apiPostMock.mock.calls.find(([endpoint]) => endpoint === '/api/ventas')[1];
+    expect(cuerpo).not.toHaveProperty('autorizador_usuario');
+    expect(await screen.findByText('Venta completada')).toBeInTheDocument();
+    expect(screen.getByText('Descuento')).toBeInTheDocument();
+  });
+
+  it('un descuento en pesos también funciona', async () => {
+    await renderPos();
+    agregar('Aceite Girasol'); // 9.800
+
+    aplicarDescuento('monto', 400, 'Empaque roto');
+
+    expect(within(ticket()).getByRole('button', { name: /^Cobrar .*9\.400/ })).toBeEnabled();
+    fireEvent.click(within(ticket()).getByRole('button', { name: /^Cobrar/ }));
+    await waitFor(() => expect(apiPostMock).toHaveBeenCalledWith('/api/ventas', expect.objectContaining({ descuento_manual: { tipo: 'monto', valor: 400, motivo: 'Empaque roto' } })));
+  });
+
+  it('pasado el límite el vendedor debe dar la clave de un administrador y esa clave no se guarda', async () => {
+    await renderPos();
+    agregar('Arroz Diana');
+    agregar('Arroz Diana');
+
+    aplicarDescuento('porcentaje', 10);
+    expect(within(ticket()).getByText(/pasa del 5 %: necesita un administrador/)).toBeInTheDocument();
+    fireEvent.click(within(ticket()).getByRole('button', { name: /^Cobrar/ }));
+    expect(await screen.findByText(/necesita usuario y clave de un administrador/)).toBeInTheDocument();
+    expect(apiPostMock).not.toHaveBeenCalled();
+
+    fireEvent.change(within(ticket()).getByLabelText('Usuario del administrador'), { target: { value: 'angelly_admin' } });
+    fireEvent.change(within(ticket()).getByLabelText('Clave del administrador'), { target: { value: 'secreta-777' } });
+    fireEvent.click(within(ticket()).getByRole('button', { name: /^Cobrar/ }));
+
+    await waitFor(() => expect(apiPostMock).toHaveBeenCalledWith('/api/ventas', expect.objectContaining({
+      descuento_manual: expect.objectContaining({ valor: 10 }),
+      autorizador_usuario: 'angelly_admin',
+      autorizador_password: 'secreta-777',
+    })));
+    await screen.findByText('Venta completada');
+    const guardado = Object.keys(localStorage).map((clave) => localStorage.getItem(clave)).join('|');
+    expect(guardado).not.toContain('secreta-777');
+  });
+
+  it('un administrador no necesita clave: se autoriza solo', async () => {
+    auth.user = { username: 'angelly_superadmin', role: 'superadmin' };
+    await renderPos();
+    agregar('Arroz Diana');
+    agregar('Arroz Diana');
+
+    aplicarDescuento('porcentaje', 10);
+
+    expect(within(ticket()).getByText(/lo autorizas tú/)).toBeInTheDocument();
+    expect(within(ticket()).queryByLabelText('Usuario del administrador')).not.toBeInTheDocument();
+    fireEvent.click(within(ticket()).getByRole('button', { name: /^Cobrar/ }));
+    await waitFor(() => expect(apiPostMock).toHaveBeenCalled());
+  });
+
+  it('el descuento exige motivo y se puede quitar', async () => {
+    await renderPos();
+    agregar('Arroz Diana');
+
+    aplicarDescuento('porcentaje', 3, '');
+    fireEvent.click(within(ticket()).getByRole('button', { name: /^Cobrar/ }));
+    expect(await screen.findByText('Escribe el motivo del descuento')).toBeInTheDocument();
+    expect(apiPostMock).not.toHaveBeenCalled();
+
+    fireEvent.click(within(ticket()).getByRole('button', { name: 'Quitar descuento' }));
+    expect(within(ticket()).getByRole('button', { name: /^Cobrar .*3\.500/ })).toBeEnabled();
+    expect(within(ticket()).getByRole('button', { name: /Aplicar descuento/ })).toBeInTheDocument();
+  });
+
   it('vaciar el ticket pide confirmacion', async () => {
     await renderPos();
     agregar('Arroz Diana');
@@ -378,7 +518,7 @@ describe('POS: flujo completo', () => {
     fireEvent.keyDown(barra, { key: 'Enter' });
 
     await waitFor(() => expect(within(ticket()).getByText('Aceite Girasol')).toBeInTheDocument());
-    expect(barra).toHaveValue('');
+    await waitFor(() => expect(barra).toHaveValue(''));
   });
 
   it('Enter con un codigo de barras lo agrega y Esc limpia la busqueda', async () => {

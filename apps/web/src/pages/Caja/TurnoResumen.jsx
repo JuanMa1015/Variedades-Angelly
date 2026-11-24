@@ -1,5 +1,6 @@
 import { Banknote, CreditCard, Receipt, Smartphone, Wallet } from 'lucide-react';
 import { formatMoney } from '../../utils/format';
+import ResumenDelTurno from './ResumenDelTurno';
 
 const Tarjeta = ({ icono, titulo, valor, detalle, tono = 'text-gray-900', fondo = 'bg-white' }) => {
   const Icono = icono;
@@ -16,7 +17,7 @@ const Tarjeta = ({ icono, titulo, valor, detalle, tono = 'text-gray-900', fondo 
 
 // Cifras del turno. Cada medio de pago va aparte: el efectivo es lo que debe haber en el cajon,
 // transferencias y tarjeta se comparan con el celular y el datafono.
-const TurnoResumen = ({ caja }) => (
+const TurnoResumen = ({ caja, version = 0 }) => (
   <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
     {caja.saldo_esperado != null ? (
       <Tarjeta
@@ -37,6 +38,7 @@ const TurnoResumen = ({ caja }) => (
       <Receipt className="h-4 w-4 text-red-500" aria-hidden="true" />
       Gastos y compras pagados en efectivo: <strong className="text-red-700">{formatMoney(caja.monto_gastos)}</strong>
     </div>
+    <div className="col-span-2 lg:col-span-4"><ResumenDelTurno cajaId={caja.id} version={version} /></div>
   </div>
 );
 

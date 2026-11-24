@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildCierreHtml, describirCierre, duracionAbierta, estaCuadrada, etiquetaDescuadre } from '../cajaHelpers';
+import { buildCierreHtml, describirCierre, duracionAbierta, estaCuadrada, etiquetaDescuadre, lineasDelResumen, montoInicialListo, totalPorDenominaciones } from '../cajaHelpers';
 
 describe('descuadre', () => {
   it('una diferencia menor a un centavo cuenta como cuadrada', () => {
@@ -61,5 +61,42 @@ describe('buildCierreHtml', () => {
 
   it('sin esperado (cierre ciego) no inventa la linea', () => {
     expect(buildCierreHtml({ ...caja, saldo_esperado: null }, { site: { name: 'X' } })).not.toContain('Efectivo esperado:');
+  });
+});
+
+
+describe('contador de billetes y monedas', () => {
+  it('suma cada denominacion por su cantidad e ignora lo invalido', () => {
+    expect(totalPorDenominaciones({})).toBe(0);
+    expect(totalPorDenominaciones({ 50000: 2, 1000: '3', 500: 1 })).toBe(103500);
+    expect(totalPorDenominaciones({ 50000: -4, 20000: 'abc', 100: 2.9 })).toBe(200);
+    expect(totalPorDenominaciones(null)).toBe(0);
+  });
+});
+
+describe('lineasDelResumen', () => {
+  const base = { ventas: 0, vendido: 0, ventas_a_credito: 0, ventas_anuladas: 0, descuentos: 0, devoluciones: 0, devuelto_en_dinero: 0, abonos: 0, abonos_total: 0, gastos: 0, gastos_total: 0, compras: 0, compras_total: 0 };
+
+  it('sin nada que contar solo dice las ventas y omite el resto', () => {
+    expect(lineasDelResumen(base).map((l) => l.clave)).toEqual(['ventas']);
+    expect(lineasDelResumen(null)).toEqual([]);
+  });
+
+  it('usa singular y plural y solo muestra lo que paso', () => {
+    const textos = lineasDelResumen({ ...base, ventas: 1, vendido: 3000, ventas_anuladas: 1, devoluciones: 1, devuelto_en_dinero: 1000, gastos: 2, gastos_total: 500 }).map((l) => l.texto);
+
+    expect(textos[0]).toMatch(/^1 venta por/);
+    expect(textos).toContain('1 venta anulada');
+    expect(textos.some((t) => /^1 devolución:/.test(t))).toBe(true);
+    expect(textos.some((t) => /^2 gastos:/.test(t))).toBe(true);
+    expect(textos.some((t) => /abono|compra|Descuentos|crédito/.test(t))).toBe(false);
+  });
+});
+
+describe('montoInicialListo', () => {
+  it('pide un monto o marcar que se empieza sin efectivo', () => {
+    expect(montoInicialListo(0, false)).toBe(false);
+    expect(montoInicialListo(20000, false)).toBe(true);
+    expect(montoInicialListo(0, true)).toBe(true);
   });
 });

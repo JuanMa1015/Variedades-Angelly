@@ -1,10 +1,11 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const api = vi.hoisted(() => ({ fetchCajaMovimientos: vi.fn(), fetchVenta: vi.fn(), printHtml: vi.fn() }));
+const api = vi.hoisted(() => ({ fetchCajaMovimientos: vi.fn(), fetchVenta: vi.fn(), fetchFactura: vi.fn(), printHtml: vi.fn() }));
 
 vi.mock('../../../api/cajaApi', () => ({ fetchCajaMovimientos: api.fetchCajaMovimientos }));
 vi.mock('../../../api/ventasApi', () => ({ fetchVenta: api.fetchVenta }));
+vi.mock('../../../api/facturasApi', () => ({ fetchFactura: api.fetchFactura }));
 vi.mock('../../Ventas/printReceipt', () => ({ printHtml: api.printHtml }));
 
 import MovimientosTurno from '../MovimientosTurno';
@@ -27,6 +28,7 @@ describe('MovimientosTurno: detalle de cada venta', () => {
   beforeEach(() => {
     api.fetchCajaMovimientos.mockReset().mockResolvedValue(MOVIMIENTOS);
     api.fetchVenta.mockReset().mockResolvedValue(VENTA);
+    api.fetchFactura.mockReset();
     api.printHtml.mockReset();
   });
 
@@ -68,6 +70,51 @@ describe('MovimientosTurno: detalle de cada venta', () => {
 
     expect(await screen.findByText(/Motivo: Error al digitar · Anuló vendedor1, autorizó angelly_admin/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Reimprimir comprobante/ })).not.toBeInTheDocument();
+  });
+
+  it('las devoluciones aparecen como salida de dinero y el detalle de la venta las explica', async () => {
+    api.fetchCajaMovimientos.mockResolvedValue([
+      ...MOVIMIENTOS,
+      { tipo: 'devolucion', id: 4, fecha: '2026-03-10T18:00:00', descripcion: 'Devolución · venta #12', metodo_pago: 'efectivo', monto: 3500, total: 3500, es_fiado: false, anulada: false },
+    ]);
+    api.fetchVenta.mockResolvedValue({
+      ...VENTA,
+      total_devuelto: 3500,
+      detalles: [{ producto_id: 1, nombre_producto: 'Arroz Diana', cantidad: 2, precio_unitario: 3500, subtotal: 7000, cantidad_devuelta: 1 }],
+      devoluciones: [{ id: 4, fecha: '2026-03-10T18:00:00', registrado_por: 'vendedor1', autorizado_por: 'angelly_admin', motivo: 'En mal estado', total_devuelto: 3500, monto_reembolsado: 3500, deuda_reducida: 0, metodo_pago: 'efectivo', lineas: [{ producto_id: 1, nombre_producto: 'Arroz Diana', cantidad: 1, valor: 3500 }] }],
+    });
+    render(<MovimientosTurno cajaId={1} />);
+
+    expect(await screen.findByText('Devolución · venta #12')).toBeInTheDocument();
+    expect(screen.getByText('Devolución')).toBeInTheDocument();
+    expect(within(screen.getByText('Devolución · venta #12').closest('tr')).getByText(/^−/)).toHaveTextContent('3.500');
+    fireEvent.click(screen.getByRole('button', { name: 'Ver los productos de la venta 12' }));
+
+    expect(await screen.findByText('1 devuelto')).toBeInTheDocument();
+    expect(screen.getByText(/En mal estado.*lo hizo vendedor1, autorizó angelly_admin/)).toBeInTheDocument();
+  });
+
+  it('las compras también se abren: muestran los productos, el envío y el total de la factura', async () => {
+    api.fetchCajaMovimientos.mockResolvedValue([
+      { tipo: 'compra', id: 5, fecha: '2026-03-10T16:30:00', descripcion: 'Factura #5 · Distribuidora', metodo_pago: 'efectivo', monto: 7000, total: 7000, es_fiado: false, anulada: false },
+    ]);
+    api.fetchFactura.mockResolvedValue({
+      id: 5, proveedor_nombre: 'Distribuidora', medio_pago: 'efectivo', subtotal: 5000, total_iva: 0, encomienda: 2000, encomienda_suma: true,
+      total_factura: 7000, numero_factura: 'FV-2026', creado_por: 'vendedor1', anulada: false,
+      items: [{ producto_id: 1, nombre_producto: 'Arroz Diana', cantidad: 5, aplica_iva: false, precio_unitario: 1000, precio_total: 5000 }],
+    });
+    render(<MovimientosTurno cajaId={1} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver los productos de la factura 5' }));
+
+    expect(await screen.findByText('Arroz Diana')).toBeInTheDocument();
+    expect(api.fetchFactura).toHaveBeenCalledWith(5, expect.anything());
+    const detalle = screen.getByText('Arroz Diana').closest('div');
+    expect(within(detalle).getByText('Distribuidora')).toBeInTheDocument();
+    expect(within(detalle).getByText(/Encomienda \(se suma\)/)).toBeInTheDocument();
+    expect(within(detalle).getByText(/^\+.*2\.000/)).toBeInTheDocument();
+    expect(within(detalle).getByText('FV-2026')).toBeInTheDocument();
+    expect(api.fetchVenta).not.toHaveBeenCalled();
   });
 
   it('si el detalle falla lo dice en la misma fila', async () => {

@@ -8,7 +8,7 @@ from datetime import datetime
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
-from src.infrastructure.database.models import AbonoCarteraModel, AbonoTiendaModel, VentaModel
+from src.infrastructure.database.models import AbonoCarteraModel, AbonoTiendaModel, DevolucionVentaModel, VentaModel
 
 
 def cobrado_en_venta():
@@ -24,7 +24,8 @@ def cobrado_en_venta():
         (VentaModel.cliente_id.is_not(None), 0.0),
         (VentaModel.es_fiado.is_(False), VentaModel.total),
         (VentaModel.saldo_pendiente >= VentaModel.total, 0.0),
-        else_=VentaModel.total - VentaModel.saldo_pendiente,
+        # Lo que una devolucion bajo de la deuda del fiado no es dinero cobrado.
+        else_=VentaModel.total - VentaModel.saldo_pendiente - VentaModel.deuda_reducida,
     )
 
 
@@ -63,4 +64,18 @@ def cobros_por_metodo(
             consulta = consulta.where(modelo.fecha < hasta)
         for metodo, total in db.execute(consulta.group_by(modelo.metodo_pago)).all():
             totales[metodo] += float(total or 0.0)
+
+    # El dinero devuelto a clientes sale del turno en que se devolvio (resta del efectivo, transferencias o tarjeta).
+    devuelto = select(DevolucionVentaModel.metodo_pago, func.coalesce(func.sum(DevolucionVentaModel.monto_reembolsado), 0.0)).where(
+        DevolucionVentaModel.metodo_pago.is_not(None),
+        DevolucionVentaModel.monto_reembolsado > 0,
+    )
+    if caja_id is not None:
+        devuelto = devuelto.where(DevolucionVentaModel.caja_id == caja_id)
+    if desde is not None:
+        devuelto = devuelto.where(DevolucionVentaModel.fecha >= desde)
+    if hasta is not None:
+        devuelto = devuelto.where(DevolucionVentaModel.fecha < hasta)
+    for metodo, total in db.execute(devuelto.group_by(DevolucionVentaModel.metodo_pago)).all():
+        totales[metodo] -= float(total or 0.0)
     return dict(totales)

@@ -3,6 +3,30 @@ import { escapeHtml } from '../Ventas/receiptHtml';
 
 const CERO = 0.01;
 
+// Billetes y monedas colombianos para contar el cajon sin calculadora.
+export const DENOMINACIONES = [100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50];
+
+export const totalPorDenominaciones = (conteo) => DENOMINACIONES.reduce(
+  (acc, valor) => acc + valor * Math.max(0, Math.trunc(Number(conteo?.[valor]) || 0)),
+  0,
+);
+
+const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
+
+// Las cifras del turno como lineas de texto; se omite lo que no paso (cero ventas anuladas, cero devoluciones...).
+export const lineasDelResumen = (resumen) => {
+  if (!resumen) return [];
+  const lineas = [{ clave: 'ventas', texto: `${plural(resumen.ventas, 'venta', 'ventas')} por ${formatMoney(resumen.vendido)}` }];
+  if (resumen.ventas_a_credito > 0) lineas.push({ clave: 'credito', texto: `A crédito (fiado): ${formatMoney(resumen.ventas_a_credito)}` });
+  if (resumen.descuentos > 0) lineas.push({ clave: 'descuentos', texto: `Descuentos dados: ${formatMoney(resumen.descuentos)}` });
+  if (resumen.ventas_anuladas > 0) lineas.push({ clave: 'anuladas', texto: `${plural(resumen.ventas_anuladas, 'venta anulada', 'ventas anuladas')}` });
+  if (resumen.devoluciones > 0) lineas.push({ clave: 'devoluciones', texto: `${plural(resumen.devoluciones, 'devolución', 'devoluciones')}: ${formatMoney(resumen.devuelto_en_dinero)} devueltos en dinero` });
+  if (resumen.abonos > 0) lineas.push({ clave: 'abonos', texto: `${plural(resumen.abonos, 'abono', 'abonos')} de clientes: ${formatMoney(resumen.abonos_total)}` });
+  if (resumen.gastos > 0) lineas.push({ clave: 'gastos', texto: `${plural(resumen.gastos, 'gasto', 'gastos')}: ${formatMoney(resumen.gastos_total)}` });
+  if (resumen.compras > 0) lineas.push({ clave: 'compras', texto: `${plural(resumen.compras, 'factura de compra', 'facturas de compra')}: ${formatMoney(resumen.compras_total)}` });
+  return lineas;
+};
+
 // Abrir la caja exige declarar el efectivo del cajon: un monto, o marcar que se empieza sin efectivo.
 // Dejar el campo vacio NO cuenta: asi un descuido no deja el cajon en $0 ni inventa un descuadre al cerrar.
 export const montoInicialListo = (monto, sinEfectivo) => Number(monto) > 0 || Boolean(sinEfectivo);
@@ -41,6 +65,7 @@ export const TIPOS_MOVIMIENTO = {
   abono_cartera: { etiqueta: 'Abono cartera', clase: 'bg-sky-50 text-sky-700' },
   gasto: { etiqueta: 'Gasto', clase: 'bg-red-50 text-red-700' },
   compra: { etiqueta: 'Compra', clase: 'bg-orange-50 text-orange-700' },
+  devolucion: { etiqueta: 'Devolución', clase: 'bg-amber-50 text-amber-800' },
 };
 
 const fila = (etiqueta, valor, fuerte = false) => (
@@ -61,7 +86,7 @@ const ESTILOS = `
 `;
 
 // Resumen imprimible del turno (reporte de cierre) para guardar o firmar.
-export const buildCierreHtml = (caja, { site }) => {
+export const buildCierreHtml = (caja, { site, resumen = null }) => {
   const esperado = caja.saldo_esperado;
   const lineas = [
     fila('Efectivo inicial:', formatMoney(caja.monto_inicial)),
@@ -86,6 +111,7 @@ export const buildCierreHtml = (caja, { site }) => {
   <div class="line"></div>
   ${fila('Transferencias:', formatMoney(caja.monto_ventas_transferencia))}
   ${fila('Tarjeta:', formatMoney(caja.monto_ventas_tarjeta))}
+  ${resumen ? `<div class="line"></div><div class="bold">Resumen del turno</div>${lineasDelResumen(resumen).map((linea) => `<div class="muted">${escapeHtml(linea.texto)}</div>`).join('')}` : ''}
   ${etiqueta ? `<div class="line"></div>${fila('Resultado:', etiqueta.texto, true)}` : ''}
   ${caja.observaciones ? `<div class="muted">Nota: ${escapeHtml(caja.observaciones)}</div>` : ''}
   <div class="firma">Firma de quien cierra</div>

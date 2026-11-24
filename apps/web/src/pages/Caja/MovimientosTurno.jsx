@@ -4,6 +4,7 @@ import { fetchCajaMovimientos } from '../../api/cajaApi';
 import PaymentBadge from '../../components/PaymentBadge';
 import Skeleton from '../../components/Skeleton';
 import { formatDateTime, formatMoney } from '../../utils/format';
+import DetalleCompraMovimiento from './DetalleCompraMovimiento';
 import DetalleVentaMovimiento from './DetalleVentaMovimiento';
 import { TIPOS_MOVIMIENTO } from './cajaHelpers';
 
@@ -11,7 +12,7 @@ const Monto = ({ movimiento }) => {
   if (movimiento.anulada) {
     return <span className="text-gray-400 line-through">{formatMoney(movimiento.total)}</span>;
   }
-  if (movimiento.tipo === 'gasto' || movimiento.tipo === 'compra') return <span className="font-bold text-red-700">−{formatMoney(movimiento.monto)}</span>;
+  if (movimiento.tipo === 'gasto' || movimiento.tipo === 'compra' || movimiento.tipo === 'devolucion') return <span className="font-bold text-red-700">−{formatMoney(movimiento.monto)}</span>;
   return (
     <span className="font-bold text-emerald-700">
       +{formatMoney(movimiento.monto)}
@@ -24,6 +25,9 @@ const FilaMovimiento = ({ movimiento }) => {
   const [abierta, setAbierta] = useState(false);
   const tipo = TIPOS_MOVIMIENTO[movimiento.tipo] ?? { etiqueta: movimiento.tipo, clase: 'bg-gray-100 text-gray-600' };
   const esVenta = movimiento.tipo === 'venta';
+  const esCompra = movimiento.tipo === 'compra';
+  const tieneDetalle = esVenta || esCompra;
+  const objeto = esVenta ? 'venta' : 'factura';
   return (
     <>
       <tr className={`border-b border-gray-100 ${abierta ? 'bg-gray-50/70' : ''}`}>
@@ -34,12 +38,12 @@ const FilaMovimiento = ({ movimiento }) => {
         <td className="px-3 py-2 text-gray-800">
           {movimiento.descripcion}
           {movimiento.anulada && <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-bold text-red-700">Anulada</span>}
-          {esVenta && (
+          {tieneDetalle && (
             <button
               type="button"
               onClick={() => setAbierta((actual) => !actual)}
               aria-expanded={abierta}
-              aria-label={`${abierta ? 'Ocultar' : 'Ver'} los productos de la venta ${movimiento.id}`}
+              aria-label={`${abierta ? 'Ocultar' : 'Ver'} los productos de la ${objeto} ${movimiento.id}`}
               className="ml-2 inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-xs font-semibold text-rosewood transition hover:bg-rosewood/10"
             >
               {abierta ? <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" /> : <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />}
@@ -52,7 +56,7 @@ const FilaMovimiento = ({ movimiento }) => {
       </tr>
       {abierta && (
         <tr className="border-b border-gray-100 bg-gray-50/70">
-          <td colSpan={5} className="px-3 pb-3 pt-1"><DetalleVentaMovimiento ventaId={movimiento.id} /></td>
+          <td colSpan={5} className="px-3 pb-3 pt-1">{esCompra ? <DetalleCompraMovimiento facturaId={movimiento.id} /> : <DetalleVentaMovimiento ventaId={movimiento.id} />}</td>
         </tr>
       )}
     </>

@@ -13,6 +13,7 @@ TipoMovimiento = Literal[
     "venta",
     "venta_cartera",
     "anulacion_venta",
+    "devolucion_venta",
     "eliminacion_venta",
     "factura_compra",
     "eliminacion_factura",

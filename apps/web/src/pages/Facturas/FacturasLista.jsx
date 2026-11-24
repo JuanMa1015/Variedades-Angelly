@@ -176,7 +176,7 @@ const FacturasLista = ({ facturas, loading, hayFiltros, texto, onTexto, filtros,
                 <div className="mb-1 flex items-center justify-between text-sm"><span className="text-gray-500">Subtotal:</span><span className="text-gray-900">{formatMoney(factura.subtotal)}</span></div>
                 <div className="mb-1 flex items-center justify-between text-sm"><span className="text-gray-500">IVA:</span><span className="text-gray-900">{formatMoney(factura.total_iva)}</span></div>
                 {factura.encomienda ? (
-                  <div className="mb-1 flex items-center justify-between text-sm"><span className="text-gray-500">Encomienda:</span><span className="text-gray-900">{formatMoney(factura.encomienda)}</span></div>
+                  <div className="mb-1 flex items-center justify-between text-sm"><span className="text-gray-500">Encomienda ({factura.encomienda_suma ? 'se suma' : 'se restó'}):</span><span className="text-gray-900">{factura.encomienda_suma ? '+' : '−'}{formatMoney(factura.encomienda)}</span></div>
                 ) : null}
                 <div className="mb-1 flex items-center justify-between text-sm"><span className="text-gray-500">Margen:</span><span className="text-gray-900">{margen(factura)}</span></div>
                 <div className="mb-3 flex items-center justify-between text-sm"><span className="text-gray-500">Total ({factura.items.length} ítems):</span><span className={`font-semibold ${factura.anulada ? 'text-gray-400 line-through' : 'text-gray-900'}`}>{formatMoney(factura.total_factura)}</span></div>
