@@ -409,7 +409,9 @@ def create_venta(
                             detail="Debes seleccionar un cliente de tienda",
                         )
 
-                    cliente_tienda.deuda_total = float(cliente_tienda.deuda_total + (total - abono_inicial))
+                    nueva_deuda = float(cliente_tienda.deuda_total + (total - abono_inicial))
+                    exigir_credito_disponible(cliente_tienda, nueva_deuda)
+                    cliente_tienda.deuda_total = nueva_deuda
                     # Saldo de ESTA venta (no la deuda total del cliente): permite revertirla y calcular caja.
                     saldo_pendiente = float(total - abono_inicial)
 

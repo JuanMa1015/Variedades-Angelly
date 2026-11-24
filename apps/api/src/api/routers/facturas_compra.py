@@ -86,6 +86,7 @@ class FacturaCompraResponse(BaseModel):
     total_factura: float
     numero_factura: str | None = None
     encomienda: float | None = 0.0
+    encomienda_suma: bool = False
     porcentaje_ganancia: float | None = None
     fecha_creacion: datetime
     items: list[FacturaDetalleResponse]
@@ -122,6 +123,7 @@ def _to_factura_response(
         total_factura=factura.total_factura,
         numero_factura=factura.numero_factura,
         encomienda=factura.encomienda,
+        encomienda_suma=bool(factura.encomienda_suma),
         porcentaje_ganancia=factura.porcentaje_ganancia,
         fecha_creacion=factura.fecha_creacion,
         medio_pago=factura.medio_pago,
@@ -261,6 +263,23 @@ def list_facturas_compra_paginadas(
     )
 
 
+@router.get("/api/facturas-compra/{factura_id}", response_model=FacturaCompraResponse)
+def get_factura_compra(
+    factura_id: int,
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_roles("vendedor", "superadmin")),
+) -> FacturaCompraResponse:
+    """Una factura con sus productos (para ver el detalle desde la caja)."""
+    factura = db.get(FacturaCompraModel, factura_id)
+    if factura is None:
+        raise HTTPException(status_code=404, detail="Factura no encontrada")
+    proveedor = db.get(ProveedorModel, factura.proveedor_id)
+    items = db.execute(
+        select(FacturaCompraDetalleModel).where(FacturaCompraDetalleModel.factura_id == factura.id).order_by(FacturaCompraDetalleModel.id),
+    ).scalars().all()
+    return _to_factura_response(factura, proveedor_nombre=proveedor.nombre if proveedor else "Proveedor", items=items)
+
+
 def _validar_numero(db: Session, proveedor_id: int, numero: str | None) -> str | None:
     """Numero limpio, de al menos 3 caracteres, y que no se haya registrado ya para ese proveedor."""
     limpio = (numero or "").strip()
@@ -369,9 +388,10 @@ def create_factura_compra(
         creado_por=current_user.username,
         subtotal=subtotal,
         total_iva=total_iva,
-        total_factura=subtotal + total_iva - (payload.encomienda or 0),
+        total_factura=subtotal + total_iva + (payload.encomienda or 0),  # el envio se paga: suma al total
         numero_factura=numero,
         encomienda=payload.encomienda or None,
+        encomienda_suma=True,
         porcentaje_ganancia=payload.porcentaje_ganancia,
         medio_pago=payload.medio_pago,
     )

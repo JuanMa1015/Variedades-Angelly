@@ -85,7 +85,15 @@ export const resolvePayment = ({ metodoPago, montoPago, total }) => {
   return recibido;
 };
 
-export const validateSale = ({ grouped, productos, ticket, total }) => {
+// Cupo del cliente de tienda (0 = sin limite): cuanto le queda y si lo que se fia lo pasa.
+export const cupoDisponible = (cliente, aFiar) => {
+  const limite = Number(cliente?.limite_credito) || 0;
+  if (limite <= 0) return { tieneCupo: false, supera: false, disponible: null, limite: 0 };
+  const disponible = Math.max(0, limite - (Number(cliente?.deuda_total) || 0));
+  return { tieneCupo: true, supera: Number(aFiar) > disponible + 1e-9, disponible, limite };
+};
+
+export const validateSale = ({ grouped, productos, ticket, total, clienteTienda = null }) => {
   if (grouped.size === 0) return 'Debes agregar al menos un producto válido a la venta';
 
   const stockError = findStockError(grouped, productos);
@@ -96,6 +104,8 @@ export const validateSale = ({ grouped, productos, ticket, total }) => {
     if (!ticket.clienteTiendaId) return 'Selecciona el cliente al que se le fía';
     if (!Number.isFinite(abono) || abono < 0) return 'El abono inicial debe ser un valor válido';
     if (abono > total) return 'El abono inicial no puede superar el total de la venta';
+    const cupo = cupoDisponible(clienteTienda, total - abono);
+    if (cupo.supera) return `La venta supera el cupo de ${clienteTienda.nombre}: tiene ${cupo.disponible} disponibles`;
     return null;
   }
 

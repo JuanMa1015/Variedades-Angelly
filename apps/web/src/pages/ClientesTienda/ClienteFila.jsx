@@ -67,6 +67,11 @@ const ClienteFila = ({ cliente, onReactivar, ...acciones }) => {
         <div className="min-w-0">
           <p className="truncate text-base font-bold text-gray-900">{cliente.nombre}</p>
           <p className="text-sm text-gray-500">{telefono || 'Sin WhatsApp'}</p>
+          {Number(cliente.limite_credito) > 0 && (
+            <p className={`text-xs font-semibold ${Number(cliente.deuda_total) > Number(cliente.limite_credito) ? 'text-red-700' : 'text-gray-600'}`}>
+              Cupo {formatMoney(cliente.limite_credito)} · {Number(cliente.deuda_total) > Number(cliente.limite_credito) ? 'pasó el cupo' : `disponible ${formatMoney(Math.max(0, Number(cliente.limite_credito) - Number(cliente.deuda_total)))}`}
+            </p>
+          )}
         </div>
         <div className="text-right">
           <p className={`text-xl font-black tabular-nums ${cliente.deuda_total > 0 ? 'text-gray-900' : 'text-gray-400'}`}>{formatMoney(cliente.deuda_total)}</p>

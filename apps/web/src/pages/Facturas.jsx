@@ -208,7 +208,7 @@ const Facturas = () => {
     return {
       subtotal,
       totalIva,
-      totalFactura: subtotal + totalIva - enf,
+      totalFactura: subtotal + totalIva + enf,
       encomienda: enf,
       totalGanancia,
     };
@@ -444,7 +444,7 @@ const Facturas = () => {
             </div>
 
             <div>
-              <label htmlFor="factura-encomienda" className={ETIQUETA} title="Se resta del total de la factura">Encomienda (−)</label>
+              <label htmlFor="factura-encomienda" className={ETIQUETA} title="Es el costo del envío: se suma al total de la factura">Encomienda (+)</label>
               <MoneyInput id="factura-encomienda" label="Encomienda" value={encomienda} onChange={setEncomienda} placeholder="0" />
             </div>
           </div>
@@ -643,7 +643,7 @@ const Facturas = () => {
           <div className="grid grid-cols-1 gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm md:grid-cols-5">
             <p>Subtotal: <span className="font-semibold">{formatMoney(resumen.subtotal)}</span></p>
             <p>IVA: <span className="font-semibold">{formatMoney(resumen.totalIva)}</span></p>
-            <p>Encomienda (se resta): <span className="font-semibold text-red-600">-{formatMoney(resumen.encomienda)}</span></p>
+            <p>Encomienda (se suma): <span className="font-semibold text-gray-900">+{formatMoney(resumen.encomienda)}</span></p>
             <p>Total factura: <span className="font-semibold text-gray-900">{formatMoney(resumen.totalFactura)}</span></p>
             <p>Ganancia estimada: <span className="font-semibold text-emerald-700">{formatMoney(resumen.totalGanancia)}</span></p>
           </div>
@@ -770,9 +770,9 @@ const Facturas = () => {
                 <span>{formatMoney(selectedPrintFactura.total_iva || 0)}</span>
               </div>
               {selectedPrintFactura.encomienda ? (
-                <div className="flex justify-between text-red-600">
+                <div className={`flex justify-between ${selectedPrintFactura.encomienda_suma ? '' : 'text-red-600'}`}>
                   <span>Encomienda:</span>
-                  <span>-{formatMoney(selectedPrintFactura.encomienda)}</span>
+                  <span>{selectedPrintFactura.encomienda_suma ? '+' : '-'}{formatMoney(selectedPrintFactura.encomienda)}</span>
                 </div>
               ) : null}
             </div>

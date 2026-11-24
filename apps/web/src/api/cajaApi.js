@@ -25,6 +25,11 @@ export const fetchCajaMovimientos = (cajaId, { signal } = {}) => {
   return apiGet(`/api/caja/${cajaId}/movimientos`, { signal, skipCache: true });
 };
 
+// Cifras del turno: ventas, anuladas, descuentos, devoluciones, abonos, gastos y compras.
+export const fetchCajaResumen = (cajaId, { signal } = {}) => {
+  return apiGet(`/api/caja/${cajaId}/resumen`, { signal, skipCache: true });
+};
+
 export const updateCaja = (cajaId, payload) => {
   return apiPatch(`/api/caja/${cajaId}`, payload);
 };

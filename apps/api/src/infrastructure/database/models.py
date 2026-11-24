@@ -111,6 +111,8 @@ class ClienteFiadoTiendaModel(Base):
     nombre: Mapped[str] = mapped_column(String(120), nullable=False)
     telefono_whatsapp: Mapped[str | None] = mapped_column(String(25), nullable=True)
     deuda_total: Mapped[float] = mapped_column(_dinero(), nullable=False, default=0.0)
+    # Tope de deuda de este cliente; 0 = sin limite.
+    limite_credito: Mapped[float] = mapped_column(_dinero(), nullable=False, default=0.0, server_default="0")
     activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     def __repr__(self) -> str:
@@ -346,6 +348,8 @@ class FacturaCompraModel(Base):
     total_factura: Mapped[float] = mapped_column(_dinero(), nullable=False)
     numero_factura: Mapped[str | None] = mapped_column(String(20), nullable=True)
     encomienda: Mapped[float | None] = mapped_column(_dinero(), nullable=True, default=0.0)
+    # Las facturas nuevas SUMAN la encomienda (envio) al total; las anteriores la restaban y conservan su total.
+    encomienda_suma: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=expression.false())
     porcentaje_ganancia: Mapped[float | None] = mapped_column(Float, nullable=True, default=0.70)
     # Como se pago la compra. NULL = sin dato (facturas viejas): no toca la caja. Solo el efectivo sale del cajon.
     medio_pago: Mapped[str | None] = mapped_column(String(20), nullable=True)

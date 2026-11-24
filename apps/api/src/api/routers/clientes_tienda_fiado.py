@@ -27,6 +27,7 @@ class ClienteFiadoTiendaResponse(BaseModel):
     nombre: str
     telefono_whatsapp: str | None
     deuda_total: float = 0.0
+    limite_credito: float = 0.0  # 0 = sin limite
 
 
 class ClienteFiadoTiendaCreateRequest(BaseModel):
@@ -34,6 +35,8 @@ class ClienteFiadoTiendaCreateRequest(BaseModel):
 
     nombre: Annotated[str, Field(min_length=3, max_length=120)]
     telefono_whatsapp: Annotated[str | None, Field(max_length=25)] = None
+    # Cuanto puede deber como maximo; 0 = sin limite.
+    limite_credito: Annotated[float, Field(ge=0, le=1_000_000_000)] = 0.0
     # Otra persona con el mismo nombre (homonimo): se registra solo si quien atiende lo confirma.
     confirmar_homonimo: bool = False
 
@@ -44,6 +47,7 @@ class ClienteFiadoTiendaUpdateRequest(BaseModel):
     nombre: Annotated[str | None, Field(min_length=3, max_length=120)] = None
     telefono_whatsapp: Annotated[str | None, Field(max_length=25)] = None
     deuda_total: Annotated[float | None, Field(ge=0)] = None
+    limite_credito: Annotated[float | None, Field(ge=0, le=1_000_000_000)] = None
     # Ajustar la deuda a mano es un movimiento de dinero: exige un motivo y queda en la auditoria.
     motivo_ajuste: Annotated[str | None, Field(min_length=3, max_length=200)] = None
     confirmar_homonimo: bool = False
@@ -129,6 +133,7 @@ def list_clientes_fiado_tienda(
             nombre=cliente.nombre,
             telefono_whatsapp=cliente.telefono_whatsapp,
             deuda_total=cliente.deuda_total,
+            limite_credito=cliente.limite_credito or 0.0,
         )
         for cliente in clientes
     ]
@@ -146,10 +151,13 @@ def create_cliente_fiado_tienda(
     if conflicto is not None:
         return conflicto
 
-    cliente = ClienteFiadoTiendaModel(nombre=nombre, telefono_whatsapp=telefono)
+    cliente = ClienteFiadoTiendaModel(nombre=nombre, telefono_whatsapp=telefono, limite_credito=payload.limite_credito)
     db.add(cliente)
     db.flush()
-    _auditar(db, current_user.username, "crear", cliente, f"WhatsApp {cliente.telefono_whatsapp or 'sin numero'}")
+    _auditar(
+        db, current_user.username, "crear", cliente,
+        f"WhatsApp {cliente.telefono_whatsapp or 'sin numero'}; cupo {float(payload.limite_credito) or 'sin limite'}",
+    )
     db.commit()
     db.refresh(cliente)
 
@@ -158,6 +166,7 @@ def create_cliente_fiado_tienda(
         nombre=cliente.nombre,
         telefono_whatsapp=cliente.telefono_whatsapp,
         deuda_total=cliente.deuda_total,
+        limite_credito=cliente.limite_credito or 0.0,
     )
 
 
@@ -198,6 +207,10 @@ def update_cliente_fiado_tienda(
             cambios.append(f"WhatsApp {cliente.telefono_whatsapp or 'vacio'} -> {telefono or 'vacio'}")
         cliente.telefono_whatsapp = telefono
 
+    if payload.limite_credito is not None and round(float(payload.limite_credito), 2) != round(float(cliente.limite_credito or 0), 2):
+        cambios.append(f"cupo {float(cliente.limite_credito or 0) or 'sin limite'} -> {float(payload.limite_credito) or 'sin limite'}")
+        cliente.limite_credito = float(payload.limite_credito)
+
     if payload.deuda_total is not None and round(float(payload.deuda_total), 2) != round(float(cliente.deuda_total), 2):
         motivo = (payload.motivo_ajuste or "").strip()
         if not motivo:
@@ -215,6 +228,7 @@ def update_cliente_fiado_tienda(
         nombre=cliente.nombre,
         telefono_whatsapp=cliente.telefono_whatsapp,
         deuda_total=cliente.deuda_total,
+        limite_credito=cliente.limite_credito or 0.0,
     )
 
 

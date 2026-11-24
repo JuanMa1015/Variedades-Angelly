@@ -1,10 +1,11 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const api = vi.hoisted(() => ({ fetchCajaMovimientos: vi.fn(), fetchVenta: vi.fn(), printHtml: vi.fn() }));
+const api = vi.hoisted(() => ({ fetchCajaMovimientos: vi.fn(), fetchVenta: vi.fn(), fetchFactura: vi.fn(), printHtml: vi.fn() }));
 
 vi.mock('../../../api/cajaApi', () => ({ fetchCajaMovimientos: api.fetchCajaMovimientos }));
 vi.mock('../../../api/ventasApi', () => ({ fetchVenta: api.fetchVenta }));
+vi.mock('../../../api/facturasApi', () => ({ fetchFactura: api.fetchFactura }));
 vi.mock('../../Ventas/printReceipt', () => ({ printHtml: api.printHtml }));
 
 import MovimientosTurno from '../MovimientosTurno';
@@ -27,6 +28,7 @@ describe('MovimientosTurno: detalle de cada venta', () => {
   beforeEach(() => {
     api.fetchCajaMovimientos.mockReset().mockResolvedValue(MOVIMIENTOS);
     api.fetchVenta.mockReset().mockResolvedValue(VENTA);
+    api.fetchFactura.mockReset();
     api.printHtml.mockReset();
   });
 
@@ -90,6 +92,29 @@ describe('MovimientosTurno: detalle de cada venta', () => {
 
     expect(await screen.findByText('1 devuelto')).toBeInTheDocument();
     expect(screen.getByText(/En mal estado.*lo hizo vendedor1, autorizó angelly_admin/)).toBeInTheDocument();
+  });
+
+  it('las compras también se abren: muestran los productos, el envío y el total de la factura', async () => {
+    api.fetchCajaMovimientos.mockResolvedValue([
+      { tipo: 'compra', id: 5, fecha: '2026-03-10T16:30:00', descripcion: 'Factura #5 · Distribuidora', metodo_pago: 'efectivo', monto: 7000, total: 7000, es_fiado: false, anulada: false },
+    ]);
+    api.fetchFactura.mockResolvedValue({
+      id: 5, proveedor_nombre: 'Distribuidora', medio_pago: 'efectivo', subtotal: 5000, total_iva: 0, encomienda: 2000, encomienda_suma: true,
+      total_factura: 7000, numero_factura: 'FV-2026', creado_por: 'vendedor1', anulada: false,
+      items: [{ producto_id: 1, nombre_producto: 'Arroz Diana', cantidad: 5, aplica_iva: false, precio_unitario: 1000, precio_total: 5000 }],
+    });
+    render(<MovimientosTurno cajaId={1} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver los productos de la factura 5' }));
+
+    expect(await screen.findByText('Arroz Diana')).toBeInTheDocument();
+    expect(api.fetchFactura).toHaveBeenCalledWith(5, expect.anything());
+    const detalle = screen.getByText('Arroz Diana').closest('div');
+    expect(within(detalle).getByText('Distribuidora')).toBeInTheDocument();
+    expect(within(detalle).getByText(/Encomienda \(se suma\)/)).toBeInTheDocument();
+    expect(within(detalle).getByText(/^\+.*2\.000/)).toBeInTheDocument();
+    expect(within(detalle).getByText('FV-2026')).toBeInTheDocument();
+    expect(api.fetchVenta).not.toHaveBeenCalled();
   });
 
   it('si el detalle falla lo dice en la misma fila', async () => {
