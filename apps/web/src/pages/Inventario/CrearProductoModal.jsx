@@ -5,6 +5,7 @@ import { resolveImageUrl } from '../../api/imagesApi';
 import { ajustarStock, buscarPorCodigo } from '../../api/inventarioApi';
 import Modal from '../../components/Modal';
 import { formatMoney } from '../../utils/format';
+import { PIE_FIJO } from '../../components/modalClasses';
 import MoneyInput from '../Ventas/MoneyInput';
 import { Margen } from './EditarProductoModal';
 import ImagenCampo from './ImagenCampo';
@@ -15,8 +16,9 @@ const LABEL = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-gra
 
 const VACIO = { nombre: '', codigo_barras: '', precio_costo: 0, precio_venta: 0, stock_actual: '', stock_minimo: '', proveedor_id: '' };
 
-const Campo = ({ id, etiqueta, children }) => (
-  <div>
+// `completo`: en el celular ocupa las dos columnas (los campos cortos van de a dos).
+const Campo = ({ id, etiqueta, completo = false, children }) => (
+  <div className={completo ? 'col-span-2 sm:col-span-1' : ''}>
     <label htmlFor={id} className={LABEL}>{etiqueta}</label>
     {children}
   </div>
@@ -37,7 +39,7 @@ const Precios = ({ form, campo }) => (
     <Campo id="nuevo-venta" etiqueta="Precio de venta">
       <MoneyInput id="nuevo-venta" label="Precio de venta" value={form.precio_venta} onChange={campo('precio_venta')} placeholder="Ej: 5.000" />
     </Campo>
-    <div className="sm:col-span-2"><Margen costo={form.precio_costo} venta={form.precio_venta} /></div>
+    <div className="col-span-2"><Margen costo={form.precio_costo} venta={form.precio_venta} /></div>
   </>
 );
 
@@ -85,12 +87,12 @@ const FormularioManual = ({ proveedores, confirmar, onCreated, catalogo = 'tiend
   };
 
   return (
-    <form className="grid grid-cols-1 gap-3 sm:grid-cols-2" onSubmit={handleSubmit}>
-      {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 sm:col-span-2">{error}</p>}
-      <Campo id="nuevo-nombre" etiqueta="Nombre">
+    <form className="grid grid-cols-2 gap-3" onSubmit={handleSubmit}>
+      {error && <p role="alert" className="col-span-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+      <Campo id="nuevo-nombre" etiqueta="Nombre" completo>
         <input id="nuevo-nombre" type="text" value={form.nombre} onChange={(e) => campo('nombre')(e.target.value)} maxLength={120} placeholder="Ej: Arroz Diana 500g" className={INPUT} />
       </Campo>
-      <Campo id="nuevo-codigo" etiqueta="Código de barras">
+      <Campo id="nuevo-codigo" etiqueta="Código de barras" completo>
         <input id="nuevo-codigo" type="text" value={form.codigo_barras} onChange={(e) => campo('codigo_barras')(e.target.value)} maxLength={64} placeholder="Opcional" className={INPUT} />
       </Campo>
       <Precios form={form} campo={campo} />
@@ -103,15 +105,17 @@ const FormularioManual = ({ proveedores, confirmar, onCreated, catalogo = 'tiend
         <input id="nuevo-minimo" type="number" min="0" value={form.stock_minimo} onChange={(e) => campo('stock_minimo')(e.target.value)} placeholder="Ej: 5" className={INPUT} />
       </Campo>
       {proveedores && (
-        <Campo id="nuevo-proveedor" etiqueta="Proveedor">
+        <Campo id="nuevo-proveedor" etiqueta="Proveedor" completo>
           <SelectProveedor id="nuevo-proveedor" value={form.proveedor_id} onChange={campo('proveedor_id')} proveedores={proveedores} />
         </Campo>
       )}
-      <div className="sm:col-span-2"><ImagenCampo valor={imagen} onChange={setImagen} /></div>
-      <button type="submit" disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-lg bg-rosewood px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300 sm:col-span-2">
-        <Plus className="h-4 w-4" aria-hidden="true" />
-        {saving ? 'Guardando...' : 'Agregar producto'}
-      </button>
+      <div className="col-span-2"><ImagenCampo valor={imagen} onChange={setImagen} /></div>
+      <div className={`col-span-2 ${PIE_FIJO}`}>
+        <button type="submit" disabled={saving} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-rosewood px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300">
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          {saving ? 'Guardando...' : 'Agregar producto'}
+        </button>
+      </div>
     </form>
   );
 };
@@ -168,29 +172,31 @@ const FormularioCodigo = ({ proveedores, confirmar, onCreated, catalogo = 'tiend
   };
 
   return (
-    <form className="grid grid-cols-1 gap-3 sm:grid-cols-2" onSubmit={handleSubmit}>
-      {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 sm:col-span-2">{error}</p>}
-      <p className="text-sm text-gray-600 sm:col-span-2">Escanea el código: si el producto ya existe se le suman las unidades; si no, se crea con los datos que escribas.</p>
-      <Campo id="cod-codigo" etiqueta="Código de barras">
+    <form className="grid grid-cols-2 gap-3" onSubmit={handleSubmit}>
+      {error && <p role="alert" className="col-span-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+      <p className="col-span-2 text-sm text-gray-600">Escanea el código: si el producto ya existe se le suman las unidades; si no, se crea con los datos que escribas.</p>
+      <Campo id="cod-codigo" etiqueta="Código de barras" completo>
         <input id="cod-codigo" type="text" value={form.codigo_barras} onChange={(e) => campo('codigo_barras')(e.target.value)} placeholder="Escanear código de barras" className={INPUT} />
       </Campo>
       <Campo id="cod-cantidad" etiqueta="Cantidad a ingresar">
         <input id="cod-cantidad" type="number" min="1" value={form.stock_actual} onChange={(e) => campo('stock_actual')(e.target.value)} placeholder="Ej: 6" className={INPUT} />
       </Campo>
-      <Campo id="cod-nombre" etiqueta="Nombre (solo si es nuevo)">
+      <Campo id="cod-nombre" etiqueta="Nombre (solo si es nuevo)" completo>
         <input id="cod-nombre" type="text" value={form.nombre} onChange={(e) => campo('nombre')(e.target.value)} maxLength={120} className={INPUT} />
       </Campo>
       {proveedores && (
-        <Campo id="cod-proveedor" etiqueta="Proveedor">
+        <Campo id="cod-proveedor" etiqueta="Proveedor" completo>
           <SelectProveedor id="cod-proveedor" value={form.proveedor_id} onChange={campo('proveedor_id')} proveedores={proveedores} />
         </Campo>
       )}
       <Precios form={form} campo={campo} />
-      <div className="sm:col-span-2"><ImagenCampo valor={imagen} onChange={setImagen} /></div>
-      <button type="submit" disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300 sm:col-span-2">
-        <Barcode className="h-4 w-4" aria-hidden="true" />
-        {saving ? 'Procesando...' : 'Procesar código'}
-      </button>
+      <div className="col-span-2"><ImagenCampo valor={imagen} onChange={setImagen} /></div>
+      <div className={`col-span-2 ${PIE_FIJO}`}>
+        <button type="submit" disabled={saving} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300">
+          <Barcode className="h-4 w-4" aria-hidden="true" />
+          {saving ? 'Procesando...' : 'Procesar código'}
+        </button>
+      </div>
     </form>
   );
 };
